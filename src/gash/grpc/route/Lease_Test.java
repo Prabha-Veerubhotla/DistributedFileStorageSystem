@@ -16,7 +16,7 @@ public class Lease_Test {
                     // here we code the action on a change
                     System.out.println("File " + file.getName() + " have change !");
                     try {
-                        Process p = new ProcessBuilder("home/vinod/cmpe275/labs/untitled/src-dhcp-ip-list/fetch_ip.sh\"").start();
+                        Process p = new ProcessBuilder("home/vinod/cmpe275/labs/untitled/src-dhcp-ip-list/fetch_ip.sh").start();
                         BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
                         String line1 = null;
                         System.out.println("Printing all the ips1: ");
