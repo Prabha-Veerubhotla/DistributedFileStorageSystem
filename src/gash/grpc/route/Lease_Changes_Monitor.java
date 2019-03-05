@@ -6,13 +6,14 @@ import java.io.*;
 
 public abstract class Lease_Changes_Monitor extends TimerTask {
 
-    List<String> ipList = new ArrayList<>();
+
     private long timeStamp;
     private File file;
 
-    public Lease_Changes_Monitor( File file ) {
+    public Lease_Changes_Monitor( File file) {
         this.file = file;
         this.timeStamp = file.lastModified();
+
     }
 
     public final void run() {

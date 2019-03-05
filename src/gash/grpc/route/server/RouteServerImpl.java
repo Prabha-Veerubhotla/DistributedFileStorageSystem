@@ -80,7 +80,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		Thread thread = new Thread(){
 			public void run(){
 				System.out.println("DHCP Lease Monitor Thread Running");
-					Lease_Test.monitorLease();
+					new Lease_Test().monitorLease();
 			}
 		};
 		thread.start();
