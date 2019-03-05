@@ -4,9 +4,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
-
+import java.lang.*;
 import com.google.protobuf.ByteString;
 
+import gash.grpc.route.Lease_Test;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -75,12 +76,25 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		}
 	}
 
+	private void invokeBackGroundThread() {
+		Thread thread = new Thread(){
+			public void run(){
+				System.out.println("DHCP Lease Monitor Thread Running");
+					Lease_Test.monitorLease();
+			}
+		};
+		thread.start();
+	}
+
 	private void start() throws Exception {
 		svr = ServerBuilder.forPort(RouteServer.getInstance().getServerPort()).addService(new RouteServerImpl())
 				.build();
 
 		System.out.println("-- starting server");
 		svr.start();
+		invokeBackGroundThread();
+
+
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
