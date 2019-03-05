@@ -29,29 +29,9 @@ public class Lease_Test {
                 set.add(s);
             }
 
-
-
             String server_id = null;
             String  server_port = null;
-            String ip = "localhost";
-            ManagedChannel ch = ManagedChannelBuilder.forAddress(ip,Integer.parseInt(server_port) ).usePlaintext(true).build();
-            RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
-            try {
-                Properties prop = new Properties();
-                String propFileName = "../../../../conf/server.conf";
-                InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
-                if (inputStream != null) {
-                    prop.load(inputStream);
-                } else {
-                    throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
-                }
 
-                server_id = prop.getProperty("server.id");
-                server_port = prop.getProperty("server.port");
-
-            } catch (IOException ie) {
-                System.out.println("io exception");
-            }
 
             StringBuffer sb = new StringBuffer();
             for(String s2 : newIpList) {
@@ -59,6 +39,25 @@ public class Lease_Test {
             }
 
             for(String s1: newIpList) {
+                String ip = "s1";
+                ManagedChannel ch = ManagedChannelBuilder.forAddress(ip,Integer.parseInt(server_port) ).usePlaintext(true).build();
+                RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
+                try {
+                    Properties prop = new Properties();
+                    String propFileName = "../../../../conf/server.conf";
+                    InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
+                    if (inputStream != null) {
+                        prop.load(inputStream);
+                    } else {
+                        throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
+                    }
+
+                    server_id = prop.getProperty("server.id");
+                    server_port = prop.getProperty("server.port");
+
+                } catch (IOException ie) {
+                    System.out.println("io exception");
+                }
                 if(!set.contains(s1)) {
                     // send hello to new node , if new node is added
                     Route.Builder bld = Route.newBuilder();
