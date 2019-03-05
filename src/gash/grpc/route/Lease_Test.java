@@ -24,42 +24,56 @@ public class Lease_Test {
         }
 
         public  void compareAndUpdate(List<String> newIpList) {
+            System.out.println("comparing and updating");
             Set<String> set = new HashSet<>();
             for(String s: oldIpList) {
                 set.add(s);
             }
 
-            String server_id = null;
-            String  server_port = null;
+            String server_id = "1234";
+            String  server_port = "2345";
 
 
             StringBuffer sb = new StringBuffer();
             for(String s2 : newIpList) {
              sb.append(s2+",");
             }
+            System.out.println("all new ips"+sb.toString());
 
             for(String s1: newIpList) {
-                String ip = "s1";
-                ManagedChannel ch = ManagedChannelBuilder.forAddress(ip,Integer.parseInt(server_port) ).usePlaintext(true).build();
+                String ip = s1;
+                System.out.println("server ip now"+s1);
+//                try {
+//                    Properties prop = new Properties();
+//                    String propFileName = "../../../../../conf/server.conf";
+//                    System.out.println("prop file name "+propFileName);
+//                    InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
+//                    if (inputStream != null) {
+//                        prop.load(inputStream);
+//                    } else {
+//                        throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
+//                    }
+//                    System.out.println("properties "+prop);
+//
+//                    server_id = prop.getProperty("server.id");
+//                    server_port = prop.getProperty("server.port");
+//
+//                } catch (IOException ie) {
+//
+//
+//                System.out.println("io exception");
+//                }
+
+                System.out.println("server port: "+server_port);
+
+                System.out.println("server id: "+server_id);
+                System.out.println("ip is"+ip);
+
+                ManagedChannel ch = ManagedChannelBuilder.forAddress(ip,Integer.parseInt(server_port.trim()) ).usePlaintext(true).build();
                 RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
-                try {
-                    Properties prop = new Properties();
-                    String propFileName = "../../../../conf/server.conf";
-                    InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
-                    if (inputStream != null) {
-                        prop.load(inputStream);
-                    } else {
-                        throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
-                    }
-
-                    server_id = prop.getProperty("server.id");
-                    server_port = prop.getProperty("server.port");
-
-                } catch (IOException ie) {
-                    System.out.println("io exception");
-                }
                 if(!set.contains(s1)) {
                     // send hello to new node , if new node is added
+                    System.out.println("sending hello to new node: "+s1);
                     Route.Builder bld = Route.newBuilder();
                     bld.setId(1);
                     bld.setOrigin(Integer.parseInt(server_id));
@@ -75,6 +89,7 @@ public class Lease_Test {
                            System.out.println("reply: " + r.getId() + ", from: " + r.getOrigin() + ", payload: " + payload);
              }
                 // update all the nodes with current ips in the network ( if new node | one node is removed)
+                System.out.println("sending current ip updates to all nodes");
                 Route.Builder bld1 = Route.newBuilder();
                 bld1.setId(1);
                 bld1.setOrigin(Integer.parseInt(server_id));
@@ -96,12 +111,13 @@ public class Lease_Test {
                     // here we code the action on a change
                     System.out.println("File " + file.getName() + " have change !");
                     try {
-                        Process p = new ProcessBuilder("/home/vinod/cmpe275/Labs/275-project1-demo1/fetch_ip.sh").start();
+                        Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                         BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
                         List<String> newIpList = new ArrayList<>();
                         String output = null;
                         while((output = reader1.readLine())!= null) {
+                            System.out.println("ip"+output);
                             newIpList.add(output);
                         }
 
@@ -109,6 +125,7 @@ public class Lease_Test {
                         copyList(newIpList);
 
                     } catch (IOException io) {
+                        System.out.println(io.getMessage());
                         System.out.println("io exception");
                     }
 
