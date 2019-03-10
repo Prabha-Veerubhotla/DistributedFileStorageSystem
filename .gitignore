@@ -1,0 +1,7 @@
+generated/
+src/gash/*
+classes/
+gash/*
+.idea/*
+data/
+main/*
