@@ -71,7 +71,7 @@ public class MongoDBHandler implements DbHandler {
             }
         } catch (Exception ex) {
         }
-        return userEmail;
+        return file.getFileName();
     }
 
     @Override

@@ -7,7 +7,9 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 
@@ -16,10 +18,6 @@ public class RedisHandler implements DbHandler {
     public static JedisPool redisPool;
     public static final int MAX_POOL_SIZE = 10;
     public static final String HOST_NAME = "localhost";
-
-    public Jedis getRedisConnector() {
-        return redisConnector;
-    }
 
     public synchronized Jedis getPoolConnection() {
         logger.info("Setting Redis Pool");
@@ -32,9 +30,10 @@ public class RedisHandler implements DbHandler {
     }
 
     /**
-     * Constructor to initialize Jedis instance
+     * Method to initialize Jedis instance
      */
-    public RedisHandler() {
+    @Override
+    public void initDatabaseHandler() throws Exception {
         logger.info("Getting pool connection");
         redisConnector = getPoolConnection();
     }
@@ -63,11 +62,9 @@ public class RedisHandler implements DbHandler {
         Object out = null;
         try {
             ObjectInputStream oin = new ObjectInputStream(bin);
-            try {
-                out = oin.readObject();
-            } catch (ClassNotFoundException ex) {
-            }
-        } catch (IOException ex) {
+            out = oin.readObject();
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
         return out;
     }
@@ -101,8 +98,9 @@ public class RedisHandler implements DbHandler {
                 logger.info("Success " + userEmail);
             }
         } catch (Exception ex) {
+            ex.printStackTrace();
         }
-        return userEmail;
+        return file.getFileName();
     }
 
     /**
@@ -113,13 +111,13 @@ public class RedisHandler implements DbHandler {
         byte[] userEmailByte = serialize(email);
         if (redisConnector.exists(userEmailByte)) {
             byte[] userData = redisConnector.get(userEmailByte);
-            logger.info("Deserializing user data map");
+            logger.info("Deserializing user data map " + userData);
             Map<String, FileEntity> map = (Map<String, FileEntity>) deserialize(userData);
             return map;
-        } else {
-            logger.warning("User email not present");
-            return null;
         }
+        logger.info("User email not present");
+        return null;
+
     }
 
     /**
@@ -140,6 +138,10 @@ public class RedisHandler implements DbHandler {
     @Override
     public FileEntity get(@NotNull String email, @NotNull String fileName) {
         Map<String, FileEntity> tempMap = getFilesMap(email);
+        if(tempMap == null || tempMap.isEmpty() || !tempMap.containsKey(fileName)){
+            return null;
+        }
+
         logger.info("Deserialized map " + tempMap.get(fileName));
         return tempMap.get(fileName);
     }
@@ -153,23 +155,25 @@ public class RedisHandler implements DbHandler {
     @Override
     public void remove(@NotNull String email, @NotNull String fileName){
         Map<String, FileEntity> tempMap = getFilesMap(email);
-        FileEntity removedFile = tempMap.remove(fileName);
+        Iterator<Map.Entry<String, FileEntity>> itr = tempMap.entrySet().iterator();
+        while(itr.hasNext()){
+            Map.Entry<String, FileEntity> entry = itr.next();
+            if(fileName.equals(entry.getKey())){
+                logger.info("Removing file ");
+                itr.remove();
+                break;
+            }
+        }
         redisConnector.set(serialize(email), serialize(tempMap));
-        if(removedFile != null){
-            logger.info("Removed file " + fileName);
-        }
-        else{
-            logger.warning("File does not exist!");
-        }
     }
 
     @Override
     public FileEntity update(String email, FileEntity newFile) {
-        return null;
-    }
-
-    @Override
-    public void initDatabaseHandler() throws Exception {
-
+        Map<String, FileEntity> tempMap = getFilesMap(email);
+        if(tempMap.containsKey(newFile.getFileName())){
+            tempMap.put(newFile.getFileName(), newFile);
+            redisConnector.set(serialize(email), serialize(tempMap));
+        }
+        return newFile;
     }
 }
