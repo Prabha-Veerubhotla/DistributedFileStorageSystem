@@ -2,8 +2,6 @@ package main.db;
 
 import com.sun.istack.internal.NotNull;
 import main.entities.FileEntity;
-
-import java.util.Map;
 import java.util.logging.Logger;
 
 public interface DbHandler {
