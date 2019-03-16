@@ -1,4 +1,4 @@
-package gash.grpc.route.server;
+package grpc.route.server;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -6,8 +6,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.lang.*;
 import com.google.protobuf.ByteString;
+import lease.Dhcp_Lease_Test;
 
-import gash.grpc.route.Lease_Test;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -80,7 +80,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		Thread thread = new Thread(){
 			public void run(){
 				System.out.println("DHCP Lease Monitor Thread Running");
-					new Lease_Test().monitorLease();
+					new Dhcp_Lease_Test().monitorLease();
 			}
 		};
 		thread.start();

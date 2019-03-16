@@ -13,11 +13,8 @@ export SVR_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo "** starting server from ${SVR_HOME} **"
 
 echo server home = $SVR_HOME
-#exit
 
-#cd ${SVR_HOME}
-
-JAVA_MAIN=' gash.grpc.route.server.RouteServerImpl'
+JAVA_MAIN='grpc.route.server.RouteServerImpl'
 JAVA_ARGS="$1"
 echo -e "\n** config: ${JAVA_ARGS} **\n"
 
