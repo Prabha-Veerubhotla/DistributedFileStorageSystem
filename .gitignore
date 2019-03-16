@@ -1,6 +1,6 @@
 generated/
 src/gash/*
-classes/
+classes/*
 gash/*
 .idea/*
 data/
