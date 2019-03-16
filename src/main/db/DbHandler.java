@@ -1,6 +1,6 @@
 package main.db;
 
-import com.sun.istack.internal.NotNull;
+import com.sun.istack.NotNull;
 import main.entities.FileEntity;
 import java.util.logging.Logger;
 

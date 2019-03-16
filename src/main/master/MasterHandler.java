@@ -25,8 +25,8 @@ public class MasterHandler {
 
     }
 
-    public static void main(String[] args){
-        MasterHandler m = new MasterHandler();
-        m.fileHandler("CREATE FILE", "Test.txt", "/Users/nrupa/Desktop/WhatsApp Image 2019-03-06 at 8.50.09 AM.jpeg", "test@gmail.com");
-    }
+//    public static void main(String[] args){
+//        MasterHandler m = new MasterHandler();
+//        m.fileHandler("CREATE FILE", "Test.txt", "/Users/nrupa/Desktop/WhatsApp Image 2019-03-06 at 8.50.09 AM.jpeg", "test@gmail.com");
+//    }
 }

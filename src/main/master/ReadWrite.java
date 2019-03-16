@@ -9,6 +9,12 @@ import java.util.List;
 public class ReadWrite {
     public static final int TOTALPARTITIONS = 3;
 
+    /**
+     * Divides file into 3 partitions of byte array
+     * @param fileName
+     * @param filePath
+     * @return List of 3 byte array
+     */
     public List<byte[]> convertFileToByteArray(String fileName, String filePath){
         List<byte[]> ans = new ArrayList<>();
         try {
@@ -17,8 +23,8 @@ public class ReadWrite {
             f.readFully(b);
             f.close();
             int chunk = (int) b.length / TOTALPARTITIONS;
-            ans.add(Arrays.copyOfRange(b, 0, chunk - 1));
-            ans.add(Arrays.copyOfRange(b, chunk , 2*chunk - 1));
+            ans.add(Arrays.copyOfRange(b, 0, chunk));
+            ans.add(Arrays.copyOfRange(b, chunk , 2*chunk));
             ans.add(Arrays.copyOfRange(b, 2*chunk, b.length));
             return ans;
         } catch (Exception e) {
@@ -27,6 +33,11 @@ public class ReadWrite {
         return null;
     }
 
+    /**
+     * Merges list of 3 byte arrays to give back file
+     * @param fileName
+     * @param allbytes
+     */
     public void convertByteArrayToFile(String fileName, List<byte[]> allbytes){
         byte[] allData = new byte[allbytes.get(0).length + allbytes.get(1).length + allbytes.get(2).length];
         int k = 0;

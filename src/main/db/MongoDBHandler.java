@@ -6,7 +6,7 @@ import com.mongodb.MongoClient;
 import com.mongodb.WriteResult;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.result.UpdateResult;
-import com.sun.istack.internal.NotNull;
+import com.sun.istack.NotNull;
 import main.entities.FileEntity;
 import org.bson.Document;
 import com.mongodb.client.MongoCollection;
@@ -20,7 +20,7 @@ public class MongoDBHandler implements DbHandler {
     private  MongoClient mongoClient;
     private MongoDatabase database;
     private MongoCollection<Document> collection;
-    private static final String MONGOCONFIG = "resources/config/mongo.properties";
+    private static final String MONGOCONFIG = "conf/mongo.properties";
 
     @Override
     public void initDatabaseHandler() throws Exception {

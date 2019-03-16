@@ -1,6 +1,6 @@
 package main.entities;
 
-import com.sun.istack.internal.NotNull;
+import com.sun.istack.NotNull;
 
 public class FileEntity implements java.io.Serializable{
     private String fileName;
