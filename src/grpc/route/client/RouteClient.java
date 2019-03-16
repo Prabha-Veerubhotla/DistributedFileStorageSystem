@@ -1,4 +1,4 @@
-package gash.grpc.route.client;
+package grpc.route.client;
 
 import com.google.protobuf.ByteString;
 

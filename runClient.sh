@@ -8,8 +8,9 @@ fi
 
 
 export SVR_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo $SVR_HOME
 
-JAVA_MAIN=' gash.grpc.route.client.RouteClient'
+JAVA_MAIN='grpc.route.client.RouteClient'
 JAVA_ARGS="$1"
 JAVA_TUNE='-client -Xms96m -Xmx512m'
 
