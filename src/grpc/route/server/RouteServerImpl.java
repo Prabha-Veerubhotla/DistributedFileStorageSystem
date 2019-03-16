@@ -7,37 +7,15 @@ import java.util.Properties;
 import java.lang.*;
 import com.google.protobuf.ByteString;
 import lease.Dhcp_Lease_Test;
-
+import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import route.RouteServiceGrpc.RouteServiceImplBase;
 
+
 public class RouteServerImpl extends RouteServiceImplBase {
 	private Server svr;
-
-	private static Properties getConfiguration(final File path) throws IOException {
-		if (!path.exists())
-			throw new IOException("missing file");
-
-		Properties rtn = new Properties();
-		FileInputStream fis = null;
-		try {
-			fis = new FileInputStream(path);
-			rtn.load(fis);
-		} finally {
-			if (fis != null) {
-				try {
-					fis.close();
-				} catch (IOException e) {
-					// ignore
-				}
-			}
-		}
-
-		return rtn;
-	}
-
 	/**
 	 * TODO refactor this!
 	 * 
@@ -59,27 +37,23 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	}
 
 	public static void main(String[] args) throws Exception {
-		// TODO check args!
-
-		String path = args[0];
-		try {
-			Properties conf = RouteServerImpl.getConfiguration(new File(path));
-			RouteServer.configure(conf);
-
-			final RouteServerImpl impl = new RouteServerImpl();
-			impl.start();
-			impl.blockUntilShutdown();
-
-		} catch (IOException e) {
-			// TODO better error message
-			e.printStackTrace();
+        if(args.length == 0) {
+        	System.out.println("Missing server configuration");
+        	return;
 		}
+		String path = args[0];
+		Properties conf = FetchConfig.getConfiguration(new File(path));
+		RouteServer.configure(conf);
+
+		final RouteServerImpl impl = new RouteServerImpl();
+		impl.start();
+		impl.blockUntilShutdown();
 	}
 
-	private void invokeBackGroundThread() {
+	private void invokeDhcpMonitorThread() {
 		Thread thread = new Thread(){
 			public void run(){
-				System.out.println("DHCP Lease Monitor Thread Running");
+				System.out.println("Starting DHCP Lease Monitor Thread...");
 					new Dhcp_Lease_Test().monitorLease();
 			}
 		};
@@ -92,9 +66,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
 		System.out.println("-- starting server");
 		svr.start();
-		invokeBackGroundThread();
-
-
+		invokeDhcpMonitorThread();
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
@@ -112,6 +84,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		svr.awaitTermination();
 	}
 
+	//respond to a request
 	@Override
 	public void request(route.Route request, StreamObserver<route.Route> responseObserver) {
 
@@ -133,4 +106,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		responseObserver.onNext(rtn);
 		responseObserver.onCompleted();
 	}
+
+	//TODO: add sending a message without getting a request
+	//make it more interactive
 }
