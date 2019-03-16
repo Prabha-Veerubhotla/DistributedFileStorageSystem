@@ -1,4 +1,4 @@
-package gash.grpc.route.server;
+package grpc.route.server;
 
 /**
  * copyright 2018, gash
