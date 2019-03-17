@@ -78,7 +78,7 @@ public class MessageClient {
                 } else if (choice.equalsIgnoreCase("post")) {
                     System.out.print("Enter message: ");
                     String msg = br.readLine();
-                    rc.sendMessage(msg);
+                    rc.sampleBlocking(msg);
                 } else if (choice.equalsIgnoreCase("help")) {
                     System.out.println("");
                     System.out.println("Commands");
@@ -116,7 +116,7 @@ public class MessageClient {
                     }
                 }
                 else {
-                    rc.sendMessage(choice);
+                    rc.sampleBlocking(choice);
                 }
             } catch (Exception e) {
                 forever = false;

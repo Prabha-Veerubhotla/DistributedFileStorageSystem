@@ -7,6 +7,8 @@ import java.util.Properties;
 import java.lang.*;
 import com.google.protobuf.ByteString;
 import lease.Dhcp_Lease_Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -15,6 +17,7 @@ import route.RouteServiceGrpc.RouteServiceImplBase;
 
 
 public class RouteServerImpl extends RouteServiceImplBase {
+	protected static Logger logger = LoggerFactory.getLogger("server");
 	private Server svr;
 	/**
 	 * TODO refactor this!
@@ -27,7 +30,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
 		// TODO placeholder
 		String content = new String(msg.getPayload().toByteArray());
-		System.out.println("-- got: " + msg.getOrigin() + ", path: " + msg.getPath() + ", with: " + content);
+		logger.info("-- got: " + msg.getOrigin() + ", path: " + msg.getPath() + ", with: " + content);
 
 		// TODO complete processing
 		final String blank = "blank";
@@ -53,7 +56,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	private void invokeDhcpMonitorThread() {
 		Thread thread = new Thread(){
 			public void run(){
-				System.out.println("Starting DHCP Lease Monitor Thread...");
+				logger.info("Starting DHCP Lease Monitor Thread...");
 					new Dhcp_Lease_Test().monitorLease();
 			}
 		};
@@ -64,7 +67,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		svr = ServerBuilder.forPort(RouteServer.getInstance().getServerPort()).addService(new RouteServerImpl())
 				.build();
 
-		System.out.println("-- starting server");
+		logger.info("-- starting server");
 		svr.start();
 		invokeDhcpMonitorThread();
 
@@ -83,6 +86,25 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	private void blockUntilShutdown() throws Exception {
 		svr.awaitTermination();
 	}
+
+	private route.Route buildError(route.Route request, String msg) {
+		route.Route.Builder builder = route.Route.newBuilder();
+
+		// routing/header information
+		builder.setId(RouteServer.getInstance().getNextMessageID());
+		builder.setOrigin(RouteServer.getInstance().getServerID());
+		builder.setSeqnum(-1);
+		builder.setDestination(request.getOrigin());
+		builder.setPath(request.getPath());
+
+		// do the work
+		builder.setPayload(process(request));
+
+		route.Route rtn = builder.build();
+
+		return rtn;
+	}
+
 
 	//respond to a request
 	@Override
@@ -105,8 +127,64 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		route.Route rtn = builder.build();
 		responseObserver.onNext(rtn);
 		responseObserver.onCompleted();
+
 	}
 
+	@Override
+	public void requestStreamFrom(route.Route request, StreamObserver<route.Route> responseObserver) {
+		route.Route.Builder builder = route.Route.newBuilder();
+
+		// TODO accept input from request as to what to retrieve. For now it is -- done
+		// hard-coded to a fixed file
+
+		String filename = new String(request.getPayload().toByteArray());
+		File fn = new File(filename);
+
+		if (!fn.exists()) {
+			route.Route rtn = buildError(request, "unknown file");
+			responseObserver.onNext(rtn);
+			responseObserver.onCompleted();
+		}
+
+		FileInputStream fis = null;
+		try {
+			fis = new FileInputStream(fn);
+			long seq = 0l;
+			final int blen = 1024;
+			byte[] raw = new byte[blen];
+			boolean done = false;
+			while (!done) {
+				int n = fis.read(raw, 0, blen);
+				if (n <= 0)
+					break;
+
+				// identifying sequence number
+				seq++;
+
+				// routing/header information
+				builder.setId(RouteServer.getInstance().getNextMessageID());
+				builder.setOrigin(RouteServer.getInstance().getServerID());
+				builder.setDestination(request.getOrigin());
+				builder.setSeqnum(seq);
+				builder.setPath(request.getPath());
+				builder.setPayload(ByteString.copyFrom(raw, 0, n));
+
+				route.Route rtn = builder.build();
+				responseObserver.onNext(rtn);
+			}
+		} catch (IOException e) {
+			; // ignore? really?
+		} finally {
+			try {
+				fis.close();
+			} catch (IOException e) {
+				; // ignore
+			}
+
+			responseObserver.onCompleted();
+		}
+
+	}
 	//TODO: add sending a message without getting a request
 	//make it more interactive
 }
