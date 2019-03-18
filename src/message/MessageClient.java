@@ -131,6 +131,7 @@ public class MessageClient {
 
         System.out.println("\nGoodbye");
         rc.stopClientSession();
+        System.exit(0);
     }
 
     public static void main(String[] args) {
@@ -140,5 +141,6 @@ public class MessageClient {
 
         MessageClient ca = new MessageClient(p);
         ca.run();
+
     }
 }

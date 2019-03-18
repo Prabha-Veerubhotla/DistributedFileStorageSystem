@@ -83,7 +83,6 @@ public class RouteClient {
 		 // blocking!
 		 Route r = RouteClient.stub.request(bld.build());
          System.out.println("reply: "+ new String(r.getPayload().toByteArray()));
-		 //System.out.println("Joined successfully");
 	 }
 
 	public  void stopClientSession() {
@@ -132,7 +131,6 @@ public class RouteClient {
 		System.out.println("Streaming: " + filename);
 
 		Route.Builder bld = Route.newBuilder();
-		System.out.println("file name is "+filename);
 		bld.setId(0);
 		bld.setOrigin(RouteClient.clientID);
 		bld.setPath("/data/read");
@@ -140,8 +138,6 @@ public class RouteClient {
 		byte[] fn = filename.getBytes();
 
 		bld.setPayload(ByteString.copyFrom(fn));
-
-		System.out.println("byte string copy from"+new String(ByteString.copyFrom(fn).toByteArray()));
 
 		// we are still blocking!
 		Iterator<Route> rIter = RouteClient.stub.requestStreamFrom(bld.build());
