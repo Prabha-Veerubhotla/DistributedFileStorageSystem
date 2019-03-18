@@ -21,5 +21,6 @@ message Route {
   int64 seqnum = 4;
   string path = 5;
   bytes payload = 6;
+  string type = 7;
 }
 

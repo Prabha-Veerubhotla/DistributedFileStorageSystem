@@ -19,6 +19,8 @@ import route.RouteServiceGrpc.RouteServiceImplBase;
 public class RouteServerImpl extends RouteServiceImplBase {
 	protected static Logger logger = LoggerFactory.getLogger("server");
 	private Server svr;
+	private int idCounter;
+	private String name;
 	/**
 	 * TODO refactor this!
 	 * 
@@ -28,14 +30,26 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	 */
 	protected ByteString process(route.Route msg) {
 
-		// TODO placeholder
-		String content = new String(msg.getPayload().toByteArray());
-		logger.info("-- got: " + msg.getOrigin() + ", path: " + msg.getPath() + ", with: " + content);
+		//logger.info("message type is: "+msg.getType());
+        String reply = null;
+        if(msg.getType().equalsIgnoreCase( "join")) {
+        	name = new String(msg.getPayload().toByteArray());
+			logger.info("--> join: " + name);
+			reply = "Hello "+new String(msg.getPayload().toByteArray())+ "!";
+		} else if(msg.getType().equalsIgnoreCase( "message")) {
+        	String message = new String(msg.getPayload().toByteArray());
+			logger.info("--> message from: " + name + ": " + message);
+			reply = "received message: "+message;
 
-		// TODO complete processing
-		final String blank = "blank";
-		byte[] raw = blank.getBytes();
+		} else {
 
+			// TODO placeholder
+			String content = new String(msg.getPayload().toByteArray());
+			logger.info("-- got: " + msg.getOrigin() + ", path: " + msg.getPath() + ", with: " + content);
+			reply = "blank";
+		}
+
+		byte[] raw = reply.getBytes();
 		return ByteString.copyFrom(raw);
 	}
 
@@ -70,6 +84,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		logger.info("-- starting server");
 		svr.start();
 		invokeDhcpMonitorThread();
+
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
@@ -145,7 +160,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			responseObserver.onNext(rtn);
 			responseObserver.onCompleted();
 		}
-
+		logger.info("-- received file: " +filename+" from: "+name);
 		FileInputStream fis = null;
 		try {
 			fis = new FileInputStream(fn);

@@ -85,6 +85,11 @@ public class MessageClient {
                     System.out.println("-------------------------------");
                     System.out.println("help - show this menu");
                     System.out.println("post - send a message");
+                    System.out.println("whoami - list my settings");
+                    System.out.println("put - store a file");
+                    System.out.println("get - retrieve a stored file");
+                    System.out.println("list - list all stored files");
+                    System.out.println("delete - delete a stored file");
                     System.out.println("exit - end session");
                     System.out.println("");
                 } else if(choice.equalsIgnoreCase("put")) {

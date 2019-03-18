@@ -72,7 +72,18 @@ public class RouteClient {
 
 	 public void join(String name) {
 		//TODO: send message to server that client with name 'name' joined
-		 System.out.println("Joined successfully");
+		 Route.Builder bld = Route.newBuilder();
+		 bld.setId(0);
+		 bld.setOrigin(RouteClient.clientID);
+		 bld.setPath("/to/server");
+         bld.setType("join");
+		 byte[] hello = name.getBytes();
+		 bld.setPayload(ByteString.copyFrom(hello));
+
+		 // blocking!
+		 Route r = RouteClient.stub.request(bld.build());
+         System.out.println("reply: "+ new String(r.getPayload().toByteArray()));
+		 //System.out.println("Joined successfully");
 	 }
 
 	public  void stopClientSession() {
@@ -97,7 +108,7 @@ public class RouteClient {
 			bld.setId(i);
 			bld.setOrigin(RouteClient.clientID);
 			bld.setPath("/to/server");
-
+			bld.setType("message");
 			byte[] hello = msg.getBytes();
 			bld.setPayload(ByteString.copyFrom(hello));
 
@@ -125,7 +136,7 @@ public class RouteClient {
 		bld.setId(0);
 		bld.setOrigin(RouteClient.clientID);
 		bld.setPath("/data/read");
-
+		bld.setType("file");
 		byte[] fn = filename.getBytes();
 
 		bld.setPayload(ByteString.copyFrom(fn));
