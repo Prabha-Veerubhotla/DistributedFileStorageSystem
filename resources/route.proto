@@ -6,17 +6,21 @@ package route;
 // a service interface (contract)
 
 service RouteService {
-   rpc request(Route) returns (Route) {}
+   rpc request( Route) returns ( Route) {}
+   rpc requestStreamFrom(Route) returns (stream Route) {}
 }
 
 // basic message correspondence between two points. Additional metadata 
 // and routing options can be added.
 
+//TODO: change the origin, destination to use ips to get more information
 message Route {
   int64 id = 1;
   int64 origin = 2;
   int64 destination = 3;
-  string path = 4;
-  bytes payload = 5;
+  int64 seqnum = 4;
+  string path = 5;
+  bytes payload = 6;
+  string type = 7;
 }
 
