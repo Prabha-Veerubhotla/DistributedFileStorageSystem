@@ -1,7 +1,6 @@
 package lease;
 
 import com.google.protobuf.ByteString;
-import utility.FetchConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import route.Route;
@@ -33,8 +32,9 @@ public class Dhcp_Lease_Test {
                 set.add(s);
             }
 
-            String server_id = null;
-            String  server_port = null;
+            String server_id = "1234";
+            String  server_port = "2345";
+
 
             StringBuffer sb = new StringBuffer();
             for(String s2 : newIpList) {
@@ -45,14 +45,26 @@ public class Dhcp_Lease_Test {
             for(String s1: newIpList) {
                 String ip = s1;
                 System.out.println("Server ip now"+s1);
-                try {
-                    Properties prop = FetchConfig.getConfiguration(new File("../../conf/server.conf"));
-                    server_id = prop.getProperty("server.id");
-                    server_port = prop.getProperty("server.port");
-                } catch (IOException ie) {
-                    System.out.println("Unable to retrieve server config properties");
-                    System.out.println("Exception: "+ie);
-                }
+//                try {
+//                    Properties prop = new Properties();
+//                    String propFileName = "../../../../../conf/server.conf";
+//                    System.out.println("prop file name "+propFileName);
+//                    InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
+//                    if (inputStream != null) {
+//                        prop.load(inputStream);
+//                    } else {
+//                        throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
+//                    }
+//                    System.out.println("properties "+prop);
+//
+//                    server_id = prop.getProperty("server.id");
+//                    server_port = prop.getProperty("server.port");
+//
+//                } catch (IOException ie) {
+//
+//
+//                System.out.println("io exception");
+//                }
 
                 System.out.println("Server port: "+server_port);
 
@@ -95,13 +107,12 @@ public class Dhcp_Lease_Test {
         }
 
         public  void monitorLease() {
-            //Check for changes in dhcpd lease file
             TimerTask task = new Dhcp_Lease_Changes_Monitor(new File("/var/lib/dhcpd/dhcpd.leases")) {
 
                 protected void onChange(File file) {
                     // here we code the action on a change
+                    System.out.println("File " + file.getName() + " have change !");
                     try {
-                        //TODO: replace the command with relative path or use root dir
                         Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                         BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
