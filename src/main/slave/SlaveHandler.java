@@ -15,7 +15,7 @@ public class SlaveHandler {
     /**
      * initialize Redis and Mongo connections
      */
-    SlaveHandler() {
+    public SlaveHandler() {
         try {
             if(CacheUnabled) {
                 redis = new RedisHandler();

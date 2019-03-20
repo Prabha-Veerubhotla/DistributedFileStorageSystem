@@ -128,7 +128,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		if(msg.getType().equalsIgnoreCase("message-get")) {
 			String actualmessage = new String(msg.getPayload().toByteArray());
 			String name = msg.getUsername();
-			reply = SlaveNode.getSavedMessage(actualmessage, name);
+			reply = SlaveNode.getSavedMessage(actualmessage, name).toString();
 			logger.info("retrieving information of "+name);
 
 		}
