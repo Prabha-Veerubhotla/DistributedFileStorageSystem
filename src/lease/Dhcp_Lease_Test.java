@@ -65,8 +65,10 @@ public class Dhcp_Lease_Test {
                     // send hello to new node , if new node is added
                     System.out.println("Sending hello to new node: "+s1);
                     Route.Builder bld = Route.newBuilder();
-                    bld.setId(1);
-                    bld.setOrigin(Integer.parseInt(server_id));
+                    //bld.setId(1);
+                    bld.setOrigin("master");
+                    bld.setDestination("node");
+                    //bld.setOrigin(Integer.parseInt(server_id));
                     bld.setPath("/update/from/dhcp/lease/new/node");
 
                     byte[] hello = ("HELLO new node!:"+ s1).getBytes();
@@ -76,13 +78,15 @@ public class Dhcp_Lease_Test {
                     Route r = stub.request(bld.build());
                             // TODO response handling
                            String payload = new String(r.getPayload().toByteArray());
-                           System.out.println("reply: " + r.getId() + ", from: " + r.getOrigin() + ", payload: " + payload);
+                           System.out.println("reply: " +payload + ", from: " + r.getOrigin() );
              }
                 // update all the nodes with current ips in the network ( if new node | one node is removed)
                 System.out.println("Sending current ip updates in the network to all nodes");
                 Route.Builder bld1 = Route.newBuilder();
-                bld1.setId(1);
-                bld1.setOrigin(Integer.parseInt(server_id));
+                //bld1.setId(1);
+                bld1.setOrigin("master");
+                bld1.setDestination("node");
+                //bld1.setOrigin(Integer.parseInt(server_id));
                 bld1.setPath("/update/from/dhcp/lease");
                 byte[] hello = ("These are the current nodes in the network: "+ sb.toString()).getBytes();
                 bld1.setPayload(ByteString.copyFrom(hello));
@@ -90,7 +94,7 @@ public class Dhcp_Lease_Test {
                 Route r = stub.request(bld1.build());
                 // TODO response handling
                 String payload = new String(r.getPayload().toByteArray());
-                System.out.println("reply: " + r.getId() + ", from: " + r.getOrigin() + ", payload: " + payload);
+                System.out.println("reply: " + payload + ", from: " + r.getOrigin() );
             }
         }
 
