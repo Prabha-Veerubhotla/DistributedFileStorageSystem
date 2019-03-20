@@ -3,6 +3,9 @@ package grpc.route.server;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
 import com.google.protobuf.ByteString;
@@ -24,6 +27,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	private static String origin = "slave";
 	private static String destination = "master";
 	private static String myIp;
+	private static List<String> slaveips = new ArrayList<>();
 	private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
 	/**
 	 * TODO refactor this!
@@ -96,6 +100,15 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
 		byte[] raw = reply.getBytes();
 		return ByteString.copyFrom(raw);
+	}
+
+
+	public void getSlaveIpList() {
+		Map<String, List<String>> map = dhcp_lease_test.getCurrentNodeMapping();
+		if(map.containsKey("slave")) {
+			slaveips = map.get("slave");
+		}
+		MasterNode.assignSlaveIp(slaveips);
 	}
 
 	protected ByteString processSlave(route.Route msg) {
