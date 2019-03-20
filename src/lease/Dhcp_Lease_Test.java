@@ -12,9 +12,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
+import java.util.logging.Logger;
 
 public class Dhcp_Lease_Test {
-
+       private static Logger logger;
        static  List<String> oldIpList = new ArrayList<>();
        Map<String, List<String>> nodesInNetwork = new HashMap<>();
        List<String> newIpList = new ArrayList<>();
@@ -48,7 +49,7 @@ public class Dhcp_Lease_Test {
                 String ip = s1;
                 System.out.println("Server ip now"+s1);
                 try {
-                    Properties prop = FetchConfig.getConfiguration(new File("../../conf/server.conf"));
+                    Properties prop = FetchConfig.getConfiguration(new File("/home/vinod/cmpe275/WednesdayTest/275-project1/conf/server.conf"));
                     server_id = prop.getProperty("server.id");
                     server_port = prop.getProperty("server.port");
                 } catch (IOException ie) {
@@ -127,7 +128,7 @@ public class Dhcp_Lease_Test {
                         Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                         BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
-                        List<String> newIpList = new ArrayList<>();
+                        //List<String> newIpList = new ArrayList<>();
                         String output = null;
                         while((output = reader1.readLine())!= null) {
                             System.out.println("ip"+output);
@@ -160,7 +161,7 @@ public class Dhcp_Lease_Test {
 
 
         public boolean updateCurrentNodeMapping(String node, String ip) {
-
+            logger.info("adding: "+ip+" to the list as "+node);
             if(nodesInNetwork.containsKey(node)) {
                 List<String> clientlist = nodesInNetwork.get(node);
                 clientlist.add(ip);

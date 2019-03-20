@@ -42,6 +42,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         	name = new String(msg.getPayload().toByteArray());
 			logger.info("--> join: " + name);
 			reply = "Hello "+new String(msg.getPayload().toByteArray())+ "!";
+			getSlaveIpList();
 
 		} else if(msg.getType().equalsIgnoreCase( "message-put")) {
         	String message = new String(msg.getPayload().toByteArray());
@@ -173,9 +174,9 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		final RouteServerImpl impl = new RouteServerImpl();
 		if(conf.getProperty("server.name").equalsIgnoreCase("master")) {
 			isMaster = true;
-			logger.info("Running as master node on: 127.0.0.1 :"+  conf.getProperty("server.port"));
+			logger.info("Running as master node on");
 		} else {
-			logger.info("Running as slave node on: 127.0.0.1 :"+  conf.getProperty("server.port"));
+			logger.info("Running as slave node");
 		}
 		impl.start();
 		impl.blockUntilShutdown();

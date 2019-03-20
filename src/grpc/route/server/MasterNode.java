@@ -16,10 +16,11 @@ public class MasterNode extends RouteServerImpl {
     static String slave1port = "2345";
     static String origin = "master";
     static String destination = "slave";
-    static String slave1 = slaveip.get(0);
+    static String slave1 = null;
 
-    public static void assignSlaveIp(List<String> slaveip) {
-        slaveip = slaveip;
+    public static void assignSlaveIp(List<String> slaveiplist) {
+        slaveip = slaveiplist;
+        slave1 = slaveip.get(0);
     }
     
     
