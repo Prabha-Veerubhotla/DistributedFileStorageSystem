@@ -7,10 +7,7 @@ import route.Route;
 import route.RouteServiceGrpc;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * copyright 2018, gash
@@ -28,6 +25,8 @@ import java.util.Properties;
  * the License.
  */
 
+//TODO: make all calls aynschronous
+
 public class RouteClient {
 	private static long clientID = 501;
 	private static ManagedChannel ch;
@@ -36,6 +35,9 @@ public class RouteClient {
 	private static String name;
 	private Route.Builder bld;
 	private Route r;
+	private static String origin = "client";
+	private static String destination = "master";
+
 
 	public RouteClient(Properties setup) {
 		this.setup = setup;
@@ -67,15 +69,16 @@ public class RouteClient {
      public void respond() {
 		 // TODO response handling
 		 String payload = new String(r.getPayload().toByteArray());
-		 System.out.println("reply: " + r.getId() + ", from: " + r.getOrigin() + ", payload: " + payload);
+		 System.out.println("reply: " + payload + ", from: " + r.getOrigin() );
 	 }
 
 	 public void join(String name) {
 		//TODO: send message to server that client with name 'name' joined
 		 Route.Builder bld = Route.newBuilder();
-		 bld.setId(0);
-		 bld.setOrigin(RouteClient.clientID);
-		 bld.setPath("/to/server");
+		 //bld.setId(0);
+		 bld.setOrigin(origin);
+		 bld.setDestination(destination);
+		 bld.setPath("/join/server");
          bld.setType("join");
 		 byte[] hello = name.getBytes();
 		 bld.setPayload(ByteString.copyFrom(hello));
@@ -89,7 +92,7 @@ public class RouteClient {
 		ch.shutdown();
 	}
 
-	//TODO: listen continuously for messages from server on a bckground thread
+	//TODO: listen continuously for messages from server on a background thread
 	public void invokeListenThread() {
 		Thread thread = new Thread(){
 			public void run(){
@@ -100,14 +103,15 @@ public class RouteClient {
 		thread.start();
 	}
 
-	public static void sampleBlocking(String msg) {
+	public static boolean sampleBlocking(String msg, String type) {
+        boolean status = false;
 
-		for (int i = 0; i < 1; i++) {
 			Route.Builder bld = Route.newBuilder();
-			bld.setId(i);
-			bld.setOrigin(RouteClient.clientID);
-			bld.setPath("/to/server");
-			bld.setType("message");
+			//bld.setId(i);
+			bld.setOrigin(origin);
+			bld.setDestination(destination);
+			bld.setPath(type+"/to/server");
+			bld.setType(type);
 			byte[] hello = msg.getBytes();
 			bld.setPayload(ByteString.copyFrom(hello));
 
@@ -116,12 +120,59 @@ public class RouteClient {
 
 			// TODO response handling
 			String payload = new String(r.getPayload().toByteArray());
-			System.out.println("reply: " + r.getId() + ", from: " + r.getOrigin() + ", payload: " + payload);
-		}
+			System.out.println("reply: " +payload + ", from: " + r.getOrigin());
+			if(payload.equalsIgnoreCase("success")) {
+				status = true;
+			}
+
+		return status;
 
 	}
 
-	private static void sampleStreaming(String filename) {
+	public static boolean deleteMessage(String msg) {
+		String type = "message-delete";
+		boolean result = false;
+		Route.Builder bld = Route.newBuilder();
+		//bld.setId(1);
+		bld.setOrigin(origin);
+		bld.setDestination(destination);
+		bld.setPath(type+"/to/server");
+		bld.setType(type);
+		byte[] hello = msg.getBytes();
+		bld.setPayload(ByteString.copyFrom(hello));
+
+		// blocking!
+		Route r = RouteClient.stub.request(bld.build());
+
+		// TODO response handling
+		String payload = new String(r.getPayload().toByteArray());
+		System.out.println("reply: " + payload + ", from: " + r.getOrigin());
+		if(payload.equalsIgnoreCase("success")) {
+			result = true;
+		}
+		return result;
+	}
+
+	public static String getSavedMessage(String msg, String type) {
+		Route.Builder bld = Route.newBuilder();
+		//bld.setId(1);
+		bld.setOrigin(origin);
+		bld.setDestination(destination);
+		bld.setPath(type+"/to/server");
+		bld.setType(type);
+		byte[] hello = msg.getBytes();
+		bld.setPayload(ByteString.copyFrom(hello));
+
+		// blocking!
+		Route r = RouteClient.stub.request(bld.build());
+
+		// TODO response handling
+		String payload = new String(r.getPayload().toByteArray());
+		System.out.println("reply: " + payload + ", from: " + r.getOrigin());
+		return payload;
+	}
+
+	private static void sampleStreaming(String filename, String type) {
 		if (filename == null)
 			return;
 
@@ -131,10 +182,11 @@ public class RouteClient {
 		System.out.println("Streaming: " + filename);
 
 		Route.Builder bld = Route.newBuilder();
-		bld.setId(0);
-		bld.setOrigin(RouteClient.clientID);
-		bld.setPath("/data/read");
-		bld.setType("file");
+		//bld.setId(0);
+		bld.setOrigin(origin);
+		bld.setDestination(destination);
+		bld.setPath("/save/file");
+		bld.setType(type);
 		byte[] fn = filename.getBytes();
 
 		bld.setPayload(ByteString.copyFrom(fn));
@@ -144,21 +196,75 @@ public class RouteClient {
 		while (rIter.hasNext()) {
 			// process responses
 			Route r = rIter.next();
-			System.out.println("reply: " + r.getId() + ", from: " + r.getOrigin() + ", seq: " + r.getSeqnum());
+			String payload = new String(r.getPayload().toByteArray());
+			System.out.println("reply: " + payload + ", from: " + r.getOrigin());
 			System.out.println("reply payload: "+new String(r.getPayload().toByteArray()));
 		}
 
 	}
 
+	public byte[] getSavedFile(String filename, String type) {
+		Route.Builder bld = Route.newBuilder();
+		//bld.setId(1);
+		bld.setOrigin(origin);
+		bld.setPath(type+"/to/server");
+		bld.setDestination(destination);
+		bld.setType(type);
+		byte[] hello = filename.getBytes();
+		bld.setPayload(ByteString.copyFrom(hello));
+
+		// blocking!
+		Route r = RouteClient.stub.request(bld.build());
+
+		// TODO response handling
+		String payload = new String(r.getPayload().toByteArray());
+		System.out.println("reply: " + payload + ", from: " + r.getOrigin());
+		return  payload.getBytes();
+	}
+
+	public boolean putString(String msg) {
+		String type = "message-put";
+		return sampleBlocking(msg, type);
+	}
+
+
+	public String getString(String msg) {
+		String type = "message-get";
+		return getSavedMessage(msg, type);
+	}
+
+
+	public List<String> listMessages() {
+		//List<String> stringList = new ArrayList<>();
+		String type = "message-list";
+		Route.Builder bld = Route.newBuilder();
+		//bld.setId(1);
+		bld.setOrigin(origin);
+		bld.setDestination(destination);
+		bld.setPath(type+"/to/server");
+		bld.setType(type);
+		byte[] hello = name.getBytes();
+		//bld.setPayload(ByteString.copyFrom(hello));
+
+		// blocking!
+		Route r = RouteClient.stub.request(bld.build());
+
+		// TODO response handling
+		String payload = new String(r.getPayload().toByteArray());
+		System.out.println("reply: " + payload + ", from: " + r.getOrigin());
+		List<String> myList = new ArrayList<String>(Arrays.asList(payload.split(",")));
+		return myList;
+	}
+
 	public boolean putFile(String filepath) {
-        //TODO: store the file in the given path
+		//TODO: store the file in the given path
 
 		// 1. validate the given file path
 		File fn = new File(filepath);
 
 		// 2. send the file to server (call sendMessage())
 		if (fn.exists()) {
-			sampleStreaming(filepath);
+			sampleStreaming(filepath, "file-put");
 		} else {
 			System.out.println("File does not exist in the given path");
 			return false;
@@ -169,27 +275,30 @@ public class RouteClient {
 	}
 
 	public byte[] getFile(String filename) {
-        //TODO: retrieve the file with given name
+		//TODO: retrieve the file with given name
 		// 1. send the file name request to server
+		return getSavedFile(filename, "file-get");
 		// 2. wait for response from server
 		// 3. return the file content
-		return new byte[5];
+		//return new byte[5];
 	}
 
 	public List<String> listFiles() {
-        // TODO: list all the files stored
+		// TODO: list all the files stored
 		// 1. send the list file request to server
+
 		// 2. wait for response from server
 		// 3. return the file list
 		return new ArrayList<>();
 	}
 
 	public boolean deleteFile(String filename) {
-        //TODO: delete the file with given name
+		//TODO: delete the file with given name
 		// 1. send the delete file name request to server
 		// 2. wait for response from server
 		// 3. return success on deletion of the file
 		return true;
 	}
+
 
 }

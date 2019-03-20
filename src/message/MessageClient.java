@@ -52,10 +52,11 @@ public class MessageClient {
         System.out.println("help - show this menu");
         System.out.println("post - send a message to the group (default)");
         System.out.println("whoami - list my settings");
-        System.out.println("put - store a file");
-        System.out.println("get - retrieve a stored file");
-        System.out.println("list - list all stored files");
-        System.out.println("delete - delete a stored file");
+        //System.out.println("put - store a file");
+        System.out.println("get - retrieve a stored message");
+        //System.out.println("get-file - retrieve a stored file");
+        System.out.println("list - list all stored messages");
+        System.out.println("delete - delete a stored message");
         System.out.println("exit - end session");
         System.out.println("");
 
@@ -78,7 +79,12 @@ public class MessageClient {
                 } else if (choice.equalsIgnoreCase("post")) {
                     System.out.print("Enter message: ");
                     String msg = br.readLine();
-                    rc.sampleBlocking(msg);
+                    boolean msgstatus = rc.putString(msg);
+                    if(msgstatus) {
+                        System.out.println(msg+ " saved successfully");
+                    } else {
+                        System.out.println(msg+ " not saved successfully");
+                    }
                 } else if (choice.equalsIgnoreCase("help")) {
                     System.out.println("");
                     System.out.println("Commands");
@@ -86,10 +92,10 @@ public class MessageClient {
                     System.out.println("help - show this menu");
                     System.out.println("post - send a message");
                     System.out.println("whoami - list my settings");
-                    System.out.println("put - store a file");
-                    System.out.println("get - retrieve a stored file");
-                    System.out.println("list - list all stored files");
-                    System.out.println("delete - delete a stored file");
+                    //System.out.println("put - store a file");
+                    System.out.println("get - retrieve a stored message");
+                    System.out.println("list - list all stored messages");
+                    System.out.println("delete - delete a stored message");
                     System.out.println("exit - end session");
                     System.out.println("");
                 } else if(choice.equalsIgnoreCase("put")) {
@@ -102,26 +108,46 @@ public class MessageClient {
                         System.out.println("Successfully stored file: "+msg);
                     }
                 } else if(choice.equalsIgnoreCase("get")) {
+                    System.out.print("Enter message to retrieve: ");
+                    String msg = br.readLine();
+                    //byte[] filecontents = rc.getFile(msg);
+                    //TODO: print the file name or the contents ?
+                    String received = rc.getString(msg);
+                    if(received.equalsIgnoreCase("")) {
+                        System.out.println("unable to retrieve message: "+msg);
+                        System.out.println("message: "+msg+" not saved or deleted");
+                    } else {
+                        System.out.println("message retrived..");
+                        System.out.println(received);
+                    }
+                   // System.out.println("Fetching file contents: ");
+                } else if(choice.equalsIgnoreCase("get-file")) {
                     System.out.print("Enter file name to retrieve: ");
                     String msg = br.readLine();
-                    byte[] filecontents = rc.getFile(msg);
+                    //byte[] filecontents = rc.getFile(msg);
                     //TODO: print the file name or the contents ?
+                    byte[] content = rc.getFile(msg);
                     System.out.println("Fetching file contents: ");
+                    System.out.println(new String(content));
                 } else if(choice.equalsIgnoreCase("list")) {
-                    List<String> fileList = rc.listFiles();
-                    for(String s: fileList) {
-                        System.out.println(s);
+                    List<String> msgList = rc.listMessages();
+                    if(msgList.size() != 0) {
+                        for (String s : msgList) {
+                            System.out.println(s);
+                        }
+                    } else {
+                        System.out.println("no messages saved for this user: "+name);
                     }
                 } else if(choice.equalsIgnoreCase("delete")) {
-                    System.out.print("Enter file name to delete: ");
+                    System.out.print("Enter message name to delete: ");
                     String msg = br.readLine();
-                    boolean deleteStatus = rc.deleteFile(msg);
+                    boolean deleteStatus = rc.deleteMessage(msg);
                     if(deleteStatus) {
-                        System.out.println("File  "+msg+" successfully deleted");
+                        System.out.println("Message  "+msg+" successfully deleted");
                     }
                 }
                 else {
-                    rc.sampleBlocking(choice);
+                    rc.putString(choice);
                 }
             } catch (Exception e) {
                 forever = false;
