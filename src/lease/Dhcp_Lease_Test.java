@@ -16,17 +16,19 @@ import java.util.*;
 public class Dhcp_Lease_Test {
 
        static  List<String> oldIpList = new ArrayList<>();
+       Map<String, List<String>> nodesInNetwork = new HashMap<>();
+       List<String> newIpList = new ArrayList<>();
         public static void main(String args[]) {
             // monitor a single file
             System.out.println("Monitoring Lease file");
         }
 
-        public  void copyList(List<String> newIpList) {
+        public  void copyList() {
             oldIpList.clear();
             oldIpList = new ArrayList<>(newIpList);
         }
 
-        public  void compareAndUpdate(List<String> newIpList) {
+        public  void compareAndUpdate() {
             System.out.println("comparing and updating");
             Set<String> set = new HashSet<>();
             for(String s: oldIpList) {
@@ -63,7 +65,8 @@ public class Dhcp_Lease_Test {
                 RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
                 if(!set.contains(s1)) {
                     // send hello to new node , if new node is added
-                    System.out.println("Sending hello to new node: "+s1);
+                    System.out.println("Sending hello");
+                    System.out.println("Your ip is: " + s1);
                     Route.Builder bld = Route.newBuilder();
                     //bld.setId(1);
                     bld.setOrigin("master");
@@ -71,20 +74,35 @@ public class Dhcp_Lease_Test {
                     //bld.setOrigin(Integer.parseInt(server_id));
                     bld.setPath("/update/from/dhcp/lease/new/node");
 
-                    byte[] hello = ("HELLO new node!:"+ s1).getBytes();
-                    bld.setPayload(ByteString.copyFrom(hello));
-
+                    //byte[] hello = ("HELLO new node!").getBytes();
+                    byte[] ipmessage = s1.getBytes();
+                    bld.setType("node-ip");
+                    bld.setPayload(ByteString.copyFrom(ipmessage));
                     // blocking!
                     Route r = stub.request(bld.build());
-                            // TODO response handling
-                           String payload = new String(r.getPayload().toByteArray());
-                           System.out.println("reply: " +payload + ", from: " + r.getOrigin() );
-             }
+                    // TODO response handling
+                    String payload = new String(r.getPayload().toByteArray());
+                    String nodereply = payload;
+                    if(nodesInNetwork.containsKey(nodereply)) {
+                        List<String> slaves = nodesInNetwork.get(nodereply);
+                        slaves.add(s1);
+                        nodesInNetwork.put(nodereply, slaves );
+                    } else {
+                        List<String> nodes = new ArrayList<>();
+                        nodes.add(s1);
+                        nodesInNetwork.put(nodereply, nodes );
+                    }
+
+                    System.out.println("reply: " + payload + ", from: " + r.getOrigin());
+
+                    //Route r = stub.request(bld.build());
+                }
                 // update all the nodes with current ips in the network ( if new node | one node is removed)
                 System.out.println("Sending current ip updates in the network to all nodes");
                 Route.Builder bld1 = Route.newBuilder();
                 //bld1.setId(1);
                 bld1.setOrigin("master");
+                bld1.setType("update-nodes");
                 bld1.setDestination("node");
                 //bld1.setOrigin(Integer.parseInt(server_id));
                 bld1.setPath("/update/from/dhcp/lease");
@@ -116,8 +134,8 @@ public class Dhcp_Lease_Test {
                             newIpList.add(output);
                         }
 
-                        compareAndUpdate(newIpList);
-                        copyList(newIpList);
+                        compareAndUpdate();
+                        copyList();
 
                     } catch (IOException io) {
                         System.out.println(io.getMessage());
@@ -129,5 +147,31 @@ public class Dhcp_Lease_Test {
             Timer timer = new Timer();
             // repeat the check every second
             timer.schedule(task, new Date(), 1000);
+        }
+
+
+        public Map<String, List<String>>  getCurrentNodeMapping() {
+            return nodesInNetwork;
+        }
+
+        public List<String> getCurrentIpList() {
+            return newIpList;
+        }
+
+
+        public boolean updateCurrentNodeMapping(String node, String ip) {
+
+            if(nodesInNetwork.containsKey(node)) {
+                List<String> clientlist = nodesInNetwork.get(node);
+                clientlist.add(ip);
+                nodesInNetwork.put(node,clientlist );
+
+            } else {
+                List<String> clientList = new ArrayList<>();
+                clientList.add(ip);
+                nodesInNetwork.put(node, clientList);
+            }
+            return true;
+
         }
 }

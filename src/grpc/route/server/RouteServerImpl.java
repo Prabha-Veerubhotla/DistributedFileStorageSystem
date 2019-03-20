@@ -23,6 +23,8 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	private static boolean isMaster = false;
 	private static String origin = "slave";
 	private static String destination = "master";
+	private static String myIp;
+	private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
 	/**
 	 * TODO refactor this!
 	 * 
@@ -66,6 +68,24 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			logger.info("--> message from: " + name +" asking to list all messages");
 			reply = MasterNode.listMessages(name);
 		}
+
+		else if(msg.getType().equalsIgnoreCase( "request-ip")) {
+			//String message = new String(msg.getPayload().toByteArray());
+			logger.info("--> message from: " + name +" asking to assign ip");
+			reply = MasterNode.sendIpToClient(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
+		}
+
+		else if(msg.getType().equalsIgnoreCase( "save-client-ip")) {
+			String message = new String(msg.getPayload().toByteArray());
+			logger.info("--> message from: " + name +" asking to save  client ip");
+			if(dhcp_lease_test.updateCurrentNodeMapping(message, msg.getOrigin())) {
+				reply = "success";
+			} else {
+				reply = "failure";
+			}
+
+		}
+
 		else {
 
 			// TODO placeholder
@@ -114,6 +134,12 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			String name = msg.getUsername();
 			reply = SlaveNode.listMessages(name).toString();
 		}
+		if(msg.getType().equalsIgnoreCase("node-ip")) {
+			String actualmessage = new String(msg.getPayload().toByteArray());
+			String name = msg.getUsername();
+			myIp = actualmessage;
+			reply = "slave";
+		}
 
 		if(reply == null) {
 			reply = "";
@@ -146,7 +172,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		Thread thread = new Thread(){
 			public void run(){
 				logger.info("Starting DHCP Lease Monitor Thread...");
-					new Dhcp_Lease_Test().monitorLease();
+					dhcp_lease_test.monitorLease();
 			}
 		};
 		thread.start();

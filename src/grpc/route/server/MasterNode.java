@@ -1,13 +1,14 @@
 package grpc.route.server;
 
+import com.gemstone.gemfire.internal.util.CollectionUtils;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import route.Route;
 import route.RouteServiceGrpc;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class MasterNode extends RouteServerImpl {
 
@@ -116,6 +117,30 @@ public class MasterNode extends RouteServerImpl {
         Route r = stub.request(bld.build());
         String status = new String(r.getPayload().toByteArray());
         return status;
+    }
+
+    public static String sendIpToClient(Map<String, List<String>> map, List<String> ipList) {
+
+        String clientIp =null;
+        List<String> slaveList = new ArrayList<>();
+
+        if(map.containsKey("slave")) {
+            slaveList = map.get("slave");
+        }
+
+        Set<String> myset = new HashSet<>();
+        for(String s: slaveList) {
+            myset.add(s);
+        }
+
+        for(String s: ipList) {
+            myset.add(s);
+        }
+
+        Object[] array1 = myset.toArray();
+        clientIp = (String) array1[array1.length-1];
+        return clientIp;
+
     }
 
 

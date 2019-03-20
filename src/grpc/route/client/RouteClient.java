@@ -37,6 +37,7 @@ public class RouteClient {
 	private Route r;
 	private static String origin = "client";
 	private static String destination = "master";
+	private static String myIp;
 
 
 	public RouteClient(Properties setup) {
@@ -101,6 +102,37 @@ public class RouteClient {
 			}
 		};
 		thread.start();
+	}
+
+	public void requestIp() {
+		String type = "request-ip";
+		Route.Builder bld = Route.newBuilder();
+		//bld.setId(i);
+		bld.setOrigin("client");
+		bld.setDestination(setup.getProperty("host"));
+		bld.setPath(type+"/to/server");
+		bld.setType(type);
+		//byte[] hello = msg.getBytes();
+		//bld.setPayload(ByteString.copyFrom(hello));
+
+		// blocking!
+		Route r = RouteClient.stub.request(bld.build());
+		myIp = new String(r.getPayload().toByteArray());
+
+		type = "save-client-ip";
+		bld.setOrigin(myIp);
+		bld.setDestination(setup.getProperty("host"));
+		bld.setPath(type+"/to/server");
+		bld.setType(type);
+		byte[] msg = "client".getBytes();
+		bld.setPayload(ByteString.copyFrom(msg));
+
+		// blocking!
+		r = RouteClient.stub.request(bld.build());
+		System.out.println("reply: "+ new String(r.getPayload().toByteArray()));
+
+
+
 	}
 
 	public static boolean sampleBlocking(String msg, String type) {
