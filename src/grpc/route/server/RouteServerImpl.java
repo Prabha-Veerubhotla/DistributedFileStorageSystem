@@ -152,6 +152,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			String actualmessage = new String(msg.getPayload().toByteArray());
 			String name = msg.getUsername();
 			myIp = actualmessage;
+			logger.info("my ip is: "+myIp);
 			reply = "slave";
 		}
 
