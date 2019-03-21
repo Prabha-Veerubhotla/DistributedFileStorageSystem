@@ -36,10 +36,10 @@ public class SlaveHandler {
     public void createNewFile(String userEmail, FileEntity file) {
         if(CacheUnabled) {
             String redisRet = redis.put(userEmail, file);
-            System.out.println("Redis Output.rtf: " + redisRet);
+            System.out.println("Redis Output: " + redisRet);
         }
         String mongoRet = mongoDB.put(userEmail, file);
-        System.out.println("Mongo Output.rtf: " + mongoRet);
+        System.out.println("Mongo Output: " + mongoRet);
     }
 
     /**
@@ -100,17 +100,18 @@ public class SlaveHandler {
 
     public static void main(String[] args) {
         SlaveHandler h = new SlaveHandler();
-
-        byte[] cont = new byte[100];
+//
+//        byte[] cont = new byte[100];
         String test1 = "Using Redis!!!!!";
-//        h.createNewFile("nrupa.chitley@sjsu.edu", new FileEntity("test1.txt", test1));
-        FileEntity reqFile = h.retrieveFile("nrupa.chitley@sjsu.edu", "test1.txt");
-        System.out.println("File: " + reqFile.getFileContents());
+        byte[] test1_byte = test1.getBytes();
+//        h.createNewFile("nrupa.test@gmail.edu", new FileEntity("test1.txt", test1_byte));
+//        FileEntity reqFile = h.retrieveFile("nrupa.test@sjsu.edu", "test1.txt");
+//        System.out.println("File: " + reqFile.getFileContents());
 //        List<FileEntity> ans = h.getAllFiles("nrupa.chitley@sjsu.edu");
 //        System.out.println("ALL Files: " + ans);
-//        h.removeFile("nrupa.chitley@sjsu.edu", "test1.txt");
+//        h.removeFile("nrupa.chitley@sjsu.edu", "/save/file");
 //        List<FileEntity> ans = ((MongoDBHandler)h.mongoDB).get("nrupa.chitley@sjsu.edu");
 //        System.out.println("Ans: " + ans);
-//        h.updateFile("nrupa.chitley@sjsu.edu", new FileEntity("test1.txt", "Update Content!!!!!!!!!"));
+//        h.updateFile("nrupa.test@sjsu.edu", new FileEntity("test1.txt", "Update Test Content!!!!!!!!!"));
     }
 }
