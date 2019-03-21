@@ -68,6 +68,7 @@ public class MasterNode extends RouteServerImpl {
                 // bld.setType("file-put");
                 bld.setPath(filename);
                 bld.setType("file-put");
+                bld.setUsername(name);
                 logger.info("sending file to slave...");
                 bld.setPayload(ByteString.copyFrom(payload.getBytes()));
 

@@ -16,6 +16,7 @@ public class SlaveNode extends RouteServerImpl {
     static SlaveHandler sh = new SlaveHandler();
 
     public static boolean saveFile(String filename, String name, ByteString content) {
+
 //        logger.info("saving message:  "+msg+" from:  "+name+" in slave..");
 //        if(map.containsKey(name)) {
 //            logger.info("saving next message of "+name);

@@ -164,7 +164,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		}
 
 		if(msg.getType().equalsIgnoreCase("file-put")) {
-             if(SlaveNode.saveFile(msg.getPath(), name, msg.getPayload())){
+             if(SlaveNode.saveFile(msg.getPath(), msg.getUsername(), msg.getPayload())){
              	reply = "success";
              	logger.info("saved file: "+msg.getPath()+ " successfully");
 			 } else {
