@@ -3,40 +3,24 @@ package main.db;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
-import com.mongodb.WriteResult;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.result.UpdateResult;
 import com.sun.istack.NotNull;
 import main.entities.FileEntity;
 import org.bson.Document;
 import com.mongodb.client.MongoCollection;
-
-import java.io.FileNotFoundException;
-import java.io.InputStream;
 import java.util.*;
 
 public class MongoDBHandler implements DbHandler {
-    private Properties mongoProp = new Properties();
     private  MongoClient mongoClient;
     private MongoDatabase database;
     private MongoCollection<Document> collection;
-    private static final String MONGOCONFIG = "conf/mongo.properties";
 
     @Override
     public void initDatabaseHandler() throws Exception {
 
         logger.info("initDatabaseHandler");
-        InputStream inputStream = getClass().getClassLoader().getResourceAsStream(MONGOCONFIG);
-        if(inputStream != null){
-            logger.info("Getting mongo properties");
-            mongoProp.load(inputStream);
-        }
-        else {
-            throw new FileNotFoundException(MONGOCONFIG);
-        }
-        String userName = mongoProp.getProperty("user");
-        String databaseName = mongoProp.getProperty("database");
-        char[] password = mongoProp.getProperty("password").toCharArray();
+        String databaseName = "fluffy";
 
         try {
             mongoClient = new MongoClient();
@@ -51,11 +35,13 @@ public class MongoDBHandler implements DbHandler {
 
     @Override
     public String put(String userEmail, FileEntity file) {
+        logger.info("userEmail: " + userEmail);
+        logger.info("file: " + file.getFileContents());
         try {
             BasicDBObject findQuery = new BasicDBObject("personEmail", userEmail);
-            Document temp = collection.find(findQuery).first();
-            logger.info("Checking if data exists" + temp.toString());
-            if(temp != null){
+            FindIterable<Document> temp = collection.find(findQuery);
+            logger.info("Checking if data exists");
+            if(temp.first() != null){
                 logger.info("Inside if ");
                 BasicDBObject listItem = new BasicDBObject("allData", new BasicDBObject("fileName", file.toString()).append("value",file.getFileContents()));
                 BasicDBObject updateQuery = new BasicDBObject("$push", listItem);
