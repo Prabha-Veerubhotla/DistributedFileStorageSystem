@@ -62,44 +62,27 @@ public class MasterNode extends RouteServerImpl {
         ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
         RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
         Route.Builder bld = Route.newBuilder();
-
-        FileInputStream fis = null;
-        try {
-            fis = new FileInputStream(filename);
-            long seq = 0l;
-            final int blen = 1024;
-            byte[] raw = new byte[blen];
-            boolean done = false;
-            while (!done) {
-                int n = fis.read(raw, 0, blen);
-                if (n <= 0)
-                    break;
-
-                // identifying sequence number
-                seq++;
-
-                // routing/header information
-                //builder.setId(RouteServer.getInstance().getNextMessageID());
-                //builder.setOrigin(RouteServer.getInstance().getServerID());
+                logger.info("received file in master...");
                 bld.setOrigin("master");
                 bld.setDestination("slave");
                 bld.setType("file-put");
                 bld.setPath(filename);
+                logger.info("sending file to slave...");
                 bld.setPayload(ByteString.copyFrom(new ReadWrite().convertFileToByteArray(filename).toString().getBytes()));
                 Route r = stub.request(bld.build());
                 if(new String(r.getPayload().toByteArray()).equalsIgnoreCase("success")){
                     return  true;
                 }
-            }
-        } catch (IOException e) {
-            ; // ignore? really?
-        } finally {
-            try {
-                fis.close();
-            } catch (IOException e) {
-                ; // ignore
-            }
-        }
+                logger.info("slave saved file successfully");
+//        } catch (IOException e) {
+//            ; // ignore? really?
+//        } finally {
+//            try {
+//                fis.close();
+//            } catch (IOException e) {
+//                ; // ignore
+//            }
+//        }
         return  false;
     }
 
