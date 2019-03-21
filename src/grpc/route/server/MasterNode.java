@@ -1,30 +1,41 @@
 package grpc.route.server;
 
+import com.gemstone.gemfire.internal.util.CollectionUtils;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import main.master.ReadWrite;
 import route.Route;
 import route.RouteServiceGrpc;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class MasterNode extends RouteServerImpl {
 
-    static String slave1ip = "127.0.0.1";
-    static String slave1port = "2346";
+    static List<String> slaveip = new ArrayList<>();
+    static String slave1port = "2345";
     static String origin = "master";
     static String destination = "slave";
+    static String slave1 = null;
+
+    public static void assignSlaveIp(List<String> slaveiplist) {
+        slaveip = slaveiplist;
+        slave1 = slaveip.get(0);
+    }
+
 
 
     public static boolean saveMessage(String msg, String name) {
         //save message in node-1
 
-        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1ip,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
         RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
 
             // send hello to new node , if new node is added
-            System.out.println("Sending message to node: "+slave1ip);
+            System.out.println("Sending message to node: "+slave1);
             Route.Builder bld = Route.newBuilder();
             bld.setOrigin(origin);
             bld.setDestination(destination);
@@ -46,14 +57,60 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
+    public static boolean saveFile(String filename, String name) {
+
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
+        RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
+        Route.Builder bld = Route.newBuilder();
+
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(filename);
+            long seq = 0l;
+            final int blen = 1024;
+            byte[] raw = new byte[blen];
+            boolean done = false;
+            while (!done) {
+                int n = fis.read(raw, 0, blen);
+                if (n <= 0)
+                    break;
+
+                // identifying sequence number
+                seq++;
+
+                // routing/header information
+                //builder.setId(RouteServer.getInstance().getNextMessageID());
+                //builder.setOrigin(RouteServer.getInstance().getServerID());
+                bld.setOrigin("master");
+                bld.setDestination("slave");
+                bld.setType("file-put");
+                bld.setPath(filename);
+                bld.setPayload(ByteString.copyFrom(new ReadWrite().convertFileToByteArray(filename).toString().getBytes()));
+                Route r = stub.request(bld.build());
+                if(new String(r.getPayload().toByteArray()).equalsIgnoreCase("success")){
+                    return  true;
+                }
+            }
+        } catch (IOException e) {
+            ; // ignore? really?
+        } finally {
+            try {
+                fis.close();
+            } catch (IOException e) {
+                ; // ignore
+            }
+        }
+        return  false;
+    }
+
     public static String getMessage(String msg, String name) {
        String result = null;
        //read from metadata
-        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1ip,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
         RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
 
         // send hello to new node , if new node is added
-        System.out.println("retrieving message from  node: "+slave1ip);
+        System.out.println("retrieving message from  node: "+slave1);
         Route.Builder bld = Route.newBuilder();
         bld.setOrigin(origin);
         bld.setDestination(destination);
@@ -72,11 +129,11 @@ public class MasterNode extends RouteServerImpl {
 
     public static boolean deleteMessage(String msg, String name) {
         boolean result = false;
-        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1ip,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
         RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
 
         // send hello to new node , if new node is added
-        System.out.println("deleting message from  node: "+slave1ip);
+        System.out.println("deleting message from  node: "+slave1);
         Route.Builder bld = Route.newBuilder();
         bld.setOrigin(origin);
         bld.setDestination(destination);
@@ -98,11 +155,11 @@ public class MasterNode extends RouteServerImpl {
     public static String listMessages(String name) {
 
         //List<String> stringList = new ArrayList<>();
-        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1ip,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
         RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
 
         // send hello to new node , if new node is added
-        System.out.println("listing messages from  node: "+slave1ip);
+        System.out.println("listing messages from  node: "+slave1);
         Route.Builder bld = Route.newBuilder();
         bld.setOrigin(origin);
         bld.setDestination(destination);
@@ -116,6 +173,30 @@ public class MasterNode extends RouteServerImpl {
         Route r = stub.request(bld.build());
         String status = new String(r.getPayload().toByteArray());
         return status;
+    }
+
+    public static String sendIpToClient(Map<String, List<String>> map, List<String> ipList) {
+
+        String clientIp =null;
+        List<String> slaveList = new ArrayList<>();
+
+        if(map.containsKey("slave")) {
+            slaveList = map.get("slave");
+        }
+
+        Set<String> myset = new HashSet<>();
+        for(String s: slaveList) {
+            myset.add(s);
+        }
+
+        for(String s: ipList) {
+            myset.add(s);
+        }
+
+        Object[] array1 = myset.toArray();
+        clientIp = (String) array1[array1.length-1];
+        return clientIp;
+
     }
 
 

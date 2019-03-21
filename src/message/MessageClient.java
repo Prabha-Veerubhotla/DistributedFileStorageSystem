@@ -52,7 +52,7 @@ public class MessageClient {
         System.out.println("help - show this menu");
         System.out.println("post - send a message to the group (default)");
         System.out.println("whoami - list my settings");
-        //System.out.println("put - store a file");
+        System.out.println("put-file - store a file");
         System.out.println("get - retrieve a stored message");
         //System.out.println("get-file - retrieve a stored file");
         System.out.println("list - list all stored messages");
@@ -98,7 +98,7 @@ public class MessageClient {
                     System.out.println("delete - delete a stored message");
                     System.out.println("exit - end session");
                     System.out.println("");
-                } else if(choice.equalsIgnoreCase("put")) {
+                } else if(choice.equalsIgnoreCase("put-file")) {
                     System.out.print("Enter the relative path of file with the file name: ");
                     System.out.println("Example Usage:  /Users/Desktop/project1.txt");
                     System.out.print("Enter file path: ");

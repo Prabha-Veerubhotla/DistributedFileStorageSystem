@@ -8,7 +8,7 @@ public class MasterHandler {
 
     public void createFile(String fileName, String filePath, String email){
         ReadWrite rw = new ReadWrite();
-        List<byte[]> out = rw.convertFileToByteArray(fileName, filePath);
+        List<byte[]> out = rw.convertFileToByteArray(filePath);
         logger.info("Out-> " + out);
         rw.convertByteArrayToFile("Output.jpeg", out);
     }

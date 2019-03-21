@@ -15,7 +15,7 @@ public class ReadWrite {
      * @param filePath
      * @return List of 3 byte array
      */
-    public List<byte[]> convertFileToByteArray(String fileName, String filePath){
+    public List<byte[]> convertFileToByteArray(String filePath){
         List<byte[]> ans = new ArrayList<>();
         try {
             RandomAccessFile f = new RandomAccessFile(filePath, "r");

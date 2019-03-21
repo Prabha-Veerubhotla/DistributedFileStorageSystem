@@ -3,6 +3,9 @@ package grpc.route.server;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
 import com.google.protobuf.ByteString;
@@ -23,6 +26,9 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	private static boolean isMaster = false;
 	private static String origin = "slave";
 	private static String destination = "master";
+	private static String myIp;
+	private static List<String> slaveips = new ArrayList<>();
+	private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
 	/**
 	 * TODO refactor this!
 	 * 
@@ -36,6 +42,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         	name = new String(msg.getPayload().toByteArray());
 			logger.info("--> join: " + name);
 			reply = "Hello "+new String(msg.getPayload().toByteArray())+ "!";
+			getSlaveIpList();
 
 		} else if(msg.getType().equalsIgnoreCase( "message-put")) {
         	String message = new String(msg.getPayload().toByteArray());
@@ -66,6 +73,24 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			logger.info("--> message from: " + name +" asking to list all messages");
 			reply = MasterNode.listMessages(name);
 		}
+
+		else if(msg.getType().equalsIgnoreCase( "request-ip")) {
+			//String message = new String(msg.getPayload().toByteArray());
+			logger.info("--> message from: " + name +" asking to assign ip");
+			reply = MasterNode.sendIpToClient(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
+		}
+
+		else if(msg.getType().equalsIgnoreCase( "save-client-ip")) {
+			String message = new String(msg.getPayload().toByteArray());
+			logger.info("--> message from: " + name +" asking to save  client ip");
+			if(dhcp_lease_test.updateCurrentNodeMapping(message, msg.getOrigin())) {
+				reply = "success";
+			} else {
+				reply = "failure";
+			}
+
+		}
+
 		else {
 
 			// TODO placeholder
@@ -76,6 +101,15 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
 		byte[] raw = reply.getBytes();
 		return ByteString.copyFrom(raw);
+	}
+
+
+	public void getSlaveIpList() {
+		Map<String, List<String>> map = dhcp_lease_test.getCurrentNodeMapping();
+		if(map.containsKey("slave")) {
+			slaveips = map.get("slave");
+		}
+		MasterNode.assignSlaveIp(slaveips);
 	}
 
 	protected ByteString processSlave(route.Route msg) {
@@ -94,7 +128,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		if(msg.getType().equalsIgnoreCase("message-get")) {
 			String actualmessage = new String(msg.getPayload().toByteArray());
 			String name = msg.getUsername();
-			reply = SlaveNode.getSavedMessage(actualmessage, name);
+			reply = SlaveNode.getSavedMessage(actualmessage, name).toString();
 			logger.info("retrieving information of "+name);
 
 		}
@@ -113,6 +147,24 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			String actualmessage = new String(msg.getPayload().toByteArray());
 			String name = msg.getUsername();
 			reply = SlaveNode.listMessages(name).toString();
+		}
+		if(msg.getType().equalsIgnoreCase("node-ip")) {
+			String actualmessage = new String(msg.getPayload().toByteArray());
+			String name = msg.getUsername();
+			myIp = actualmessage;
+			logger.info("my ip is: "+myIp);
+			reply = "slave";
+		}
+
+		if(msg.getType().equalsIgnoreCase("file-put")) {
+             if(SlaveNode.saveFile(msg.getPath(), name, msg.getPayload())){
+             	reply = "success";
+             	logger.info("saved file: "+msg.getPath()+ " successfully");
+			 } else {
+             	reply = "failure";
+             	logger.info("unable to save file: "+msg.getPath());
+			 }
+
 		}
 
 		if(reply == null) {
@@ -134,9 +186,9 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		final RouteServerImpl impl = new RouteServerImpl();
 		if(conf.getProperty("server.name").equalsIgnoreCase("master")) {
 			isMaster = true;
-			logger.info("Running as master node on: 127.0.0.1 :"+  conf.getProperty("server.port"));
+			logger.info("Running as master node on");
 		} else {
-			logger.info("Running as slave node on: 127.0.0.1 :"+  conf.getProperty("server.port"));
+			logger.info("Running as slave node");
 		}
 		impl.start();
 		impl.blockUntilShutdown();
@@ -146,7 +198,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 		Thread thread = new Thread(){
 			public void run(){
 				logger.info("Starting DHCP Lease Monitor Thread...");
-					new Dhcp_Lease_Test().monitorLease();
+					dhcp_lease_test.monitorLease();
 			}
 		};
 		thread.start();
@@ -242,7 +294,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	@Override
 	public void requestStreamFrom(route.Route request, StreamObserver<route.Route> responseObserver) {
 		route.Route.Builder builder = route.Route.newBuilder();
-
+        String reply = "failure";
 		// TODO accept input from request as to what to retrieve. For now it is -- done
 		// hard-coded to a fixed file
 
@@ -255,21 +307,24 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			responseObserver.onCompleted();
 		}
 		logger.info("-- received file: " +filename+" from: "+name);
+		if(MasterNode.saveFile(filename, name)) {
+			reply = "success";
+		}
 
-		FileInputStream fis = null;
-		try {
-			fis = new FileInputStream(fn);
-			long seq = 0l;
-			final int blen = 1024;
-			byte[] raw = new byte[blen];
-			boolean done = false;
-			while (!done) {
-				int n = fis.read(raw, 0, blen);
-				if (n <= 0)
-					break;
-
-				// identifying sequence number
-				seq++;
+//		FileInputStream fis = null;
+//		try {
+//			fis = new FileInputStream(fn);
+//			long seq = 0l;
+//			final int blen = 1024;
+//			byte[] raw = new byte[blen];
+//			boolean done = false;
+//			while (!done) {
+//				int n = fis.read(raw, 0, blen);
+//				if (n <= 0)
+//					break;
+//
+//				// identifying sequence number
+//				seq++;
 
 				// routing/header information
 				//builder.setId(RouteServer.getInstance().getNextMessageID());
@@ -278,24 +333,27 @@ public class RouteServerImpl extends RouteServiceImplBase {
 				builder.setDestination(request.getOrigin());
 				//builder.setSeqnum(seq);
 				builder.setPath(request.getPath());
-				builder.setPayload(ByteString.copyFrom(raw, 0, n));
+				builder.setPayload(ByteString.copyFrom(reply.getBytes()));
+                logger.info("sending reply to client..");
+				//builder.setPayload(ByteString.copyFrom(raw, 0, n));
 
 				route.Route rtn = builder.build();
 				responseObserver.onNext(rtn);
+		responseObserver.onCompleted();
 			}
-		} catch (IOException e) {
-			; // ignore? really?
-		} finally {
-			try {
-				fis.close();
-			} catch (IOException e) {
-				; // ignore
-			}
+//		} catch (IOException e) {
+//			; // ignore? really?
+//		} finally {
+//			try {
+//				fis.close();
+//			} catch (IOException e) {
+//				; // ignore
+//			}
 
-			responseObserver.onCompleted();
-		}
 
-	}
+
+
+
 	//TODO: add sending a message without getting a request
 	//make it more interactive
 }
