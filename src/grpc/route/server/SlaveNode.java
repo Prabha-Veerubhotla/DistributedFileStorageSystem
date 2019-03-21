@@ -1,5 +1,6 @@
 package grpc.route.server;
 
+import com.google.protobuf.ByteString;
 import main.entities.FileEntity;
 import main.slave.SlaveHandler;
 
@@ -14,7 +15,7 @@ public class SlaveNode extends RouteServerImpl {
     static Map<String, List<String>> map = new HashMap<>();
     static SlaveHandler sh = new SlaveHandler();
 
-    public static boolean saveMessage(String msg, String name) {
+    public static boolean saveFile(String filename, String name, ByteString content) {
 //        logger.info("saving message:  "+msg+" from:  "+name+" in slave..");
 //        if(map.containsKey(name)) {
 //            logger.info("saving next message of "+name);
@@ -29,6 +30,12 @@ public class SlaveNode extends RouteServerImpl {
 //            map.put(name, messages);
 //
 //        }
+        sh.createNewFile(name, new FileEntity(filename, content));
+        return true;
+    }
+
+    public static boolean saveMessage(String name, String message) {
+
         sh.createNewFile(name, new FileEntity("hi", "hi"));
         return true;
     }
@@ -52,6 +59,8 @@ public class SlaveNode extends RouteServerImpl {
         FileEntity result = sh.retrieveFile(name, "hi");
         return result;
     }
+
+    //public static boolean saveFile()
 
 
     public static boolean deleteMessage(String msg, String name) {
