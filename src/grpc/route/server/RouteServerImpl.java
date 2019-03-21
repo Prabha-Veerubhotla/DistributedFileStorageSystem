@@ -156,6 +156,17 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			reply = "slave";
 		}
 
+		if(msg.getType().equalsIgnoreCase("file-put")) {
+             if(SlaveNode.saveFile(msg.getPath(), name, msg.getPayload())){
+             	reply = "success";
+             	logger.info("saved file: "+msg.getPath()+ " successfully");
+			 } else {
+             	reply = "failure";
+             	logger.info("unable to save file: "+msg.getPath());
+			 }
+
+		}
+
 		if(reply == null) {
 			reply = "";
 		}
@@ -283,7 +294,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 	@Override
 	public void requestStreamFrom(route.Route request, StreamObserver<route.Route> responseObserver) {
 		route.Route.Builder builder = route.Route.newBuilder();
-
+        String reply = "failure";
 		// TODO accept input from request as to what to retrieve. For now it is -- done
 		// hard-coded to a fixed file
 
@@ -296,21 +307,24 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			responseObserver.onCompleted();
 		}
 		logger.info("-- received file: " +filename+" from: "+name);
+		if(MasterNode.saveFile(filename, name)) {
+			reply = "success";
+		}
 
-		FileInputStream fis = null;
-		try {
-			fis = new FileInputStream(fn);
-			long seq = 0l;
-			final int blen = 1024;
-			byte[] raw = new byte[blen];
-			boolean done = false;
-			while (!done) {
-				int n = fis.read(raw, 0, blen);
-				if (n <= 0)
-					break;
-
-				// identifying sequence number
-				seq++;
+//		FileInputStream fis = null;
+//		try {
+//			fis = new FileInputStream(fn);
+//			long seq = 0l;
+//			final int blen = 1024;
+//			byte[] raw = new byte[blen];
+//			boolean done = false;
+//			while (!done) {
+//				int n = fis.read(raw, 0, blen);
+//				if (n <= 0)
+//					break;
+//
+//				// identifying sequence number
+//				seq++;
 
 				// routing/header information
 				//builder.setId(RouteServer.getInstance().getNextMessageID());
@@ -319,24 +333,27 @@ public class RouteServerImpl extends RouteServiceImplBase {
 				builder.setDestination(request.getOrigin());
 				//builder.setSeqnum(seq);
 				builder.setPath(request.getPath());
-				builder.setPayload(ByteString.copyFrom(raw, 0, n));
+				builder.setPayload(ByteString.copyFrom(reply.getBytes()));
+                logger.info("sending reply to client..");
+				//builder.setPayload(ByteString.copyFrom(raw, 0, n));
 
 				route.Route rtn = builder.build();
 				responseObserver.onNext(rtn);
+		responseObserver.onCompleted();
 			}
-		} catch (IOException e) {
-			; // ignore? really?
-		} finally {
-			try {
-				fis.close();
-			} catch (IOException e) {
-				; // ignore
-			}
+//		} catch (IOException e) {
+//			; // ignore? really?
+//		} finally {
+//			try {
+//				fis.close();
+//			} catch (IOException e) {
+//				; // ignore
+//			}
 
-			responseObserver.onCompleted();
-		}
 
-	}
+
+
+
 	//TODO: add sending a message without getting a request
 	//make it more interactive
 }

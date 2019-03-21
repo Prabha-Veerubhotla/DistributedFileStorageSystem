@@ -4,9 +4,12 @@ import com.gemstone.gemfire.internal.util.CollectionUtils;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import main.master.ReadWrite;
 import route.Route;
 import route.RouteServiceGrpc;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,8 +25,8 @@ public class MasterNode extends RouteServerImpl {
         slaveip = slaveiplist;
         slave1 = slaveip.get(0);
     }
-    
-    
+
+
 
     public static boolean saveMessage(String msg, String name) {
         //save message in node-1
@@ -52,6 +55,52 @@ public class MasterNode extends RouteServerImpl {
             }
             return false;
 
+    }
+
+    public static boolean saveFile(String filename, String name) {
+
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
+        RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
+        Route.Builder bld = Route.newBuilder();
+
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(filename);
+            long seq = 0l;
+            final int blen = 1024;
+            byte[] raw = new byte[blen];
+            boolean done = false;
+            while (!done) {
+                int n = fis.read(raw, 0, blen);
+                if (n <= 0)
+                    break;
+
+                // identifying sequence number
+                seq++;
+
+                // routing/header information
+                //builder.setId(RouteServer.getInstance().getNextMessageID());
+                //builder.setOrigin(RouteServer.getInstance().getServerID());
+                bld.setOrigin("master");
+                bld.setDestination("slave");
+                bld.setType("file-put");
+                bld.setPath(filename);
+                bld.setPayload(ByteString.copyFrom(new ReadWrite().convertFileToByteArray(filename).toString().getBytes()));
+                Route r = stub.request(bld.build());
+                if(new String(r.getPayload().toByteArray()).equalsIgnoreCase("success")){
+                    return  true;
+                }
+            }
+        } catch (IOException e) {
+            ; // ignore? really?
+        } finally {
+            try {
+                fis.close();
+            } catch (IOException e) {
+                ; // ignore
+            }
+        }
+        return  false;
     }
 
     public static String getMessage(String msg, String name) {

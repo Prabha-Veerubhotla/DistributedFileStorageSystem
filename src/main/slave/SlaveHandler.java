@@ -98,19 +98,19 @@ public class SlaveHandler {
         return ((MongoDBHandler)mongoDB).get(email);
     }
 
-//    public static void main(String[] args) {
-//        SlaveHandler h = new SlaveHandler();
-//
-//        byte[] cont = new byte[100];
-//        String test1 = "Using Redis!!!!!";
+    public static void main(String[] args) {
+        SlaveHandler h = new SlaveHandler();
+
+        byte[] cont = new byte[100];
+        String test1 = "Using Redis!!!!!";
 //        h.createNewFile("nrupa.chitley@sjsu.edu", new FileEntity("test1.txt", test1));
-//        FileEntity reqFile = h.retrieveFile("nrupa.chitley@sjsu.edu", "test1.txt");
-//        System.out.println("File: " + reqFile.getFileContents());
+        FileEntity reqFile = h.retrieveFile("nrupa.chitley@sjsu.edu", "test1.txt");
+        System.out.println("File: " + reqFile.getFileContents());
 //        List<FileEntity> ans = h.getAllFiles("nrupa.chitley@sjsu.edu");
 //        System.out.println("ALL Files: " + ans);
 //        h.removeFile("nrupa.chitley@sjsu.edu", "test1.txt");
 //        List<FileEntity> ans = ((MongoDBHandler)h.mongoDB).get("nrupa.chitley@sjsu.edu");
 //        System.out.println("Ans: " + ans);
 //        h.updateFile("nrupa.chitley@sjsu.edu", new FileEntity("test1.txt", "Update Content!!!!!!!!!"));
-//    }
+    }
 }
