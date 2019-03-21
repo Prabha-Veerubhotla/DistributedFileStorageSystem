@@ -57,7 +57,7 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
-    public static boolean saveFile(String filename, String name) {
+    public static boolean saveFile(String filename, String name, String payload) {
 
         ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1,Integer.parseInt(slave1port.trim()) ).usePlaintext(true).build();
         RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
@@ -68,7 +68,8 @@ public class MasterNode extends RouteServerImpl {
                 bld.setType("file-put");
                 bld.setPath(filename);
                 logger.info("sending file to slave...");
-                bld.setPayload(ByteString.copyFrom(new ReadWrite().convertFileToByteArray(filename).toString().getBytes()));
+                bld.setPayload(ByteString.copyFrom(payload.getBytes()));
+
                 Route r = stub.request(bld.build());
                 if(new String(r.getPayload().toByteArray()).equalsIgnoreCase("success")){
                     return  true;

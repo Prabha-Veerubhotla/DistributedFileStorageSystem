@@ -7,6 +7,8 @@ import route.Route;
 import route.RouteServiceGrpc;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.*;
 
 /**
@@ -221,19 +223,27 @@ public class RouteClient {
 		bld.setType(type);
 		byte[] fn = filename.getBytes();
 
-		bld.setPayload(ByteString.copyFrom(fn));
+		try {
+			RandomAccessFile f = new RandomAccessFile(filename, "r");
+			byte[] b = new byte[(int) f.length()];
+			f.readFully(b);
+			f.close();
+			bld.setPayload(ByteString.copyFrom(b));
+		} catch (IOException ie) {
+			System.out.println("Unable to copy data from file..");
+		}
 
 		// we are still blocking!
-		Iterator<Route> rIter = RouteClient.stub.requestStreamFrom(bld.build());
-		while (rIter.hasNext()) {
+		Route r = RouteClient.stub.request(bld.build());
+		//while (rIter.hasNext()) {
 			// process responses
-			Route r = rIter.next();
+			//Route r = rIter.next();
 			String payload = new String(r.getPayload().toByteArray());
 			System.out.println("reply: " + payload + ", from: " + r.getOrigin());
 			System.out.println("reply payload: "+new String(r.getPayload().toByteArray()));
 		}
 
-	}
+
 
 	public byte[] getSavedFile(String filename, String type) {
 		Route.Builder bld = Route.newBuilder();

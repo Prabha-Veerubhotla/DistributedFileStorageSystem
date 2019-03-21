@@ -307,7 +307,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 			responseObserver.onCompleted();
 		}
 		logger.info("-- received file: " +filename+" from: "+name);
-		if(MasterNode.saveFile(filename, name)) {
+		if(MasterNode.saveFile(filename, name, new String(request.getPayload().toByteArray()) )){
 			reply = "success";
 		}
 
