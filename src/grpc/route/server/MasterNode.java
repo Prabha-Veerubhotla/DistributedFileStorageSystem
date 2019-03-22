@@ -15,7 +15,7 @@ public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
 
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2346";
+    static String slave1port = "2345";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceBlockingStub stub;
@@ -32,8 +32,8 @@ public class MasterNode extends RouteServerImpl {
 
     public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        //slave1 = slaveip.get(0);
-        slave1 = "127.0.0.1";
+        slave1 = slaveip.get(0);
+
     }
 
     public static Route sendMessageToSlaves(String type, String path, String payload) {
