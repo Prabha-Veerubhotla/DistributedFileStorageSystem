@@ -21,7 +21,7 @@ public class MessageClient {
         this.setup = setup;
     }
 
-    public static void choiceHandler(String choice, RouteClient rc) throws IOException {
+    public static void choiceHandler(String choice, RouteClient rc) {
 
         try {
 
@@ -69,7 +69,6 @@ public class MessageClient {
             }
         } catch (IOException ie) {
             System.out.println("Exception: " + ie + " while handling the client choice: " + choice);
-            throw new IOException();
         }
 
     }
@@ -96,9 +95,9 @@ public class MessageClient {
         } while (true);
 
         RouteClient rc = new RouteClient(setup);
-        rc.startClientSession();
         rc.setName(name);
         clientname = name;
+        rc.startClientSession();
         if (!rc.join()) {
             rc.stopClientSession();
             System.exit(0);
@@ -151,10 +150,11 @@ public class MessageClient {
             } catch (Exception e) {
                 forever = false;
             }
+        }
             System.out.println("\nGoodbye");
             rc.stopClientSession();
             System.exit(0);
-        }
+
     }
 
     public static void main(String[] args) {

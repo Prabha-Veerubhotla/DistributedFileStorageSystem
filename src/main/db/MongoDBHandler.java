@@ -9,9 +9,13 @@ import com.sun.istack.NotNull;
 import main.entities.FileEntity;
 import org.bson.Document;
 import com.mongodb.client.MongoCollection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.*;
 
 public class MongoDBHandler implements DbHandler {
+    protected static Logger logger = LoggerFactory.getLogger("mongodb-handler");
     private  MongoClient mongoClient;
     private MongoDatabase database;
     private MongoCollection<Document> collection;

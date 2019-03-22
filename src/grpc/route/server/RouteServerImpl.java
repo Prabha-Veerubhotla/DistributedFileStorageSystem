@@ -27,8 +27,6 @@ public class RouteServerImpl extends RouteServiceImplBase {
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     private List<String> msgTypes = FetchConfig.getMsgTypes();
-    private MasterNode masterNode = new MasterNode();
-    private SlaveNode slaveNode = new SlaveNode();
 
     /**
      * TODO refactor this!
@@ -44,24 +42,24 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
         if (msg.getType().equalsIgnoreCase(msgTypes.get(0))) {
             //save client user name
-            name = new String(msg.getPayload().toByteArray());
+            name = msg.getUsername();
             logger.info("--> join: " + name);
             reply = "welcome";
             myIp = msg.getDestination();
-            masterNode.setMasterIp(myIp);
-            masterNode.setUsername(name);
+            MasterNode.setMasterIp(myIp);
+            MasterNode.setUsername(name);
             //TODO: run a background theread continuously monitoring slave ip list
             getSlaveIpList();
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
             String message = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: " + name + " asking to retrieve: " + message);
-            reply = masterNode.get(msg).toString();
+            reply = MasterNode.get(msg).toString();
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
             String message = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: " + name + " asking to save: " + message);
-            if (masterNode.put(msg)) {
+            if (MasterNode.put(msg)) {
                 reply = "success";
             } else {
                 reply = "failure";
@@ -69,19 +67,19 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
             logger.info("--> message from: " + name + " asking to list all messages or files");
-            reply = masterNode.list(msg);
+            reply = MasterNode.list(msg);
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
             String message = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: " + name + " asking to delete: " + message);
-            if (masterNode.delete(msg)) {
+            if (MasterNode.delete(msg)) {
                 reply = "success";
             } else {
                 reply = "failure";
             }
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(5))) {
             logger.info("--> message from: " + name + " asking to assign ip");
-            reply = masterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
+            reply = MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(6))) {
             logger.info("--> message from: " + name + " asking to save client information");
             if (dhcp_lease_test.updateCurrentNodeMapping(msg, msg.getOrigin())) {
@@ -106,23 +104,25 @@ public class RouteServerImpl extends RouteServiceImplBase {
         if (map.containsKey("slave")) {
             slaveips = map.get("slave");
         }
-        masterNode.assignSlaveIp(slaveips);
+        MasterNode.assignSlaveIp(slaveips);
     }
 
 
     protected ByteString processSlave(route.Route msg) {
+
+        name = msg.getUsername();
 
         String reply;
 
         if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to retrieve: " + actualmessage);
-            reply = slaveNode.get(msg).toString();
+            reply = SlaveNode.get(msg).toString();
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: master asking to save: " + actualmessage);
-            if (slaveNode.put(msg)) {
+            logger.info("--> message from: master asking to save: " + msg.getPath());
+            if (SlaveNode.put(msg)) {
                 logger.info("--saved message: " + actualmessage + " from: " + name + " successfully");
                 reply = "success";
             } else {
@@ -132,11 +132,11 @@ public class RouteServerImpl extends RouteServiceImplBase {
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to list messages or files of: " + msg.getUsername());
-            reply = slaveNode.list(msg).toString();
+            reply = SlaveNode.list(msg).toString();
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to delete: " + actualmessage);
-            if (slaveNode.delete(msg)) {
+            if (SlaveNode.delete(msg)) {
                 reply = "success";
             } else {
                 reply = "failure";

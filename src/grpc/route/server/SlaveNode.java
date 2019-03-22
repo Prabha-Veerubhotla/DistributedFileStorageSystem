@@ -6,7 +6,6 @@ import main.slave.SlaveHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +21,7 @@ public class SlaveNode extends RouteServerImpl {
         return true;
     }
 
-    public boolean put(Route r) {
+    public static boolean put(Route r) {
         String name = r.getUsername();
         String path = r.getPath();
         String payload = r.getPayload().toString();
@@ -30,36 +29,29 @@ public class SlaveNode extends RouteServerImpl {
         return true;
     }
 
-    public FileEntity get(Route r) {
+    public static FileEntity get(Route r) {
         String payload = r.getPayload().toString();
         logger.info("retrieving information of: " + payload);
         String name = r.getUsername();
-        FileEntity result = sh.retrieveFile(name, payload);
+        FileEntity result = sh.retrieveFile(name, r.getPath());
         return result;
     }
 
-    public boolean delete(Route r) {
+    public static boolean delete(Route r) {
         boolean status = false;
         String name = r.getUsername();
         String msg = r.getPayload().toString();
         logger.info("deleting message " + msg + " from:  " + name + " in slave..");
-        if (map.containsKey(name)) {
-            List<String> messages = map.get(name);
-            messages.remove(msg);
-            map.put(name, messages);
-            status = true;
-        }
+        status = sh.removeFile(name, msg);
         return status;
     }
 
-    public List<String> list(Route r) {
+    public static List<FileEntity> list(Route r) {
         logger.info("listing messages or files of: " + r.getUsername());
         String username = r.getUsername();
-        List<String> stringList = new ArrayList<>();
-        if (map.containsKey(username)) {
-            return map.get(username);
-        }
-        return stringList;
+        List<FileEntity> list = sh.getAllFiles(username);
+        logger.info("list of files are: "+list);
+        return list;
     }
 }
 
