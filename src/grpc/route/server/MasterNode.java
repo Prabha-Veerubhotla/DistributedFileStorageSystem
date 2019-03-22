@@ -1,50 +1,44 @@
 package grpc.route.server;
 
-import com.gemstone.gemfire.internal.util.CollectionUtils;
+
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import main.master.ReadWrite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
 import route.RouteServiceGrpc;
 
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
 
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2345";
+    static String slave1port = "2346";
     static String slave1 = null;
-    private ManagedChannel ch;
-    private RouteServiceGrpc.RouteServiceBlockingStub stub;
-    private String myIp;
-    private String username;
+    private static ManagedChannel ch;
+    private static RouteServiceGrpc.RouteServiceBlockingStub stub;
+    private static String myIp;
+    private static String username;
 
-    public MasterNode() {
-        ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
-        stub = RouteServiceGrpc.newBlockingStub(ch);
-    }
-
-    public void setMasterIp(String ip) {
+    public static void setMasterIp(String ip) {
         myIp = ip;
     }
 
-    public void setUsername(String name) {
+    public static void setUsername(String name) {
         username = name;
     }
 
-    public  void assignSlaveIp(List<String> slaveiplist) {
+    public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        slave1 = slaveip.get(0);
+        //slave1 = slaveip.get(0);
+        slave1 = "127.0.0.1";
     }
 
-    public Route sendMessageToSlaves(String type, String path, String payload) {
+    public static Route sendMessageToSlaves(String type, String path, String payload) {
+        ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+        stub = RouteServiceGrpc.newBlockingStub(ch);
         Route.Builder bld = Route.newBuilder();
         bld.setUsername(username);
         bld.setOrigin(myIp);
@@ -53,11 +47,11 @@ public class MasterNode extends RouteServerImpl {
         bld.setType(type);
         bld.setPath(path);
         Route r = stub.request(bld.build());
-        return  r;
+        return r;
     }
 
-    public boolean put(Route r) {
-        logger.info("Sending message to node: " + slave1);
+    public static boolean put(Route r) {
+        logger.info("Saving message in node: " + slave1);
         String path = r.getPath();
         String type = r.getType();
         String payload = r.getPayload().toString();
@@ -67,10 +61,10 @@ public class MasterNode extends RouteServerImpl {
         if (payload.equalsIgnoreCase("success")) {
             return true;
         }
-        return  false;
+        return false;
     }
 
-    public byte[] get(Route r) {
+    public static byte[] get(Route r) {
         logger.info("retrieving message from  node: " + slave1);
         String type = r.getType();
         String payload = r.getPayload().toString();
@@ -80,18 +74,19 @@ public class MasterNode extends RouteServerImpl {
         return r.getPayload().toByteArray();
     }
 
-    public String list(Route r) {
-        logger.info("retrieving all message of user: "+r.getUsername()+" from  node: " + slave1);
+    public static String list(Route r) {
+        logger.info("retrieving all message of user: " + r.getUsername() + " from  node: " + slave1);
         String type = r.getType();
         String payload = r.getPayload().toString();
         String path = r.getPath();
         r = sendMessageToSlaves(type, path, payload);
         logger.info("Received response from slave node: " + payload);
+        logger.info("list of messages or files are: " + new ArrayList<>(Arrays.asList(payload.split(","))));
         return r.getPayload().toString();
     }
 
-    public boolean delete(Route r) {
-        logger.info("deleting message or file: "+r.getPayload()+" from:" + slave1);
+    public static boolean delete(Route r) {
+        logger.info("deleting message or file: " + r.getPayload() + " from:" + slave1);
         String path = r.getPath();
         String type = r.getType();
         String payload = r.getPayload().toString();
@@ -101,10 +96,10 @@ public class MasterNode extends RouteServerImpl {
         if (payload.equalsIgnoreCase("success")) {
             return true;
         }
-        return  false;
+        return false;
     }
 
-    public String sendIpToNode(Map<String, List<String>> map, List<String> ipList) {
+    public static String sendIpToNode(Map<String, List<String>> map, List<String> ipList) {
         //TODO: modify to accommodate client or slave ip
         String clientIp;
         List<String> slaveList = new ArrayList<>();

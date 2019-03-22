@@ -4,10 +4,13 @@ import main.db.DbHandler;
 import main.db.MongoDBHandler;
 import main.db.RedisHandler;
 import main.entities.FileEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public class SlaveHandler {
+    protected static Logger logger = LoggerFactory.getLogger("slave-handler");
     private DbHandler redis;
     private DbHandler mongoDB;
     public static final boolean CacheUnabled = false;
@@ -70,11 +73,12 @@ public class SlaveHandler {
      * @param email
      * @param fileName
      */
-    public void removeFile(String email, String fileName){
+    public boolean removeFile(String email, String fileName){
         if(CacheUnabled) {
             redis.remove(email, fileName);
         }
         mongoDB.remove(email, fileName);
+        return true;
     }
 
     /**

@@ -36,7 +36,7 @@ public class RouteClient {
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceBlockingStub stub;
     private Properties setup;
-    private static String name;
+    private String name;
     private static String myIp = "client"; // intially , later master node will assign an ip
     protected static Logger logger = LoggerFactory.getLogger("client");
     private List<String> msgTypes = new ArrayList<>();
@@ -45,8 +45,9 @@ public class RouteClient {
         this.setup = setup;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setName(String clientName) {
+        name = clientName;
+        logger.info("setting client name as: "+name);
     }
 
     public String getName() {
@@ -160,6 +161,17 @@ public class RouteClient {
         return putStatus;
     }
 
+    public boolean checkIfFile(String msg) {
+        try {
+            RandomAccessFile f = new RandomAccessFile(msg, "r");
+            return true;
+        }
+        catch (FileNotFoundException fe) {
+            logger.info("Not a file");
+        }
+        return false;
+    }
+
     public boolean delete(String msg) {
         boolean deleteStatus = false;
         String type = msgTypes.get(4);
@@ -195,12 +207,7 @@ public class RouteClient {
     }
 }
 
-
-
-
-
-
-    /*public static boolean sampleBlocking(String msg, String type) {
+ /*public static boolean sampleBlocking(String msg, String type) {
         boolean status = false;
 
         Route.Builder bld = Route.newBuilder();
