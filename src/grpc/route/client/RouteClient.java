@@ -164,12 +164,12 @@ public class RouteClient {
     public boolean checkIfFile(String msg) {
         try {
             RandomAccessFile f = new RandomAccessFile(msg, "r");
-            return true;
         }
         catch (FileNotFoundException fe) {
             logger.info("Not a file");
+            return false;
         }
-        return false;
+        return true;
     }
 
     public boolean delete(String msg) {
