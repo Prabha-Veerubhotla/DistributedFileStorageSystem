@@ -91,7 +91,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         } else {
             // TODO placeholder
             String content = new String(msg.getPayload().toByteArray());
-            logger.info("-- got: " + content + "from: " + msg.getOrigin() + "path: " + msg.getPath());
+            logger.info("-- got: " + content + "from: " + msg.getOrigin() + "  path: " + msg.getPath());
             reply = "blank";
         }
         byte[] raw = reply.getBytes();
@@ -150,7 +150,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
             // TODO placeholder
             String content = new String(msg.getPayload().toByteArray());
-            logger.info("-- got: " + content + "from: " + msg.getOrigin() + "path: " + msg.getPath());
+            logger.info(" got: " + content + "from: " + msg.getOrigin() + " path: " + msg.getPath());
             reply = "blank";
         }
 

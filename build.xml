@@ -41,8 +41,8 @@
     </target>
 
 
-    <!-- invoke server -->
-   <target name="server" depends="build">
+    <!-- invoke master node -->
+   <target name="master" depends="build">
        <java fork="yes" classname="grpc.route.server.RouteServerImpl">
            <classpath refid="project.classpath" />
            <arg value="conf/server.conf" />
@@ -51,6 +51,18 @@
            <jvmarg value = '-Xmx1000m' />
        </java>
    </target>
+
+
+    <!-- invoke slave node -->
+    <target name="slave" depends="build">
+        <java fork="yes" classname="grpc.route.server.RouteServerImpl">
+            <classpath refid="project.classpath" />
+            <arg value="conf/slave.conf" />
+            <jvmarg value = '-server' />
+            <jvmarg value = '-Xms500m' />
+            <jvmarg value = '-Xmx1000m' />
+        </java>
+    </target>
 
 
     <!-- invoke client -->

@@ -45,7 +45,7 @@ public class Dhcp_Lease_Test {
         for (String s2 : newIpList) {
             sb.append(s2 + ",");
         }
-        logger.info("All new ips" + sb.toString());
+        logger.info("All new ips: " + sb.toString());
 
         for (String s1 : newIpList) {
             String ip = s1;
@@ -55,9 +55,8 @@ public class Dhcp_Lease_Test {
             } catch (IOException ie) {
                 logger.info("Unable to retrieve server config properties, exception: "+ie);
             }
-            logger.info("Node Ip is" + ip);
+            logger.info("Node Ip is: " + ip);
             logger.info("Node port: " + server_port);
-
             ManagedChannel ch = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(server_port.trim())).usePlaintext(true).build();
             RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
 

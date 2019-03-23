@@ -134,6 +134,7 @@ public class RouteClient {
                 logger.info("Saving it as message");
                 return filename.getBytes();
             }
+            logger.info("file length is: "+f.length());
             byte[] b = new byte[(int) f.length()];
             f.readFully(b);
             f.close();
