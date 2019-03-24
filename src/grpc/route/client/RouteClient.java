@@ -74,9 +74,9 @@ public class RouteClient {
         System.out.println("Client running...");
         msgTypes = FetchConfig.getMsgTypes();
         //request ip from node running dhcp-server
-        // requestIp();
+        requestIp();
         //reply node info stating that you are client
-        //sendNodeInfo();
+        sendNodeInfo();
     }
 
     public boolean checkIfFile(String msg) {
@@ -95,27 +95,20 @@ public class RouteClient {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-                /*if (route.getType().equalsIgnoreCase("put")) {
-                    synchronized (response) {
-                        try {
-                            response.wait();
-                            response = route.toBuilder().build();
-                        } catch (InterruptedException ie) {
-                            ie.printStackTrace();
-                        }
-                    }
-                } else*/ if (route.getType().equalsIgnoreCase("get")) {
 
+                if (route.getType().equalsIgnoreCase("get")) {
+                    logger.info("recevied data from master: " + new String(route.getPayload().toByteArray()));
                     File file = new File("output-" + route.getPath());
                     //Create the file
                     try {
                         if (file.createNewFile()) {
-                            System.out.println("File is created!");
+                            logger.info("File: " + file + " is created!");
                         } else {
-                            System.out.println("File already exists.");
+                            logger.info("File: " + file + " already exists.");
                         }
                         RandomAccessFile f = new RandomAccessFile(file, "rw");
-                        f.write(route.getPayload().toByteArray(), 0, 1);
+                        // write into the file , every chunk received from master
+                        f.write(route.getPayload().toByteArray());
                         f.close();
                     } catch (IOException io) {
                         io.printStackTrace();
@@ -218,7 +211,6 @@ public class RouteClient {
             logger.info("Exception while waiting for count down latch: " + ie);
         }
 
-
     }
 
     public boolean join() {
@@ -258,28 +250,6 @@ public class RouteClient {
         }
     }
 
-    public byte[] convertFileContent(String filename) {
-        RandomAccessFile f;
-        try {
-            try {
-                f = new RandomAccessFile(filename, "r");
-            } catch (FileNotFoundException fe) {
-                //if file is not found
-                // if it is msg, return byte array
-                logger.info("File: " + filename + " not found");
-                logger.info("Saving it as message");
-                return filename.getBytes();
-            }
-            logger.info("file length is: " + f.length());
-            byte[] b = new byte[(int) f.length()];
-            f.readFully(b);
-            f.close();
-            return b;
-        } catch (IOException ie) {
-            logger.info("Unable to convert file contents of: " + filename + " to byte array");
-        }
-        return new byte[1]; // return byte array of size 1, if unable to read file content
-    }
 
     public boolean put(String msg) {
         String type = msgTypes.get(2);
@@ -288,19 +258,19 @@ public class RouteClient {
         boolean putStatus = false;
         System.out.println("Streaming: " + msg);
         sendMessageToServer(type, path, payload);
-       // synchronized (response) {
-          //  try {
-                //response.wait();
-                if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
-                    putStatus = true;
-                    logger.info("Successfully saved: " + msg);
-                } else {
-                    logger.info("Could not save: " + msg);
-                }
+        // synchronized (response) {
+        //  try {
+        //response.wait();
+        if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
+            putStatus = true;
+            logger.info("Successfully saved: " + msg);
+        } else {
+            logger.info("Could not save: " + msg);
+        }
             /*} catch (InterruptedException ie) {
                 ie.printStackTrace();
             }*/
-        
+
         return putStatus;
     }
 
@@ -329,11 +299,11 @@ public class RouteClient {
         synchronized (response) {
             try {
                 response.wait();
-            } catch(InterruptedException ie) {
+            } catch (InterruptedException ie) {
                 ie.printStackTrace();
             }
         }
-        return new File("output-"+msg);
+        return new File("output-" + msg);
     }
 
     public List<String> list() {

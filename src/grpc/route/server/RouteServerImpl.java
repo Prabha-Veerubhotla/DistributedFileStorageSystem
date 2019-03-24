@@ -52,12 +52,12 @@ public class RouteServerImpl extends RouteServiceImplBase {
             //TODO: run a background theread continuously monitoring slave ip list
             getSlaveIpList();
 
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
+        } /*else if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
             String message = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: " + name + " asking to retrieve: " + message);
             reply = MasterNode.get(msg).toString();
 
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
+        }*/ else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
             String message = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: " + name + " asking to save: " + msg.getPath());
             if (MasterNode.put(msg)) {
@@ -115,12 +115,13 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
         String reply;
 
-        if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
+        /*if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to retrieve: " + actualmessage);
             reply = SlaveNode.get(msg).toString();
 
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
+        }*/
+        /*if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to save: " + msg.getPath());
             logger.info("received message from master asking to save seq num: " + msg.getSeq());
@@ -131,7 +132,8 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 reply = "failure";
                 logger.info("--unable to save message: " + actualmessage + "from: " + name);
             }
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
+        }*/
+        if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to list messages or files of: " + msg.getUsername());
             reply = SlaveNode.list(msg).toString();
@@ -256,20 +258,17 @@ public class RouteServerImpl extends RouteServiceImplBase {
                     } else {
                         collectStreamingDataInSlave(route);
                     }
-                   /* builder.setType(route.getType());
-                    builder.setOrigin(myIp);
-                    builder.setDestination(route.getOrigin());
-                    builder.setSeq(route.getSeq());
-                    builder.setPayload(ByteString.copyFrom("success".getBytes()));
-                    responseObserver.onNext(route);*/
                 }
                 if (route.getType().equalsIgnoreCase("get")) {
                     if (isMaster) {
-                        collectDataFromSlavesInChunks(route);
+                        Route route1 = collectDataFromSlavesInChunks(route);
+                        responseObserver.onNext(route1);
                     } else {
-                        sendStreamingDataToSlave(route);
+                        sendDataToMasterInChunks(route);
+
                     }
-                    responseObserver.onNext(route);
+                    //   responseObserver.onNext(route);
+
                 } else {
                     if (isMaster) {
                         builder.setPayload(processMaster(route));

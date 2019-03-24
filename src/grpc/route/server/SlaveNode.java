@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 public class SlaveNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-slave");
     static Map<String, List<String>> map = new HashMap<>();
-    static SlaveHandler sh = new SlaveHandler();
+    static SlaveHandler sh;
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceStub stub;
     private static String slave1port = "2345";
@@ -40,7 +40,8 @@ public class SlaveNode extends RouteServerImpl {
         String path = r.getPath();
         String payload = r.getPayload().toString();
         logger.info("saving file with seq num: " + r.getSeq());
-        sh.createNewFile(name, new FileEntity(path, payload));
+        //TODO: store the file in db from method : writeChunksIntoFile
+        //sh.createNewFile(name, new FileEntity(path, payload));
         return true;
     }
 
@@ -52,14 +53,16 @@ public class SlaveNode extends RouteServerImpl {
         return result;
     }
 
+
+    // new - introduced with bi directional streaming
     public static void writeChunksIntoFile(Route r) {
         File file = new File(r.getPath());
         //Create the file
         try {
             if (file.createNewFile()) {
-                System.out.println("File is created!");
+                logger.info("File: "+ file+  "is created!");
             } else {
-                System.out.println("File already exists.");
+                logger.info("File: "+ file+" already exists.");
             }
             RandomAccessFile f = new RandomAccessFile(file, "rw");
             logger.info("writing chunk with seq num into file: " + r.getSeq());
@@ -70,13 +73,14 @@ public class SlaveNode extends RouteServerImpl {
         }
     }
 
-    //TODO: complete this method
+    //TODO: complete this method - new
     public static void writeFileInDb() {
 
     }
 
+    //return file in chunks to the master
     public static void returnFileInchunks(Route r) {
-        ch = ManagedChannelBuilder.forAddress(r.getOrigin(), Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+        ch = ManagedChannelBuilder.forAddress(r.getOrigin(), Integer.parseInt("2345")).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
         CountDownLatch latch = new CountDownLatch(1);
         StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
@@ -103,7 +107,8 @@ public class SlaveNode extends RouteServerImpl {
         } catch (InterruptedException ie) {
             logger.info("Exception while waiting for count down latch: " + ie);
         }
-        File fn = new File(r.getPayload().toString());
+        logger.info("Streaming file: "+new String(r.getPayload().toByteArray()));
+        File fn = new File(new String(r.getPayload().toByteArray()));
         FileInputStream fis = null;
         try {
             fis = new FileInputStream(fn);

@@ -9,16 +9,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
 import route.RouteServiceGrpc;
-
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
-
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2346";
+    static String slave1port = "2345";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceStub stub;
@@ -36,10 +34,12 @@ public class MasterNode extends RouteServerImpl {
 
     public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        //slave1 = slaveip.get(0);
-        slave1 = "localhost";
+        slave1 = slaveip.get(0);
+        //slave1 = "localhost"; // local testing
     }
 
+
+    // send any message to slave
     public static void sendMessageToSlaves(Route r) {
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
@@ -48,22 +48,23 @@ public class MasterNode extends RouteServerImpl {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-                logger.info("Received response from server: " + route.getPayload());
+                logger.info("Received response from slave: " + route.getPayload());
                 response = route;
             }
 
             @Override
             public void onError(Throwable throwable) {
-                logger.info("Exception in the response from server: " + throwable);
+                logger.info("Exception in the response from slaves: " + throwable);
                 latch.countDown();
             }
 
             @Override
             public void onCompleted() {
-                logger.info("Server is done sending data");
+                logger.info("Slave is done sending data.!");
                 latch.countDown();
             }
         });
+
         Route.Builder bld = Route.newBuilder();
         bld.setUsername(username);
         bld.setOrigin(myIp);
@@ -72,16 +73,18 @@ public class MasterNode extends RouteServerImpl {
         bld.setType(r.getType());
         bld.setPath(r.getPath());
         bld.setSeq(r.getSeq());
+
         requestObserver.onNext(bld.build());
+
         requestObserver.onCompleted();
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
             logger.info("Exception while waiting for count down latch: " + ie);
         }
-
     }
 
+    // collecting data(chunks) from slaves -- for get call
     public static Route collectDataFromSlaves(Route r) {
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
@@ -90,18 +93,19 @@ public class MasterNode extends RouteServerImpl {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-                logger.info("Received response from server: " + route.getPayload());
+                logger.info("Received response from slave: " + route.getPayload());
+                response = route.toBuilder().build();
             }
 
             @Override
             public void onError(Throwable throwable) {
-                logger.info("Exception in the response from server: " + throwable);
+                logger.info("Exception in the response from slave: " + throwable);
                 latch.countDown();
             }
 
             @Override
             public void onCompleted() {
-                logger.info("Server is done sending data");
+                logger.info("Slave is done sending data");
                 latch.countDown();
             }
         });
@@ -114,14 +118,15 @@ public class MasterNode extends RouteServerImpl {
         bld.setType(r.getType());
         bld.setPath(r.getPath());
         bld.setSeq(r.getSeq());
+        logger.info("sending request to slave to retrieve chunk: " + r.getPath());
         requestObserver.onNext(bld.build());
         requestObserver.onCompleted();
-        return bld.build();
+        return response;
     }
 
     public static boolean put(Route r) {
-        logger.info("Saving message in node: " + slave1);
-        logger.info("sending message to slave with seq num: "+r.getSeq());
+        logger.info("Saving file in node: " + slave1);
+        logger.info("sending file to slave with seq num: " + r.getSeq());
         sendMessageToSlaves(r);
         String payload = new String(response.getPayload().toByteArray());
         logger.info("Received response from slave node: " + payload);
@@ -150,11 +155,8 @@ public class MasterNode extends RouteServerImpl {
 
     public static boolean delete(Route r) {
         logger.info("deleting message or file: " + r.getPayload() + " from:" + slave1);
-        String path = r.getPath();
-        String type = r.getType();
-        String payload = r.getPayload().toString();
         sendMessageToSlaves(r);
-        payload = new String(response.getPayload().toByteArray());
+        String payload = new String(response.getPayload().toByteArray());
         logger.info("Received response from slave node: " + payload);
         if (payload.equalsIgnoreCase("success")) {
             return true;
@@ -182,7 +184,6 @@ public class MasterNode extends RouteServerImpl {
     }
 }
 
-
 // 1. save meta data of files (which partition on which slave)
 
 // 2. send heartbeat to slaves
@@ -195,5 +196,5 @@ public class MasterNode extends RouteServerImpl {
 
 // 6. take care of load balancing(data replication) when node goes up or down
 
-// 7. talk with both client and other slaves
+// 7. talk with both client and other slaves -- done
 
