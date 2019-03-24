@@ -2,6 +2,7 @@ package message;
 
 import grpc.route.client.RouteClient;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.List;
@@ -27,7 +28,7 @@ public class MessageClient {
 
             BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
             if (choice.equalsIgnoreCase("post")) {
-                System.out.print("Enter message or file path: ");
+                System.out.print("Enter file path: ");
                 String msg = br.readLine();
                 boolean msgstatus = rc.put(msg);
                 if (msgstatus) {
@@ -37,12 +38,10 @@ public class MessageClient {
                 }
 
             } else if (choice.equalsIgnoreCase("get")) {
-                System.out.print("Enter message or file name to retrieve: ");
+                System.out.print("Enter file name to retrieve: ");
                 String msg = br.readLine();
-                byte[] received = rc.get(msg); // pending: change this method call
-                System.out.println("Retrieved file or message in byte array format: " + received);
-                System.out.println("Retrieved file or message in string format:" + received.toString());
-
+                File f = rc.get(msg);
+                System.out.println("Retrieved file: " + f);
             } else if (choice.equalsIgnoreCase("list")) {
                 List<String> msgList = rc.list();
                 if (msgList.size() != 0) {
@@ -50,14 +49,14 @@ public class MessageClient {
                         System.out.println(s);
                     }
                 } else {
-                    System.out.println("no messages or files saved from this user: " + clientname);
+                    System.out.println("no files saved from this user: " + clientname);
                 }
             } else if (choice.equalsIgnoreCase("delete")) {
-                System.out.print("Enter message or file name to delete: ");
+                System.out.print("Enter file name to delete: ");
                 String msg = br.readLine();
                 boolean deleteStatus = rc.delete(msg);
                 if (deleteStatus) {
-                    System.out.println("Message  " + msg + " successfully deleted");
+                    System.out.println("File  " + msg + " successfully deleted");
                 } else {
                     System.out.println("Delete operation failed for: " + msg);
                 }
@@ -98,7 +97,9 @@ public class MessageClient {
         rc.setName(name);
         clientname = name;
         rc.startClientSession();
-        if (!rc.join()) {
+        boolean joinStatus  = rc.join();
+        System.out.println("join status is: "+joinStatus);
+        if (!joinStatus) {
             rc.stopClientSession();
             System.exit(0);
         }
@@ -168,24 +169,3 @@ public class MessageClient {
 
     }
 }
-
- /*else if(choice.equalsIgnoreCase("put-file")) {
-                    System.out.print("Enter the relative path of file with the file name: ");
-                    System.out.println("Example Usage:  /Users/Desktop/project1.txt");
-                    System.out.print("Enter file path: ");
-                    String msg = br.readLine();
-                    boolean putStatus = rc.putFile(msg);
-                    if(putStatus) {
-                        System.out.println("Successfully stored file: "+msg);
-                    }
-                }*/
-
- /*else if(choice.equalsIgnoreCase("get-file")) {
-                    System.out.print("Enter file name to retrieve: ");
-                    String msg = br.readLine();
-                    //byte[] filecontents = rc.getFile(msg);
-                    //TODO: print the file name or the contents ?
-                    byte[] content = rc.getFile(msg);
-                    System.out.println("Fetching file contents: ");
-                    System.out.println(new String(content));
-                }*/

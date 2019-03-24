@@ -11,6 +11,7 @@ import com.google.protobuf.ByteString;
 import lease.Dhcp_Lease_Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import route.Route;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -58,7 +59,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
             String message = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: " + name + " asking to save: " + message);
+            logger.info("--> message from: " + name + " asking to save: " + msg.getPath());
             if (MasterNode.put(msg)) {
                 reply = "success";
             } else {
@@ -122,6 +123,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to save: " + msg.getPath());
+            logger.info("received message from master asking to save seq num: " + msg.getSeq());
             if (SlaveNode.put(msg)) {
                 logger.info("--saved message: " + actualmessage + " from: " + name + " successfully");
                 reply = "success";
@@ -217,69 +219,84 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.awaitTermination();
     }
 
-    //respond to a request
+    public void sendStreamingDataToSlave(Route r) {
+        logger.info("sending each chunk to slave");
+        MasterNode.sendMessageToSlaves(r);
+
+    }
+
+    public void collectStreamingDataInSlave(Route r) {
+        logger.info("saving each chunk in slave");
+        //receiving each chunk in slave and writing into a file
+        SlaveNode.writeChunksIntoFile(r);
+    }
+
+    public Route collectDataFromSlavesInChunks(Route r) {
+        return MasterNode.collectDataFromSlaves(r);
+    }
+
+    public void sendDataToMasterInChunks(Route r) {
+        SlaveNode.returnFileInchunks(r);
+    }
+
     @Override
-    public void request(route.Route request, StreamObserver<route.Route> responseObserver) {
+    public StreamObserver<Route> request(StreamObserver<route.Route> responseObserver) {
+        StreamObserver<Route> requestObserver = new StreamObserver<Route>() {
 
-        // TODO refactor to use RouteServer to isolate implementation from
-        // transportation
+            //handle requests from client here
+            @Override
+            public void onNext(Route route) {
+                logger.info("received file data with seq num: " + route.getSeq());
+                route.Route.Builder builder = Route.newBuilder();
+                builder.setPath(route.getPath());
 
-        route.Route.Builder builder = route.Route.newBuilder();
-        builder.setPath(request.getPath());
+                if (route.getType().equalsIgnoreCase("put")) {
+                    if (isMaster) {
+                        sendStreamingDataToSlave(route);
+                    } else {
+                        collectStreamingDataInSlave(route);
+                    }
+                   /* builder.setType(route.getType());
+                    builder.setOrigin(myIp);
+                    builder.setDestination(route.getOrigin());
+                    builder.setSeq(route.getSeq());
+                    builder.setPayload(ByteString.copyFrom("success".getBytes()));
+                    responseObserver.onNext(route);*/
+                }
+                if (route.getType().equalsIgnoreCase("get")) {
+                    if (isMaster) {
+                        collectDataFromSlavesInChunks(route);
+                    } else {
+                        sendStreamingDataToSlave(route);
+                    }
+                    responseObserver.onNext(route);
+                } else {
+                    if (isMaster) {
+                        builder.setPayload(processMaster(route));
+                        builder.setOrigin(myIp);
+                        builder.setDestination(route.getOrigin());
+                    } else {
+                        builder.setPayload(processSlave(route));
+                        builder.setOrigin(myIp);
+                        builder.setDestination(route.getOrigin());
+                    }
+                    route.Route rtn = builder.build();
+                    responseObserver.onNext(rtn);
+                }
+            }
 
-        // do the work
-        if (isMaster) {
-            builder.setPayload(processMaster(request));
-            builder.setOrigin(myIp);
-            builder.setDestination(request.getOrigin());
-        } else {
-            builder.setPayload(processSlave(request));
-            builder.setOrigin(myIp);
-            builder.setDestination(request.getOrigin());
-        }
-        route.Route rtn = builder.build();
-        responseObserver.onNext(rtn);
-        responseObserver.onCompleted();
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the request from client: " + throwable);
+            }
 
+            @Override
+            public void onCompleted() {
+                logger.info("completed sending messages to client");
+                responseObserver.onCompleted();
+            }
+        };
+        return requestObserver;
     }
 }
 
- /*else if (msg.getType().equalsIgnoreCase("file-put")) {
-            if (SlaveNode.saveFile(msg.getPath(), msg.getUsername(), msg.getPayload())) {
-                reply = "success";
-                logger.info("saved file: " + msg.getPath() + " successfully");
-            } else {
-                reply = "failure";
-                logger.info("unable to save file: " + msg.getPath());
-            }
-
-        }*/
-
-  /*else if (msg.getType().equalsIgnoreCase("file-put")) {
-            logger.info("-- received file: " + msg.getPath() + " from: " + name);
-            if (MasterNode.saveFile(msg.getPath(), name, new String(msg.getPayload().toByteArray()))) {
-                reply = "success";
-            }
-
-        }*/
-
-  /*private route.Route buildError(route.Route request, String msg) {
-        route.Route.Builder builder = route.Route.newBuilder();
-
-        builder.setPath(request.getPath());
-
-        // do the work
-        if (isMaster) {
-            builder.setPayload(processMaster(request));
-            builder.setOrigin("master");
-            builder.setDestination("slave");
-        } else {
-            builder.setPayload(processSlave(request));
-            builder.setOrigin("slave");
-            builder.setDestination("master");
-        }
-
-        route.Route rtn = builder.build();
-
-        return rtn;
-    }*/

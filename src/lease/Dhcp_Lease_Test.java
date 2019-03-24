@@ -1,6 +1,7 @@
 package lease;
 
 import com.google.protobuf.ByteString;
+import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import utility.FetchConfig;
@@ -14,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 
 public class Dhcp_Lease_Test {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
@@ -21,6 +23,7 @@ public class Dhcp_Lease_Test {
     Map<String, List<String>> nodesInNetwork = new HashMap<>();
     List<String> newIpList = new ArrayList<>();
     private List<String> msgTypes = FetchConfig.getMsgTypes();
+    private Route response;
 
 
     public static void main(String args[]) {
@@ -53,12 +56,33 @@ public class Dhcp_Lease_Test {
                 Properties prop = FetchConfig.getConfiguration(new File("/home/vinod/cmpe275/WednesdayTest/275-project1/conf/server.conf"));
                 server_port = prop.getProperty("server.port");
             } catch (IOException ie) {
-                logger.info("Unable to retrieve server config properties, exception: "+ie);
+                logger.info("Unable to retrieve server config properties, exception: " + ie);
             }
             logger.info("Node Ip is: " + ip);
             logger.info("Node port: " + server_port);
             ManagedChannel ch = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(server_port.trim())).usePlaintext(true).build();
-            RouteServiceGrpc.RouteServiceBlockingStub stub = RouteServiceGrpc.newBlockingStub(ch);
+            RouteServiceGrpc.RouteServiceStub stub = RouteServiceGrpc.newStub(ch);
+            CountDownLatch latch = new CountDownLatch(1);
+            StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
+                //handle response from server here
+                @Override
+                public void onNext(Route route) {
+                    logger.info("Received response from server: " + route.getPayload());
+                    response = route;
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    latch.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    logger.info("Server is done sending data");
+                    latch.countDown();
+                }
+            });
 
             if (!set.contains(s1)) {
                 logger.info("Sending hello to new node!");
@@ -71,12 +95,13 @@ public class Dhcp_Lease_Test {
                 byte[] ipmessage = s1.getBytes();
                 bld.setType(msgTypes.get(7));
                 bld.setPayload(ByteString.copyFrom(ipmessage));
+                requestObserver.onNext(bld.build());
 
                 // blocking!
-                Route r = stub.request(bld.build());
+               // Route r = stub.request(bld.build());
                 // TODO response handling
 
-                String payload = new String(r.getPayload().toByteArray());
+                String payload = new String(response.getPayload().toByteArray());
                 String nodereply = payload; // indicating whether node is a slave or client
                 if (nodesInNetwork.containsKey(nodereply)) {
                     List<String> slaves = nodesInNetwork.get(nodereply);
@@ -87,7 +112,7 @@ public class Dhcp_Lease_Test {
                     nodes.add(s1);
                     nodesInNetwork.put(nodereply, nodes);
                 }
-                logger.info("reply: " + payload + ", from: " + r.getOrigin());
+                logger.info("reply: " + payload + ", from: " + response.getOrigin());
             }
 
             // update all the nodes with current ips in the network ( if new node | one node is removed)
@@ -100,10 +125,12 @@ public class Dhcp_Lease_Test {
             byte[] hello = ("These are the current nodes in the network: " + sb.toString()).getBytes();
             bld1.setPayload(ByteString.copyFrom(hello));
             // blocking!
-            Route r = stub.request(bld1.build());
+           // Route r = stub.request(bld1.build());
+           requestObserver.onNext(bld1.build());
+           requestObserver.onCompleted();
             // TODO response handling
-            String payload = new String(r.getPayload().toByteArray());
-            logger.info("reply: " + payload + ", from: " + r.getOrigin());
+            String payload = new String(response.getPayload().toByteArray());
+            logger.info("reply: " + payload + ", from: " + response.getOrigin());
         }
     }
 
@@ -128,7 +155,7 @@ public class Dhcp_Lease_Test {
                     copyList();
 
                 } catch (IOException io) {
-                    logger.info("Exception while handling changes of lease file: "+io);
+                    logger.info("Exception while handling changes of lease file: " + io);
                 }
 
             }
