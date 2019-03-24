@@ -2,9 +2,8 @@ package utility;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+
+import java.io.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -37,6 +36,29 @@ public class FetchConfig {
 
     public static List<String> getMsgTypes() {
         return msgTypes;
+    }
+
+    public byte[] convertFileContent(String filename) {
+        RandomAccessFile f;
+        try {
+            try {
+                f = new RandomAccessFile(filename, "r");
+            } catch (FileNotFoundException fe) {
+                //if file is not found
+                // if it is msg, return byte array
+                logger.info("File: " + filename + " not found");
+                logger.info("Saving it as message");
+                return filename.getBytes();
+            }
+            logger.info("file length is: " + f.length());
+            byte[] b = new byte[(int) f.length()];
+            f.readFully(b);
+            f.close();
+            return b;
+        } catch (IOException ie) {
+            logger.info("Unable to convert file contents of: " + filename + " to byte array");
+        }
+        return new byte[1]; // return byte array of size 1, if unable to read file content
     }
 
 }
