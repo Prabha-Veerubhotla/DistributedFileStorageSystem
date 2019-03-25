@@ -237,7 +237,10 @@ public class RouteServerImpl extends RouteServiceImplBase {
     public void collectStreamingDataInSlave(Route r) {
         logger.info("Saving chunk with seq num: " + r.getSeq() + " in slave");
         //receiving each chunk in slave and writing into a file
-        SlaveNode.put(r);
+       boolean putStatus = SlaveNode.put(r);
+       if(putStatus){
+           logger.info("successfully saved chunk in slave");
+       }
     }
 
     public Route collectDataFromSlavesInChunks(Route r) {

@@ -88,7 +88,8 @@ public class MasterNode extends RouteServerImpl {
         requestObserver.onNext(bld.build());
 
         if(r.getType().equalsIgnoreCase("put")) {
-
+            logger.info("entering put");
+logger.info("payload is: "+r.getPayload());
             if (new String(r.getPayload().toByteArray()).equalsIgnoreCase("complete") ) {
                 requestObserver.onCompleted();
             } else {
