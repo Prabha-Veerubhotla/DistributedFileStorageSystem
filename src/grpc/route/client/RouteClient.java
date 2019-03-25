@@ -42,6 +42,7 @@ import utility.FetchConfig;
 public class RouteClient {
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceStub stub;
+    private static RouteServiceGrpc.RouteServiceBlockingStub blockingStub;
     private Properties setup;
     private String name;
     private static String myIp = "client"; // intially , later master node will assign an ip
@@ -71,6 +72,7 @@ public class RouteClient {
         ch = ManagedChannelBuilder.forAddress(host, Integer.parseInt(port)).usePlaintext(true).build();
         //TODO: make it async stub -- done
         stub = RouteServiceGrpc.newStub(ch);
+        blockingStub = RouteServiceGrpc.newBlockingStub(ch);
         System.out.println("Client running...");
         msgTypes = FetchConfig.getMsgTypes();
         //request ip from node running dhcp-server
@@ -223,11 +225,26 @@ public class RouteClient {
 
     }
 
+    public Route sendBlockingMessageToServer(String type, String path, String payload) {
+            Route.Builder bld = Route.newBuilder();
+            bld.setOrigin(myIp);
+            bld.setDestination(setup.getProperty("host")); // from the args , when we start client
+            bld.setType(type);
+            bld.setUsername(name);
+            bld.setPath(path);
+            bld.setPayload(ByteString.copyFrom(payload.getBytes()));
+            bld.setSeq(0);
+            // to be compatible with protobuf format
+
+            // blocking!
+            return RouteClient.blockingStub.blockingrequest(bld.build());
+    }
+
     public boolean join() {
         String type = msgTypes.get(0);
         String payload = "joining";
         String path = "/client/joining";
-        sendMessageToServer(type, path, payload);
+        Route response = sendBlockingMessageToServer(type, path, payload);
         //TODO: use some kind of wait, notify
         logger.info("reply from master node: " + new String(response.getPayload().toByteArray()));
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("welcome")) {
@@ -245,7 +262,7 @@ public class RouteClient {
         String type = msgTypes.get(5);
         String path = "requesting/client/ip";
         String payload = "/requesting";
-        sendMessageToServer(type, path, payload);
+        Route response = sendBlockingMessageToServer(type, path, payload);
         myIp = new String(response.getPayload().toByteArray());
         logger.info("my ip is: "+myIp);
     }
@@ -254,7 +271,7 @@ public class RouteClient {
         String type = msgTypes.get(6);
         String path = "sending/node/info";
         String payload = "client";
-        sendMessageToServer(type, path, payload);
+        Route response = sendBlockingMessageToServer(type, path, payload);
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
             logger.info("Got node information from master node");
             logger.info("My IP is: " + myIp);

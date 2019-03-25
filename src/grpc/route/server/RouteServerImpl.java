@@ -7,12 +7,15 @@ import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
 import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
 import main.db.RedisHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
+import route.RouteServiceGrpc;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -296,12 +299,23 @@ public class RouteServerImpl extends RouteServiceImplBase {
                         builder.setOrigin(myIp);
                         builder.setDestination(route.getOrigin());
                     } else {
-                        builder.setPayload(processSlave(route));
-                        builder.setOrigin(myIp);
-                        builder.setDestination(route.getOrigin());
+                        if(methodType.equalsIgnoreCase("slave-ip")) {
+                            builder.setPayload(processSlave(route));
+                            builder.setOrigin(myIp);
+                            builder.setDestination(route.getOrigin());
+                            ManagedChannel ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
+                            RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
+                            Route r = blockingStub.blockingrequest(builder.build());
+
+                        } else {
+                            builder.setPayload(processSlave(route));
+                            builder.setOrigin(myIp);
+                            builder.setDestination(route.getOrigin());
+                            route.Route rtn = builder.build();
+                            responseObserver.onNext(rtn);
+                        }
                     }
-                    route.Route rtn = builder.build();
-                    responseObserver.onNext(rtn);
+
                 }
             }
 
