@@ -9,6 +9,8 @@ import java.lang.*;
 
 import com.google.protobuf.ByteString;
 import lease.Dhcp_Lease_Test;
+import main.db.MongoDBHandler;
+import main.db.RedisHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
@@ -28,12 +30,12 @@ public class RouteServerImpl extends RouteServiceImplBase {
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     private List<String> msgTypes = FetchConfig.getMsgTypes();
+    static MongoDBHandler mh = new MongoDBHandler();
+    static RedisHandler rh = new RedisHandler();
 
     /**
      * TODO refactor this!
      *
-     * @param path
-     * @param payload
      * @return
      */
 
@@ -91,8 +93,8 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
         } else {
             // TODO placeholder
-            String content = new String(msg.getPayload().toByteArray());
-            logger.info("-- got: " + content + "from: " + msg.getOrigin() + "  path: " + msg.getPath());
+//            String content = new String(msg.getPayload().toByteArray());
+            logger.info("-- got content from: " + msg.getOrigin() + "  path: " + msg.getPath());
             reply = "blank";
         }
         byte[] raw = reply.getBytes();
@@ -113,7 +115,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
         name = msg.getUsername();
 
-        String reply;
+        String reply = null;
 
         /*if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
@@ -136,7 +138,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to list messages or files of: " + msg.getUsername());
-            reply = SlaveNode.list(msg).toString();
+//            reply = SlaveNode.list(msg).toString();
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
             logger.info("--> message from: master asking to delete: " + actualmessage);
@@ -151,10 +153,9 @@ public class RouteServerImpl extends RouteServiceImplBase {
             myIp = actualmessage;
             reply = "slave";
         } else {
-
             // TODO placeholder
-            String content = new String(msg.getPayload().toByteArray());
-            logger.info(" got: " + content + "from: " + msg.getOrigin() + " path: " + msg.getPath());
+//            String content = new String(msg.getPayload().toByteArray());
+            logger.info(" got content: from: " + msg.getOrigin() + " path: " + msg.getPath());
             reply = "blank";
         }
 
@@ -230,7 +231,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
     public void collectStreamingDataInSlave(Route r) {
         logger.info("saving each chunk in slave");
         //receiving each chunk in slave and writing into a file
-        SlaveNode.writeChunksIntoFile(r);
+        SlaveNode.put(r);
     }
 
     public Route collectDataFromSlavesInChunks(Route r) {
@@ -244,11 +245,16 @@ public class RouteServerImpl extends RouteServiceImplBase {
     @Override
     public StreamObserver<Route> request(StreamObserver<route.Route> responseObserver) {
         StreamObserver<Route> requestObserver = new StreamObserver<Route>() {
-
+            String userName;
+            String filePath;
+            String methodType;
             //handle requests from client here
             @Override
             public void onNext(Route route) {
-                logger.info("received file data with seq num: " + route.getSeq());
+                logger.info("receiving file data with seq num: " + route.getSeq());
+                userName = route.getUsername();
+                filePath = route.getPath();
+                methodType = route.getType();
                 route.Route.Builder builder = Route.newBuilder();
                 builder.setPath(route.getPath());
 
@@ -292,6 +298,10 @@ public class RouteServerImpl extends RouteServiceImplBase {
             @Override
             public void onCompleted() {
                 logger.info("completed sending messages to client");
+                if(!isMaster && methodType.equalsIgnoreCase("put")) {
+                    SlaveNode.put(userName, filePath);
+                }
+
                 responseObserver.onCompleted();
             }
         };

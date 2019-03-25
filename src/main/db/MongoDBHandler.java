@@ -20,6 +20,14 @@ public class MongoDBHandler implements DbHandler {
     private MongoDatabase database;
     private MongoCollection<Document> collection;
 
+    public MongoDBHandler(){
+        try {
+            initDatabaseHandler();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     public void initDatabaseHandler() throws Exception {
 
@@ -40,7 +48,6 @@ public class MongoDBHandler implements DbHandler {
     @Override
     public String put(String userEmail, FileEntity file) {
         logger.info("userEmail: " + userEmail);
-        logger.info("file: " + file.getFileContents());
         try {
             BasicDBObject findQuery = new BasicDBObject("personEmail", userEmail);
             FindIterable<Document> temp = collection.find(findQuery);
@@ -71,7 +78,7 @@ public class MongoDBHandler implements DbHandler {
             BasicDBObject query = new BasicDBObject("allData", new BasicDBObject("$elemMatch", elementQuery));
             query.put("personEmail", email);
             Document doc = collection.find(query).first();
-            logger.info("Query Successful" + doc.toString());
+            logger.info("Query Successful");
             List<Document> dataList = (List<Document>)doc.get("allData");
             for( Document docu : dataList){
                 String checkFile = (String) docu.get("fileName");
@@ -87,18 +94,6 @@ public class MongoDBHandler implements DbHandler {
         return null;
     }
 
-    public List<FileEntity> get(@NotNull String email){
-        List<FileEntity> allFiles = new ArrayList<>();
-        BasicDBObject findQuery = new BasicDBObject("personEmail", email);
-        Document data = collection.find(findQuery).first();
-        logger.info("data: " + data);
-        List<Document> dataList = (List<Document>)data.get("allData");
-        for(Document doc : dataList){
-            FileEntity newFile = new FileEntity((String)doc.get("fileName"), doc.get("value"));
-            allFiles.add(newFile);
-        }
-        return allFiles;
-    }
 
     @Override
     public void remove(@NotNull String email, @NotNull String fileName){
