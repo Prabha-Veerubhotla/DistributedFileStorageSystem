@@ -67,13 +67,17 @@ public class Dhcp_Lease_Test {
                 //handle response from server here
                 @Override
                 public void onNext(Route route) {
-                    logger.info("Received response from server: " + route.getPayload());
-                    response = route;
+                    logger.info("Received response from node: " + new String(route.getPayload().toByteArray()));
+                    synchronized (response) {
+                        logger.info("notifying response ");
+                        response = route;
+                        response.notify();
+                    }
                 }
 
                 @Override
                 public void onError(Throwable throwable) {
-                    logger.info("Exception in the response from server: " + throwable);
+                    logger.info("Exception in the response from node: " + throwable);
                     latch.countDown();
                 }
 
@@ -90,18 +94,34 @@ public class Dhcp_Lease_Test {
 
                 Route.Builder bld = Route.newBuilder();
                 bld.setOrigin("master");
+                // destinatoion = ip address of new node joined
                 bld.setDestination(s1);
                 bld.setPath("/update/from/dhcp/lease/new/node");
                 byte[] ipmessage = s1.getBytes();
-                bld.setType(msgTypes.get(7));
+                bld.setType(msgTypes.get(7)); // slave-ip
                 bld.setPayload(ByteString.copyFrom(ipmessage));
+                logger.info("sending payload: "+ipmessage+" to node");
                 requestObserver.onNext(bld.build());
+
+
+
 
                 // blocking!
                // Route r = stub.request(bld.build());
+                String payload = "blank";
                 // TODO response handling
+                synchronized (response) {
+                    try {
+                        logger.info("waiting for response");
+                        response.wait();
+                        logger.info("response wait done");
+                        payload = new String(response.getPayload().toByteArray());
+                    } catch(InterruptedException ie) {
+                        logger.info("Exception: "+ie+" while waiting for the response from node");
+                    }
+                }
 
-                String payload = new String(response.getPayload().toByteArray());
+
                 String nodereply = payload; // indicating whether node is a slave or client
                 if (nodesInNetwork.containsKey(nodereply)) {
                     List<String> slaves = nodesInNetwork.get(nodereply);

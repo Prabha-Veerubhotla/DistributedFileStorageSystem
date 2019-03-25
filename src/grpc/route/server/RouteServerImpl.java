@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
-
 import com.google.protobuf.ByteString;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
@@ -109,6 +108,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
 
     protected ByteString processSlave(route.Route msg) {
+        logger.info("processing msg of type: "+msg.getType()+ "with: "+msg.getPayload());
 
         name = msg.getUsername();
 
@@ -145,9 +145,10 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 reply = "failure";
             }
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(7))) {
+            logger.info("got a message from master of type: "+msg.getType()+" with payload: "+msg.getPayload());
             String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("Assigned ip: " + myIp + " by dhcp server node");
             myIp = actualmessage;
+            logger.info("Assigned ip: " + myIp + " by dhcp server node");
             reply = "slave";
         } else {
             // TODO placeholder
@@ -294,6 +295,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
                         builder.setOrigin(myIp);
                         builder.setDestination(route.getOrigin());
                     } else {
+                        logger.info("received ip: "+ route.getPayload()+" from client");
                         builder.setPayload(processSlave(route));
                         builder.setOrigin(myIp);
                         builder.setDestination(route.getOrigin());
@@ -316,6 +318,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 }
                 if(isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
                     logger.info("received all the data from slave");
+                    //
                 } else {
 
                     responseObserver.onCompleted();
