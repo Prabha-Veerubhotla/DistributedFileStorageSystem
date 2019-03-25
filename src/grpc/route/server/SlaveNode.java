@@ -42,8 +42,8 @@ public class SlaveNode extends RouteServerImpl {
         byte[] payload = r.getPayload().toByteArray();
         String seqID = Long.toString(r.getSeq());
         String fileName = getFileName(r.getPath());
-        logger.info("put details: "+ userName +" " + " "+ fileName + " "+ seqID);
-        //TODO: store the file in db from method : writeChunksIntoFile
+        logger.info("Put details: "+ userName +" " + " "+ fileName + " "+ seqID);
+        //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName, fileName, seqID, payload);
         return true;
     }
@@ -56,7 +56,7 @@ public class SlaveNode extends RouteServerImpl {
     public static void put(String userName, String filePath) {
         logger.info("SlaveNode.put userName " + userName + " filePath: " + filePath);
         String fileName = getFileName(filePath);
-        logger.info("Completed Streaming File. Now writing to MongoDB!");
+        logger.info("Completed Streaming File: "+filePath+" Now writing to MongoDB!");
         Map<String, byte[]> res = rh.get(userName, fileName); // SeqID:content
         mh.put(userName, new FileEntity(fileName, res));
     }
@@ -152,7 +152,8 @@ public class SlaveNode extends RouteServerImpl {
             logger.info("Exception while waiting for count down latch: " + ie);
         }
         logger.info("Streaming file: "+new String(r.getPayload().toByteArray()));
-        File fn = new File(new String(r.getPayload().toByteArray()));
+        FileEntity fileEntity = get(r);
+        File fn = new File(fileEntity.getFileName());
         FileInputStream fis = null;
         try {
             fis = new FileInputStream(fn);
@@ -188,6 +189,16 @@ public class SlaveNode extends RouteServerImpl {
                 e.printStackTrace();
             }
         }
+        route.Route.Builder builder = Route.newBuilder();
+        builder.setPath(r.getPath());
+        builder.setPayload(ByteString.copyFrom("complete".getBytes()));
+        builder.setOrigin(r.getDestination());
+        builder.setDestination(r.getOrigin());
+        builder.setSeq(0);
+        builder.setType(r.getType());
+        logger.info("Sending complete message to master");
+        requestObserver.onNext(builder.build());
+
         requestObserver.onCompleted();
     }
 

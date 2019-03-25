@@ -47,7 +47,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             //save client user name
             name = msg.getUsername();
             logger.info("--> join: " + name);
-            reply = "welcome";
+            reply = "WELCOME";
             myIp = msg.getDestination();
             MasterNode.setMasterIp(myIp);
             MasterNode.setUsername(name);
@@ -60,8 +60,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             reply = MasterNode.get(msg).toString();
 
         }*/ else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
-            String message = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: " + name + " asking to save: " + msg.getPath());
+            logger.info("--> Message from: " + name + " asking to save: " + msg.getPath());
             if (MasterNode.put(msg)) {
                 reply = "success";
             } else {
@@ -69,22 +68,22 @@ public class RouteServerImpl extends RouteServiceImplBase {
             }
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
-            logger.info("--> message from: " + name + " asking to list all messages or files");
+            logger.info("--> Message from: " + name + " asking to list all messages or files");
             reply = MasterNode.list(msg);
 
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
             String message = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: " + name + " asking to delete: " + message);
+            logger.info("--> Message from: " + name + " asking to delete: " + message);
             if (MasterNode.delete(msg)) {
                 reply = "success";
             } else {
                 reply = "failure";
             }
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(5))) {
-            logger.info("--> message from: " + name + " asking to assign ip");
+            logger.info("--> Message from: " + name + " asking to assign ip");
             reply = MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(6))) {
-            logger.info("--> message from: " + name + " asking to save client information");
+            logger.info("--> Message from: " + name + " asking to save client information");
             if (dhcp_lease_test.updateCurrentNodeMapping(msg, msg.getOrigin())) {
                 reply = "success";
             } else {
@@ -92,9 +91,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             }
 
         } else {
-            // TODO placeholder
-//            String content = new String(msg.getPayload().toByteArray());
-            logger.info("-- got content from: " + msg.getOrigin() + "  path: " + msg.getPath());
+            logger.info("--> Got data from: " + msg.getOrigin() + "  path: " + msg.getPath());
             reply = "blank";
         }
         byte[] raw = reply.getBytes();
@@ -137,11 +134,11 @@ public class RouteServerImpl extends RouteServiceImplBase {
         }*/
         if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: master asking to list messages or files of: " + msg.getUsername());
+            logger.info("--> Message from: master asking to list messages or files of: " + msg.getUsername());
 //            reply = SlaveNode.list(msg).toString();
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: master asking to delete: " + actualmessage);
+            logger.info("--> Message from: master asking to delete: " + actualmessage);
             if (SlaveNode.delete(msg)) {
                 reply = "success";
             } else {
@@ -149,13 +146,13 @@ public class RouteServerImpl extends RouteServiceImplBase {
             }
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(7))) {
             String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("assigned ip: " + myIp + " by dhcp server node");
+            logger.info("Assigned ip: " + myIp + " by dhcp server node");
             myIp = actualmessage;
             reply = "slave";
         } else {
             // TODO placeholder
 //            String content = new String(msg.getPayload().toByteArray());
-            logger.info(" got content: from: " + msg.getOrigin() + " path: " + msg.getPath());
+            logger.info("Got content: from: " + msg.getOrigin() + " path: " + msg.getPath());
             reply = "blank";
         }
 
@@ -200,7 +197,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr = ServerBuilder.forPort(RouteServer.getInstance().getServerPort()).addService(new RouteServerImpl())
                 .build();
 
-        logger.info("-- starting server");
+        logger.info("Starting server..");
         svr.start();
         if (isMaster) {
             invokeDhcpMonitorThread();
@@ -222,23 +219,26 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.awaitTermination();
     }
 
-    public void sendStreamingDataToSlave(Route r) {
-        logger.info("sending each chunk to slave");
+    /*public void sendStreamingDataToSlave(Route r) {
+        logger.info("Sending file chunk with seq num: "+ r.getSeq()+" to slave");
         MasterNode.sendMessageToSlaves(r);
 
-    }
+    }*/
 
     public void collectStreamingDataInSlave(Route r) {
-        logger.info("saving each chunk in slave");
+        logger.info("Saving chunk with seq num: " + r.getSeq() + " in slave");
         //receiving each chunk in slave and writing into a file
         SlaveNode.put(r);
     }
 
     public Route collectDataFromSlavesInChunks(Route r) {
-        return MasterNode.collectDataFromSlaves(r);
+        Route route = MasterNode.collectDataFromSlaves(r);
+        logger.info("received data from slave: "+r.getSeq());
+        return route;
     }
 
     public void sendDataToMasterInChunks(Route r) {
+        logger.info("request from master, asking to retrieve: "+r.getPath());
         SlaveNode.returnFileInchunks(r);
     }
 
@@ -248,28 +248,41 @@ public class RouteServerImpl extends RouteServiceImplBase {
             String userName;
             String filePath;
             String methodType;
+            boolean isComplete = false;
+
             //handle requests from client here
             @Override
             public void onNext(Route route) {
-                logger.info("receiving file data with seq num: " + route.getSeq());
                 userName = route.getUsername();
                 filePath = route.getPath();
                 methodType = route.getType();
+
                 route.Route.Builder builder = Route.newBuilder();
                 builder.setPath(route.getPath());
 
+
+
                 if (route.getType().equalsIgnoreCase("put")) {
                     if (isMaster) {
-                        sendStreamingDataToSlave(route);
+                        logger.info("Receiving file data with seq num: " + route.getSeq() + " from: " + name);
+                        builder.setPayload(processMaster(route));
+                        builder.setOrigin(myIp);
+                        builder.setDestination(route.getOrigin());
                     } else {
                         collectStreamingDataInSlave(route);
                     }
-                }
-                if (route.getType().equalsIgnoreCase("get")) {
+                } else if (route.getType().equalsIgnoreCase("get")) {
+                    logger.info("receiving request get");
                     if (isMaster) {
-                        Route route1 = collectDataFromSlavesInChunks(route);
-                        responseObserver.onNext(route1);
+                        if(new String(route.getPayload().toByteArray()).equalsIgnoreCase("complete")) {
+                            isComplete = true;
+                        } else {
+                            Route route1 = collectDataFromSlavesInChunks(route);
+                            logger.info("sending data to client");
+                            responseObserver.onNext(route1);
+                        }
                     } else {
+                        logger.info("received request from master of type: "+route.getType());
                         sendDataToMasterInChunks(route);
 
                     }
@@ -297,12 +310,17 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
             @Override
             public void onCompleted() {
-                logger.info("completed sending messages to client");
-                if(!isMaster && methodType.equalsIgnoreCase("put")) {
+                logger.info("Node is done sending messages");
+                if (!isMaster && methodType.equalsIgnoreCase("put")) {
                     SlaveNode.put(userName, filePath);
                 }
+                if(isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
+                    logger.info("received all the data from slave");
+                } else {
 
-                responseObserver.onCompleted();
+                    responseObserver.onCompleted();
+                }
+
             }
         };
         return requestObserver;

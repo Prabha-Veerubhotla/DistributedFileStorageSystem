@@ -55,7 +55,7 @@ public class RouteClient {
 
     public void setName(String clientName) {
         name = clientName;
-        logger.info("setting client name as: " + name);
+        logger.info("Setting client name as: " + name);
     }
 
     public String getName() {
@@ -69,7 +69,7 @@ public class RouteClient {
             throw new RuntimeException("Missing port and/or host");
         }
         ch = ManagedChannelBuilder.forAddress(host, Integer.parseInt(port)).usePlaintext(true).build();
-        //TODO: make it async stub
+        //TODO: make it async stub -- done
         stub = RouteServiceGrpc.newStub(ch);
         System.out.println("Client running...");
         msgTypes = FetchConfig.getMsgTypes();
@@ -97,7 +97,7 @@ public class RouteClient {
             public void onNext(Route route) {
 
                 if (route.getType().equalsIgnoreCase("get")) {
-                    logger.info("recevied data from master: " + new String(route.getPayload().toByteArray()));
+                    logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
                     File file = new File("output-" + route.getPath());
                     //Create the file
                     try {
@@ -142,7 +142,7 @@ public class RouteClient {
             }
         });
 
-        logger.info("sending request to server of type: " + type);
+        logger.info("Sending request to server of type: " + type);
         Route.Builder bld = Route.newBuilder();
         bld.setOrigin(myIp);
         bld.setDestination(setup.getProperty("host")); // from the args , when we start client
@@ -176,11 +176,7 @@ public class RouteClient {
                         // convert string to byte string,
                         // to be compatible with protobuf format
 
-                        // blocking!
-
                         requestObserver.onNext(bld.build());
-
-
                     }
                 } catch (IOException e) {
                     ; // ignore? really?
@@ -204,7 +200,9 @@ public class RouteClient {
             requestObserver.onNext(bld.build());
 
         }
-        requestObserver.onCompleted();
+        if(!bld.getType().equalsIgnoreCase("get")) {
+            requestObserver.onCompleted();
+        }
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
@@ -246,7 +244,7 @@ public class RouteClient {
         sendMessageToServer(type, path, payload);
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
             logger.info("Got node information from master node");
-            logger.info("my ip is: " + myIp);
+            logger.info("My IP is: " + myIp);
         }
     }
 
