@@ -251,6 +251,33 @@ public class RouteServerImpl extends RouteServiceImplBase {
         SlaveNode.returnFileInchunks(r);
     }
 
+    //respond to a request
+    @Override
+    public void blockingrequest(route.Route request, StreamObserver<route.Route> responseObserver) {
+
+        // TODO refactor to use RouteServer to isolate implementation from
+        // transportation
+
+        route.Route.Builder builder = route.Route.newBuilder();
+        builder.setPath(request.getPath());
+
+        // do the work
+        if (isMaster) {
+            builder.setPayload(processMaster(request));
+            builder.setOrigin(myIp);
+            builder.setDestination(request.getOrigin());
+        } else {
+            builder.setPayload(processSlave(request));
+            builder.setOrigin(myIp);
+            builder.setDestination(request.getOrigin());
+        }
+        route.Route rtn = builder.build();
+        responseObserver.onNext(rtn);
+       responseObserver.onCompleted();
+
+    }
+
+
     @Override
     public StreamObserver<Route> request(StreamObserver<route.Route> responseObserver) {
         StreamObserver<Route> requestObserver = new StreamObserver<Route>() {
