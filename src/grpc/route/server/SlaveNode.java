@@ -5,19 +5,13 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import main.entities.FileEntity;
-import main.slave.SlaveHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
 import route.RouteServiceGrpc;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.*;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -25,61 +19,111 @@ import java.util.concurrent.TimeUnit;
 public class SlaveNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-slave");
     static Map<String, List<String>> map = new HashMap<>();
-    static SlaveHandler sh;
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceStub stub;
     private static String slave1port = "2345";
 
-    public static boolean saveFile(String filename, String name, ByteString content) {
-        sh.createNewFile(name, new FileEntity(filename, content));
-        return true;
+    /**
+     *
+     */
+    public static String getFileName(String filePath){
+        String[] tokens = filePath.split("/");
+        String fileName = tokens[tokens.length - 1];
+        return fileName;
     }
 
+    /**
+     * put in Redis
+     * @param r route
+     * @return
+     */
     public static boolean put(Route r) {
-        String name = r.getUsername();
-        String path = r.getPath();
-        String payload = r.getPayload().toString();
-        logger.info("saving file with seq num: " + r.getSeq());
+        String userName = r.getUsername();
+        byte[] payload = r.getPayload().toByteArray();
+        String seqID = Long.toString(r.getSeq());
+        String fileName = getFileName(r.getPath());
+        logger.info("put details: "+ userName +" " + " "+ fileName + " "+ seqID);
         //TODO: store the file in db from method : writeChunksIntoFile
-        //sh.createNewFile(name, new FileEntity(path, payload));
+        rh.put(userName, fileName, seqID, payload);
         return true;
     }
 
+    /**
+     * put in MongoDB
+     * @param userName
+     * @param filePath
+     */
+    public static void put(String userName, String filePath) {
+        logger.info("SlaveNode.put userName " + userName + " filePath: " + filePath);
+        String fileName = getFileName(filePath);
+        logger.info("Completed Streaming File. Now writing to MongoDB!");
+        Map<String, byte[]> res = rh.get(userName, fileName); // SeqID:content
+        mh.put(userName, new FileEntity(fileName, res));
+    }
+
+    //TODO: Handle cache miss
+    /**
+     * retrieve a file. If file is not in Redis fetch from MongoDB
+     * @param r
+     * @return
+     */
     public static FileEntity get(Route r) {
-        String payload = r.getPayload().toString();
-        logger.info("retrieving information of: " + payload);
+        logger.info("SlaveNode.GET");
+        String userName = r.getUsername();
+        String fileName = getFileName(r.getPath());
+        logger.info("retrieving information of: " + fileName);
         String name = r.getUsername();
-        FileEntity result = sh.retrieveFile(name, r.getPath());
-        return result;
-    }
-
-
-    // new - introduced with bi directional streaming
-    public static void writeChunksIntoFile(Route r) {
-        File file = new File(r.getPath());
-        //Create the file
-        try {
-            if (file.createNewFile()) {
-                logger.info("File: "+ file+  "is created!");
-            } else {
-                logger.info("File: "+ file+" already exists.");
-            }
-            RandomAccessFile f = new RandomAccessFile(file, "rw");
-            logger.info("writing chunk with seq num into file: " + r.getSeq());
-            f.write(r.getPayload().toByteArray());
-            f.close();
-        } catch (IOException io) {
-            io.printStackTrace();
+        Map<String, byte[]> result = rh.get(name, fileName);
+        if(result != null) {
+            return new FileEntity(fileName, result);
         }
+       return mh.get(userName, fileName);
     }
 
-    //TODO: complete this method - new
-    public static void writeFileInDb() {
+    /**
+     * delete a file
+     * @param r route coming from somewhere
+     * @return
+     */
+    public static boolean delete(Route r) {
+        boolean status = false;
+        String userName = r.getUsername();
+        String fileName = getFileName(r.getPath());
+        logger.info("deleting file " + fileName + "from Redis.");
+        status = rh.remove(userName, fileName);
+        logger.info("deleting file " + fileName + "from Mongo.");
+        mh.remove(userName, fileName);
+        return status;
+    }
 
+    //TODO: Move to client - wrote here for testing purposes
+    @SuppressWarnings("unchecked")
+    public static byte[] combineBytes(Map<String, byte[]> res){
+        List<String> sortedKeys = new ArrayList(res.keySet());
+        sortedKeys.sort(Comparator.comparingInt(Integer::parseInt));
+        List<byte[]> allbytes = new ArrayList<>();
+        for (String sortedKey : sortedKeys) {
+            allbytes.add(res.get(sortedKey));
+        }
+        logger.info("Total Size: " + allbytes.size());
+        List<Byte> allData = new ArrayList<>();
+        for (byte[] allbyte : allbytes) {
+            for (byte anAllbyte : allbyte) {
+                allData.add(anAllbyte);
+            }
+        }
+
+        byte[] b = new byte[allData.size()];
+        for (int i = 0; i< allData.size();i++) {
+            b[i] = allData.get(i);
+        }
+        logger.info("Total BSize: " + b.length);
+        return b;
     }
 
     //return file in chunks to the master
     public static void returnFileInchunks(Route r) {
+        logger.info("returnFileInchunks");
         ch = ManagedChannelBuilder.forAddress(r.getOrigin(), Integer.parseInt("2345")).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
         CountDownLatch latch = new CountDownLatch(1);
@@ -135,7 +179,7 @@ public class SlaveNode extends RouteServerImpl {
                 requestObserver.onNext(builder.build());
             }
         } catch (IOException e) {
-            ; // ignore? really?
+            ; // ignore? really? ...yes
              requestObserver.onError(e);
         } finally {
             try {
@@ -148,22 +192,45 @@ public class SlaveNode extends RouteServerImpl {
     }
 
 
-    public static boolean delete(Route r) {
-        boolean status = false;
-        String name = r.getUsername();
-        String msg = r.getPayload().toString();
-        logger.info("deleting message " + msg + " from:  " + name + " in slave..");
-        status = sh.removeFile(name, msg);
-        return status;
-    }
-
-    public static List<FileEntity> list(Route r) {
-        logger.info("listing messages or files of: " + r.getUsername());
-        String username = r.getUsername();
-        List<FileEntity> list = sh.getAllFiles(username);
-        logger.info("list of files are: " + list);
-        return list;
-    }
+//    @SuppressWarnings("unchecked")
+//    public static void main(String[] args) {
+//        String filePath = "temp.jpg";
+//        String userName = "N";
+//        long seq = 0l;
+//        try{
+//            FileInputStream fis = new FileInputStream(filePath);
+//            int i = 0;
+//            do {
+//                byte[] buf = new byte[1024];
+//                i = fis.read(buf);
+//                if (i != -1 ) {
+//                    rh.put(userName, filePath, Long.toString(seq), buf);
+//                }
+//                seq++;
+//            } while (i != -1);
+//            byte[] payload = null;
+//            Map<String, byte[]> res = rh.get(userName, filePath);
+//
+//            byte[] temp = combineBytes(res);
+//            BufferedOutputStream bw = null;
+//            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.jpg"));
+//            bw.write(temp);
+//            bw.flush();
+//            bw.close();
+//            logger.info("Putting into DB");
+//            mh.put(userName, new FileEntity(filePath, res));
+//            FileEntity mongoDBres = mh.get(userName, filePath);
+//            Map<String, byte[]> r = (Map<String, byte[]>)mongoDBres.getFileContents();
+//            temp = combineBytes(res);
+//            bw = null;
+//            bw = new BufferedOutputStream(new FileOutputStream("tempMongo.jpg"));
+//            bw.write(temp);
+//            bw.flush();
+//            bw.close();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 }
 // v2: 4. maintain a in memory, cache
 

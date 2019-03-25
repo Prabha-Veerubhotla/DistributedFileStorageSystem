@@ -23,6 +23,9 @@ public class MasterNode extends RouteServerImpl {
     private static String myIp;
     private static String username;
     private static Route response;
+    private static String currentIP;
+    private static int currentIPIxd = 0;
+    private static int NOOFSHARDS = 3;
 
     public static void setMasterIp(String ip) {
         myIp = ip;
@@ -36,8 +39,15 @@ public class MasterNode extends RouteServerImpl {
         slaveip = slaveiplist;
         slave1 = slaveip.get(0);
         //slave1 = "localhost"; // local testing
+
     }
 
+    //Method for round robin IP - Sharding data among 3 Slaves
+    public synchronized static String roundRobinIP(){
+        currentIP = slaveip.get(currentIPIxd);
+        currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
+        return currentIP;
+    }
 
     // send any message to slave
     public static void sendMessageToSlaves(Route r) {
@@ -68,6 +78,7 @@ public class MasterNode extends RouteServerImpl {
         Route.Builder bld = Route.newBuilder();
         bld.setUsername(username);
         bld.setOrigin(myIp);
+        //MasterMetaData Methods (userName, fileName, seqID, IP);
         bld.setDestination(slave1);
         bld.setPayload(ByteString.copyFrom(r.getPayload().toByteArray()));
         bld.setType(r.getType());

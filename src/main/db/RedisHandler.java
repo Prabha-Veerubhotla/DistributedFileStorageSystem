@@ -1,5 +1,4 @@
 package main.db;
-
 import com.sun.istack.NotNull;
 import main.entities.FileEntity;
 import redis.clients.jedis.Jedis;
@@ -7,16 +6,17 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
 import java.io.*;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.logging.Logger;
 
 
-public class RedisHandler implements DbHandler {
+public class RedisHandler {
+    Logger logger = Logger.getLogger(RedisHandler.class.getName());
     private Jedis redisConnector;
     public static JedisPool redisPool;
-    public static final int MAX_POOL_SIZE = 10;
+    public static final int MAX_POOL_SIZE = 100;
     public static final String HOST_NAME = "localhost";
 
     public synchronized Jedis getPoolConnection() {
@@ -32,8 +32,7 @@ public class RedisHandler implements DbHandler {
     /**
      * Method to initialize Jedis instance
      */
-    @Override
-    public void initDatabaseHandler() throws Exception {
+    public RedisHandler() {
         logger.info("Getting pool connection");
         redisConnector = getPoolConnection();
     }
@@ -43,7 +42,6 @@ public class RedisHandler implements DbHandler {
      * @return byte[]
      */
     public byte[] serialize(Object obj) {
-        logger.info("Serializing data");
         ByteArrayOutputStream bout = new ByteArrayOutputStream();
         try {
             ObjectOutputStream oout = new ObjectOutputStream(bout);
@@ -73,107 +71,113 @@ public class RedisHandler implements DbHandler {
      *
      */
     @SuppressWarnings("unchecked")
-    @Override
-    public String put(@NotNull String userEmail, @NotNull FileEntity file) {
-        byte[] userEmailByte = serialize(userEmail);
+    public String put(@NotNull String userName, @NotNull String fileName, String seqID, byte[] content) {
+        byte[] userNameByte = serialize(userName);
         try {
-            if (redisConnector.exists(userEmailByte)) {
-                byte[] val = redisConnector.get(userEmailByte);
-                Map<String, FileEntity> map = (Map<String, FileEntity>) deserialize(val);
-                map.put(file.toString(), file);
-                String res = redisConnector.set(userEmailByte, serialize(map));
+            if (redisConnector.exists(userNameByte)) {
+                byte[] val = redisConnector.get(userNameByte);
+                Map<String, Map<String, byte[]>> map = (Map<String, Map<String, byte[]>>) deserialize(val);
+                if(map.containsKey(fileName)){
+                    Map<String, byte[]> map1 = map.get(fileName);
+                    map1.put(seqID, content);
+                }
+                else{
+                    Map<String, byte[]> map2 = new HashMap<>();
+                    map2.put(seqID, content);
+                    map.put(fileName, map2);
+                }
+
+                String res = redisConnector.set(userNameByte, serialize(map));
                 if (res == null) {
-                    logger.info("Error storing in Redis " + userEmail);
+                    logger.info("Error storing in Redis " + userName);
                     return null;
                 }
-                logger.info("Success " + userEmail);
+
             } else {
-                Map<String, FileEntity> newMap = new HashMap<String, FileEntity>();
-                newMap.put(file.toString(), file);
-                String res = redisConnector.set(userEmailByte, serialize(newMap));
+                HashMap<String, Map<String, byte[]>> newMap = new HashMap<>();
+                Map<String, byte[]> innerMap = new HashMap<>();
+                innerMap.put(seqID, content);
+                newMap.put(fileName, innerMap);
+                String res = redisConnector.set(userNameByte, serialize(newMap));
                 if (res == null) {
-                    logger.info("Error storing in Redis for first time " + userEmail);
+                    logger.info("Error storing in Redis for first time " + userName);
                     return null;
                 }
-                logger.info("Success " + userEmail);
             }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-        return file.getFileName();
+        return fileName;
     }
 
     /**
      *
      */
     @SuppressWarnings("unchecked")
-    private Map<String, FileEntity> getFilesMap(@NotNull String email) {
-        byte[] userEmailByte = serialize(email);
+    private Map<String, Map<String, byte[]>> getFilesMap(@NotNull String userName) {
+        byte[] userEmailByte = serialize(userName);
         if (redisConnector.exists(userEmailByte)) {
             byte[] userData = redisConnector.get(userEmailByte);
             logger.info("Deserializing user data map " + userData);
-            Map<String, FileEntity> map = (Map<String, FileEntity>) deserialize(userData);
+            Map<String, Map<String, byte[]>> map = (Map<String, Map<String, byte[]>>) deserialize(userData);
             return map;
         }
         logger.info("User email not present");
         return null;
-
-    }
-
-    /**
-     * @param email
-     */
-//    @Override
-    public Map<String, FileEntity> get(@NotNull String email) {
-        return getFilesMap(email);
-
     }
 
     /**
      *
-     * @param email
-     * @param fileName
+     * @param
+     * @param
      * @return
      */
-    @Override
-    public FileEntity get(@NotNull String email, @NotNull String fileName) {
-        Map<String, FileEntity> tempMap = getFilesMap(email);
+    public Map<String, byte[]> get(@NotNull String userName, @NotNull String fileName) {
+        Map<String, Map<String, byte[]>> tempMap = getFilesMap(userName);
         if(tempMap == null || tempMap.isEmpty() || !tempMap.containsKey(fileName)){
             return null;
         }
-
-        logger.info("Deserialized map " + tempMap.get(fileName));
-        return tempMap.get(fileName);
+        Map<String, byte[]> res = tempMap.get(fileName);
+        return res;
     }
 
     /**
      *
-     * @param email
+     * @param userName
      * @param fileName
      * @return
      */
-    @Override
-    public void remove(@NotNull String email, @NotNull String fileName){
-        Map<String, FileEntity> tempMap = getFilesMap(email);
-        Iterator<Map.Entry<String, FileEntity>> itr = tempMap.entrySet().iterator();
+    public boolean remove(@NotNull String userName, @NotNull String fileName){
+        Map<String, Map<String, byte[]>> tempMap = getFilesMap(userName);
+        if(tempMap == null || tempMap.isEmpty() || !tempMap.containsKey(fileName)){
+            return false;
+        }
+        Iterator<Map.Entry<String, Map<String, byte[]>>> itr = tempMap.entrySet().iterator();
         while(itr.hasNext()){
-            Map.Entry<String, FileEntity> entry = itr.next();
+            Map.Entry<String, Map<String, byte[]>> entry = itr.next();
             if(fileName.equals(entry.getKey())){
                 logger.info("Removing file ");
                 itr.remove();
                 break;
             }
         }
-        redisConnector.set(serialize(email), serialize(tempMap));
+        logger.info("After deletion ----> " + tempMap);
+        redisConnector.set(serialize(userName), serialize(tempMap));
+        return true;
     }
 
-    @Override
-    public FileEntity update(String email, FileEntity newFile) {
-        Map<String, FileEntity> tempMap = getFilesMap(email);
-        if(tempMap.containsKey(newFile.getFileName())){
-            tempMap.put(newFile.getFileName(), newFile);
-            redisConnector.set(serialize(email), serialize(tempMap));
+    //TODO: Implement update file
+    public boolean update(@NotNull String userName, @NotNull String fileName, String seqID, byte[] content) {
+        Map<String, Map<String, byte[]>> tempMap = getFilesMap(userName);
+        if(tempMap == null || tempMap.isEmpty() || !tempMap.containsKey(fileName)){
+            return false;
         }
-        return newFile;
+        Map<String, byte[]> newdata = new HashMap<>();
+        newdata.put(seqID, content);
+        redisConnector.set(serialize(userName), serialize(tempMap));
+        return true;
     }
+
+
+
 }
