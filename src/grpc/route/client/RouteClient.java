@@ -191,7 +191,7 @@ public class RouteClient {
                 }
 
                 //say to server that file streaming is done
-                Route.Builder bld1 = Route.newBuilder();
+                //Route.Builder bld1 = Route.newBuilder();
                 bld.setOrigin(myIp);
                 bld.setDestination(setup.getProperty("host")); // from the args , when we start client
                 bld.setType(type);
@@ -199,7 +199,8 @@ public class RouteClient {
                 bld.setPath(path);
                 bld.setPayload(ByteString.copyFrom("complete".getBytes()));
                 bld.setUsername(name);
-                requestObserver.onNext(bld1.build());
+                logger.info("sending complete to master");
+                requestObserver.onNext(bld.build());
 
             } else {
                 bld.setPayload(ByteString.copyFrom(payload.getBytes()));
