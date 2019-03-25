@@ -187,6 +187,18 @@ public class RouteClient {
                         ; // ignore
                     }
                 }
+
+                //say to server that file streaming is done
+                Route.Builder bld1 = Route.newBuilder();
+                bld.setOrigin(myIp);
+                bld.setDestination(setup.getProperty("host")); // from the args , when we start client
+                bld.setType(type);
+                bld.setUsername(name);
+                bld.setPath(path);
+                bld.setPayload(ByteString.copyFrom("complete".getBytes()));
+                bld.setUsername(name);
+                requestObserver.onNext(bld1.build());
+
             } else {
                 bld.setPayload(ByteString.copyFrom(payload.getBytes()));
                 logger.info("Sending request to server with payload: " + payload);
@@ -199,9 +211,10 @@ public class RouteClient {
             requestObserver.onNext(bld.build());
 
         }
-        if(!bld.getType().equalsIgnoreCase("get")) {
+
+        //if (!bld.getType().equalsIgnoreCase("get")) {
             requestObserver.onCompleted();
-        }
+        //}
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
@@ -234,6 +247,7 @@ public class RouteClient {
         String payload = "/requesting";
         sendMessageToServer(type, path, payload);
         myIp = new String(response.getPayload().toByteArray());
+        logger.info("my ip is: "+myIp);
     }
 
     public void sendNodeInfo() {

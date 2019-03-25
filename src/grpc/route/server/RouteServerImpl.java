@@ -248,6 +248,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             String userName;
             String filePath;
             String methodType;
+            ByteString payload;
             boolean isComplete = false;
 
             //handle requests from client here
@@ -256,6 +257,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 userName = route.getUsername();
                 filePath = route.getPath();
                 methodType = route.getType();
+                payload = route.getPayload();
 
                 route.Route.Builder builder = Route.newBuilder();
                 builder.setPath(route.getPath());
@@ -314,6 +316,17 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 if (!isMaster && methodType.equalsIgnoreCase("put")) {
                     SlaveNode.put(userName, filePath);
                 }
+                if (isMaster && methodType.equalsIgnoreCase("put")) {
+                    logger.info("received all data from client");
+                }
+                /*if(isMaster && methodType.equalsIgnoreCase("put")) {
+                    String received  = new String(payload.toByteArray());
+                    logger.info("Received response from slave node: " + payload);
+                    if (received.equalsIgnoreCase("success")) {
+                        //return true;
+                    }
+                    //return false;
+                }*/
                 if(isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
                     logger.info("received all the data from slave");
                     //
