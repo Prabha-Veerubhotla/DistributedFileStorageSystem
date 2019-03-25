@@ -353,7 +353,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
             @Override
             public void onError(Throwable throwable) {
-                logger.info("Exception in the request from client: " + throwable);
+                logger.info("Exception in the request from node: " + throwable);
             }
 
             @Override

@@ -90,7 +90,6 @@ public class MasterNode extends RouteServerImpl {
         if(r.getType().equalsIgnoreCase("put")) {
 
             if (new String(r.getPayload().toByteArray()).equalsIgnoreCase("complete") ) {
-
                 requestObserver.onCompleted();
             } else {
                 logger.info("put still going on...");
