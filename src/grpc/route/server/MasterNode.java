@@ -86,7 +86,16 @@ public class MasterNode extends RouteServerImpl {
         bld.setSeq(r.getSeq());
 
         requestObserver.onNext(bld.build());
-        //requestObserver.onCompleted();
+
+        if(r.getType().equalsIgnoreCase("put")) {
+
+            if (new String(r.getPayload().toByteArray()).equalsIgnoreCase("complete") ) {
+
+                requestObserver.onCompleted();
+            } else {
+                logger.info("put still going on...");
+            }
+        }
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
@@ -132,7 +141,7 @@ public class MasterNode extends RouteServerImpl {
         logger.info("Sending request to slave to retrieve file: " + r.getPath());
         requestObserver.onNext(bld.build());
         //if(!bld.getType().equalsIgnoreCase("get")) {
-        requestObserver.onCompleted();
+            requestObserver.onCompleted();
         //}
         return response;
     }
