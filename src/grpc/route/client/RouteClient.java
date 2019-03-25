@@ -95,7 +95,6 @@ public class RouteClient {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-
                 if (route.getType().equalsIgnoreCase("get")) {
                     logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
                     File file = new File("output-" + route.getPath());
@@ -149,7 +148,7 @@ public class RouteClient {
         bld.setType(type);
         bld.setUsername(name);
         bld.setPath(path);
-        // if msg is post, if it is a file, stream it
+        // if msg is put, if it is a file, stream it
         if (type.equalsIgnoreCase(msgTypes.get(2))) {
             if (payload == null)
                 return;

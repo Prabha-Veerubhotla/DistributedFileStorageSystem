@@ -11,5 +11,5 @@ echo "deleting dhcpd lease file"
 
 docker run -d --net=host -v /etc/dhcp/:/etc/dhcp -v /var/lib/dhcpd:/var/lib/dhcpd --name dhcp vinodkatta3/dhcpd
 
-ant server
+ant master
 

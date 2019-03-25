@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
-
 import com.google.protobuf.ByteString;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
@@ -145,9 +144,10 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 reply = "failure";
             }
         } else if (msg.getType().equalsIgnoreCase(msgTypes.get(7))) {
+            logger.info("got a message from master of type: "+msg.getType()+" with payload: "+msg.getPayload());
             String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("Assigned ip: " + myIp + " by dhcp server node");
             myIp = actualmessage;
+            logger.info("Assigned ip: " + myIp + " by dhcp server node");
             reply = "slave";
         } else {
             // TODO placeholder
@@ -316,6 +316,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 }
                 if(isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
                     logger.info("received all the data from slave");
+                    //
                 } else {
 
                     responseObserver.onCompleted();
