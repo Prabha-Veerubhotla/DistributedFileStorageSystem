@@ -101,6 +101,9 @@ public class Dhcp_Lease_Test {
                 bld.setPayload(ByteString.copyFrom(ipmessage));
                 Route response = blockingStub.blockingrequest(bld.build());
                 //requestObserver.onNext(bld.build());
+                logger.info("sending payload: "+ipmessage+" to node");
+                //requestObserver.onNext(bld.build());
+
 
 
 

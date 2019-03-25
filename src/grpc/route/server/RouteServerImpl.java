@@ -111,6 +111,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
 
     protected ByteString processSlave(route.Route msg) {
+        logger.info("processing msg of type: "+msg.getType()+ "with: "+msg.getPayload());
 
         name = msg.getUsername();
 
