@@ -135,8 +135,7 @@ public class MasterNode extends RouteServerImpl {
         bld.setDestination(slave1);
         bld.setPayload(ByteString.copyFrom(r.getPayload().toByteArray()));
         bld.setType(r.getType());
-        logger.in    logger.info("--> join: " + name);
-            reply = "WELCOME";fo("request type is: "+r.getType());
+        logger.info("request type is: "+r.getType());
         bld.setPath(r.getPath());
         bld.setSeq(r.getSeq());
         logger.info("Sending request to slave to retrieve file: " + r.getPath());

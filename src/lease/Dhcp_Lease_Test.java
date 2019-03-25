@@ -23,7 +23,7 @@ public class Dhcp_Lease_Test {
     Map<String, List<String>> nodesInNetwork = new HashMap<>();
     List<String> newIpList = new ArrayList<>();
     private List<String> msgTypes = FetchConfig.getMsgTypes();
-    private Route response;
+    //private Route response;
 
 
     public static void main(String args[]) {
@@ -61,15 +61,14 @@ public class Dhcp_Lease_Test {
             logger.info("Node Ip is: " + ip);
             logger.info("Node port: " + server_port);
             ManagedChannel ch = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(server_port.trim())).usePlaintext(true).build();
-            RouteServiceGrpc.RouteServiceStub stub = RouteServiceGrpc.newStub(ch);
-            CountDownLatch latch = new CountDownLatch(1);
-            StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
+            RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
+           // CountDownLatch latch = new CountDownLatch(1);
+            /*StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
                 //handle response from server here
                 @Override
                 public void onNext(Route route) {
                     logger.info("Received response from node: " + new String(route.getPayload().toByteArray()));
                     synchronized (response) {
-                        logger.info("notifying response ");
                         response = route;
                         response.notify();
                     }
@@ -86,7 +85,7 @@ public class Dhcp_Lease_Test {
                     logger.info("Server is done sending data");
                     latch.countDown();
                 }
-            });
+            });*/
 
             if (!set.contains(s1)) {
                 logger.info("Sending hello to new node!");
@@ -100,8 +99,10 @@ public class Dhcp_Lease_Test {
                 byte[] ipmessage = s1.getBytes();
                 bld.setType(msgTypes.get(7)); // slave-ip
                 bld.setPayload(ByteString.copyFrom(ipmessage));
+                Route response = blockingStub.blockingrequest(bld.build());
+                //requestObserver.onNext(bld.build());
                 logger.info("sending payload: "+ipmessage+" to node");
-                requestObserver.onNext(bld.build());
+                //requestObserver.onNext(bld.build());
 
 
 
@@ -110,16 +111,14 @@ public class Dhcp_Lease_Test {
                // Route r = stub.request(bld.build());
                 String payload = "blank";
                 // TODO response handling
-                synchronized (response) {
-                    try {
-                        logger.info("waiting for response");
-                        response.wait();
-                        logger.info("response wait done");
-                        payload = new String(response.getPayload().toByteArray());
-                    } catch(InterruptedException ie) {
+                //synchronized (response) {
+                    //try {
+                      //  response.wait();
+                payload = new String(response.getPayload().toByteArray());
+                    /*} catch(InterruptedException ie) {
                         logger.info("Exception: "+ie+" while waiting for the response from node");
-                    }
-                }
+                    }*/
+
 
 
                 String nodereply = payload; // indicating whether node is a slave or client
@@ -144,13 +143,14 @@ public class Dhcp_Lease_Test {
             bld1.setPath("/update/from/dhcp/lease");
             byte[] hello = ("These are the current nodes in the network: " + sb.toString()).getBytes();
             bld1.setPayload(ByteString.copyFrom(hello));
+            Route response1  = blockingStub.blockingrequest(bld1.build());
             // blocking!
            // Route r = stub.request(bld1.build());
-           requestObserver.onNext(bld1.build());
-           requestObserver.onCompleted();
+          // requestObserver.onNext(bld1.build());
+         //  requestObserver.onCompleted();
             // TODO response handling
-            String payload = new String(response.getPayload().toByteArray());
-            logger.info("reply: " + payload + ", from: " + response.getOrigin());
+            String payload = new String(response1.getPayload().toByteArray());
+            logger.info("reply: " + payload + ", from: " + response1.getOrigin());
         }
     }
 

@@ -7,12 +7,15 @@ import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
 import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
 import main.db.RedisHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
+import route.RouteServiceGrpc;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -254,6 +257,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             String userName;
             String filePath;
             String methodType;
+            ByteString payload;
             boolean isComplete = false;
 
             //handle requests from client here
@@ -262,6 +266,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 userName = route.getUsername();
                 filePath = route.getPath();
                 methodType = route.getType();
+                payload = route.getPayload();
 
                 route.Route.Builder builder = Route.newBuilder();
                 builder.setPath(route.getPath());
@@ -299,13 +304,23 @@ public class RouteServerImpl extends RouteServiceImplBase {
                         builder.setOrigin(myIp);
                         builder.setDestination(route.getOrigin());
                     } else {
-                        logger.info("received ip: " + route.getPayload() + " from client");
-                        builder.setPayload(processSlave(route));
-                        builder.setOrigin(myIp);
-                        builder.setDestination(route.getOrigin());
+                        if(methodType.equalsIgnoreCase("slave-ip")) {
+                            builder.setPayload(processSlave(route));
+                            builder.setOrigin(myIp);
+                            builder.setDestination(route.getOrigin());
+                            ManagedChannel ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
+                            RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
+                            Route r = blockingStub.blockingrequest(builder.build());
+
+                        } else {
+                            builder.setPayload(processSlave(route));
+                            builder.setOrigin(myIp);
+                            builder.setDestination(route.getOrigin());
+                            route.Route rtn = builder.build();
+                            responseObserver.onNext(rtn);
+                        }
                     }
-                    route.Route rtn = builder.build();
-                    responseObserver.onNext(rtn);
+
                 }
             }
 
@@ -319,6 +334,21 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 logger.info("Node is done sending messages");
                 if (!isMaster && methodType.equalsIgnoreCase("put")) {
                     SlaveNode.put(userName, filePath);
+                }
+                if (isMaster && methodType.equalsIgnoreCase("put")) {
+                    logger.info("received all data from client");
+                }
+                /*if(isMaster && methodType.equalsIgnoreCase("put")) {
+                    String received  = new String(payload.toByteArray());
+                    logger.info("Received response from slave node: " + payload);
+                    if (received.equalsIgnoreCase("success")) {
+                        //return true;
+                    }
+                    //return false;
+                }*/
+                if(isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
+                    logger.info("received all the data from slave");
+                    //
                 } else {
 
                     responseObserver.onCompleted();
