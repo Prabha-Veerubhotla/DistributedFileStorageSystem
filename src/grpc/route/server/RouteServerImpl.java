@@ -367,6 +367,14 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 }
                 if (isMaster && methodType.equalsIgnoreCase("put")) {
                     logger.info("received all data from client");
+                    route.Route.Builder builder = Route.newBuilder();
+                    builder.setPath(filePath);
+                    builder.setUsername(userName);
+                    //builder.setDestination()
+                    builder.setOrigin(myIp);
+                    builder.setPayload(ByteString.copyFrom("complete".getBytes()));
+                    builder.setType("put");
+                    MasterNode.put(builder.build());
                 }
                 /*if(isMaster && methodType.equalsIgnoreCase("put")) {
                     String received  = new String(payload.toByteArray());

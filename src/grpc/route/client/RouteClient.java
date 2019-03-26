@@ -189,6 +189,7 @@ public class RouteClient {
                         ; // ignore
                     }
                 }
+                logger.info("Streaming file is done");
 
                 //say to server that file streaming is done
                 //Route.Builder bld1 = Route.newBuilder();
@@ -198,9 +199,11 @@ public class RouteClient {
                 bld.setUsername(name);
                 bld.setPath(path);
                 bld.setPayload(ByteString.copyFrom("complete".getBytes()));
-                bld.setUsername(name);
+                //bld.setUsername(name);
+                logger.info("request type is: "+ type);
                 logger.info("sending complete to master");
                 requestObserver.onNext(bld.build());
+                logger.info("Sent complete to master");
 
             } else {
                 bld.setPayload(ByteString.copyFrom(payload.getBytes()));
