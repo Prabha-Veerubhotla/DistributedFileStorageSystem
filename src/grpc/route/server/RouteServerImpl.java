@@ -37,6 +37,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
     static RedisHandler rh = new RedisHandler();
     private ManagedChannel ch;
     private RouteServiceGrpc.RouteServiceStub stub;
+    private Route response;
 
     /**
      * TODO refactor this!
@@ -50,7 +51,6 @@ public class RouteServerImpl extends RouteServiceImplBase {
         name = r.getUsername();
         logger.info("--> join: " + name);
         myIp = r.getDestination();
-        logger.info("my ip is: " + myIp);
         MasterNode.setMasterIp(myIp);
         MasterNode.setUsername(name);
         //TODO: run a background theread continuously monitoring slave ip list
@@ -247,7 +247,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.awaitTermination();
     }
 
-    public void collectStreamingDataInSlave(Route r) {
+    public Route collectStreamingDataInSlave(Route r) {
         logger.info("Saving chunk with seq num: " + r.getSeq() + " in slave");
         boolean putStatus = SlaveNode.put(r);
         if (putStatus) {
@@ -263,6 +263,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             @Override
             public void onNext(Route route) {
                 logger.info("collectStreamingDataInSlave:received response from master: " + new String(route.getPayload().toByteArray()));
+                response = route;
             }
 
             @Override
@@ -294,6 +295,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         bld.setSeq(bld.getSeq());
         requestObserver.onNext(bld.build());
         requestObserver.onCompleted();
+        return response;
     }
 
 
@@ -311,7 +313,6 @@ public class RouteServerImpl extends RouteServiceImplBase {
         // do the work
         if (isMaster) {
             builder.setPayload(processMaster(request));
-            logger.info("my ip is: " + myIp);
             if (myIp != null) {
                 builder.setOrigin(myIp);
             }
@@ -326,7 +327,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         responseObserver.onCompleted();
     }
 
-    private void completeResponse(Route route) {
+    private Route completeResponse(Route route) {
         ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
         CountDownLatch latch = new CountDownLatch(1);
@@ -334,8 +335,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-                //logger.info("Received response from slave: " + route.getPayload());
-                // response = route.toBuilder().build();
+                response = route.toBuilder().build();
                 logger.info("completeResponse: received response from master: " + new String(route.getPayload().toByteArray()));
             }
 
@@ -359,10 +359,63 @@ public class RouteServerImpl extends RouteServiceImplBase {
         bld.setPayload(ByteString.copyFrom("success".getBytes()));
         bld.setType(route.getType());
         logger.info("request type is: " + bld.getType());
-        bld.setPath(bld.getPath());
-        bld.setSeq(bld.getSeq());
+        bld.setPath(route.getPath());
+        bld.setSeq(route.getSeq());
         requestObserver.onNext(bld.build());
         requestObserver.onCompleted();
+        return response;
+    }
+
+    private Route handleComplete(Route route) {
+        if (isMaster) {
+            logger.info("origin: " + route.getOrigin());
+            logger.info("Received complete message from client-master");
+            Route.Builder bld = Route.newBuilder();
+            bld.setUsername(route.getUsername());
+            bld.setOrigin(myIp);
+            bld.setDestination(route.getOrigin());
+            bld.setPayload(processMaster(route));
+            bld.setType(route.getType());
+            bld.setSeq(route.getSeq());
+            return bld.build();
+        } else {
+            logger.info("Entering complete- slave");
+            SlaveNode.put(route.getUsername(), route.getPath());
+            return completeResponse(route);
+        }
+    }
+
+    private Route handlePut(Route route) {
+        if (isMaster) {
+            logger.info("Receiving file data with seq num: " + route.getSeq() + " from: " + name);
+            ByteString msg = processMaster(route);
+            logger.info("Received complete message from client-master");
+            Route.Builder bld = Route.newBuilder();
+            bld.setUsername(route.getUsername());
+            bld.setOrigin(myIp);
+            bld.setDestination(route.getOrigin());
+            bld.setPayload(msg);
+            bld.setType(route.getType());
+            bld.setSeq(route.getSeq());
+            logger.info("put: received response from slave: " + new String(msg.toByteArray()));
+            return bld.build();
+        } else {
+            return collectStreamingDataInSlave(route);
+        }
+    }
+
+    private void handleSlaveIp(Route route) {
+        Route.Builder builder = Route.newBuilder();
+        builder.setPayload(processSlave(route));
+        builder.setOrigin(myIp);
+        builder.setDestination(route.getOrigin());
+        builder.setPath(route.getPath());
+        builder.setUsername(route.getUsername());
+        builder.setSeq(route.getSeq());
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
+        RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
+        Route r = blockingStub.blockingrequest(builder.build());
+        logger.info("--got: " + new String(r.getPayload().toByteArray()) + " from: " + r.getOrigin());
     }
 
 
@@ -373,7 +426,6 @@ public class RouteServerImpl extends RouteServiceImplBase {
             String filePath;
             String methodType;
             ByteString payload;
-            boolean isComplete = false;
 
             //handle requests from client here
             @Override
@@ -388,44 +440,21 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 builder.setPath(route.getPath());
 
                 if (methodType.equalsIgnoreCase("complete")) {
-                    if (isMaster) {
-                        logger.info("origin: " + route.getOrigin());
-                        logger.info("Received complete message from client-master");
-                        builder.setPayload(processMaster(route));
-                        builder.setOrigin(myIp);
-                        builder.setDestination(route.getOrigin());
-                    } else {
-                        logger.info("Entering complete- slave");
-                        SlaveNode.put(route.getUsername(), route.getPath());
-                        completeResponse(route);
-                    }
+                    responseObserver.onNext(handleComplete(route));
 
                 } else if (route.getType().equalsIgnoreCase("put")) {
-                    if (isMaster) {
-                        logger.info("Receiving file data with seq num: " + route.getSeq() + " from: " + name);
-                        ByteString msg = processMaster(route);
-                        builder.setPayload(msg);
-                        builder.setOrigin(myIp);
-                        builder.setDestination(route.getOrigin());
-                        logger.info("put: received response from slave: " + new String(msg.toByteArray()));
-                    } else {
-                        collectStreamingDataInSlave(route);
-                    }
+                    responseObserver.onNext(handlePut(route));
+
                 } else {
                     if (isMaster) {
                         builder.setPayload(processMaster(route));
                         builder.setOrigin(myIp);
                         builder.setDestination(route.getOrigin());
                         responseObserver.onNext(builder.build());
+
                     } else {
                         if (methodType.equalsIgnoreCase("slave-ip")) {
-                            builder.setPayload(processSlave(route));
-                            builder.setOrigin(myIp);
-                            builder.setDestination(route.getOrigin());
-                            ManagedChannel ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
-                            RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
-                            Route r = blockingStub.blockingrequest(builder.build());
-                            logger.info("--got: " + new String(r.getPayload().toByteArray()) + " from: " + r.getOrigin());
+                            handleSlaveIp(route);
                         } else {
                             builder.setPayload(processSlave(route));
                             builder.setOrigin(myIp);

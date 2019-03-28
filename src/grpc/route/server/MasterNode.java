@@ -60,7 +60,6 @@ public class MasterNode extends RouteServerImpl {
             @Override
             public void onNext(Route route) {
                 logger.info("sendMessageToSlaves:Received response from slave: " + route.getPayload());
-                logger.info("sendMessageToSlaves:Received response from slave: " + route.getPayload());
                 response = route.toBuilder().build();
             }
 
@@ -86,7 +85,7 @@ public class MasterNode extends RouteServerImpl {
         bld.setType(r.getType());
         bld.setPath(r.getPath());
         bld.setSeq(r.getSeq());
-
+        logger.info("sending seq num: "+bld.getSeq()+ " to slave");
         requestObserver.onNext(bld.build());
         requestObserver.onCompleted();
 
@@ -154,22 +153,6 @@ public class MasterNode extends RouteServerImpl {
     public static void put(Route r) {
         logger.info("sending file to slave with seq num: " + r.getSeq());
         sendMessageToSlaves(r);
-        try {
-            Thread.sleep(10000);
-        } catch (InterruptedException ie) {
-            logger.info("put: exception :" + ie + " while waiting for response to be notified");
-
-        }
-        /*logger.info("response is: " + response);
-        String payload = "blank";
-        if (response != null) {
-            payload = new String(response.getPayload().toByteArray());
-        }
-        logger.info("Received response from slave node: " + payload);
-        if (payload.equalsIgnoreCase("success")) {
-            return true;
-        }
-        return false;*/
     }
 
     public static byte[] get(Route r) {

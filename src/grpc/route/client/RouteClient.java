@@ -114,6 +114,7 @@ public class RouteClient {
             @Override
             public void onNext(Route route) {
                 response = route.toBuilder().build();
+                logger.info("received response from server: "+new String(response.getPayload().toByteArray()));
             }
 
             @Override
