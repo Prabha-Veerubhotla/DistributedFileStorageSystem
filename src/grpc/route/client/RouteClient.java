@@ -48,7 +48,7 @@ public class RouteClient {
     private String name;
     private static String myIp = "client"; // intially , later master node will assign an ip
     protected static Logger logger = LoggerFactory.getLogger("client");
-    private Route response = Route.newBuilder().setDestination("server").build();
+    private Route response = Route.newBuilder().build();
 
     public RouteClient(Properties setup) {
         this.setup = setup;
@@ -75,9 +75,9 @@ public class RouteClient {
         blockingStub = RouteServiceGrpc.newBlockingStub(ch);
         System.out.println("Client running...");
         //request ip from node running dhcp-server
-        //requestIp(); // blocking
+        requestIp(); // blocking
         //reply node info stating that you are client
-        //sendNodeInfo(); //blocking
+        sendNodeInfo(); //blocking
     }
 
 
@@ -114,7 +114,7 @@ public class RouteClient {
             @Override
             public void onNext(Route route) {
                 response = route.toBuilder().build();
-                logger.info("received response from server: "+new String(response.getPayload().toByteArray()));
+                logger.info("received response from server: " + new String(response.getPayload().toByteArray()));
             }
 
             @Override
@@ -160,10 +160,9 @@ public class RouteClient {
                         seq++;
                         logger.info("Streaming seq num: " + seq);
                         bld.setPayload(ByteString.copyFrom(raw, 0, n));
-                        logger.info("seq num is: "+seq);
+                        logger.info("seq num is: " + seq);
                         bld.setSeq(seq);
                         logger.info("Sending file data to server with seq num: " + seq);
-
                         requestObserver.onNext(bld.build());
                     }
                 } catch (IOException e) {
@@ -269,14 +268,16 @@ public class RouteClient {
         boolean putStatus = false;
         System.out.println("Streaming: " + msg);
         sendMessageToServer(type, path, payload);
+
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
             putStatus = true;
             logger.info("Successfully saved: " + msg);
         } else {
             logger.info("Could not save: " + msg);
         }
+
         return putStatus;
-    }
+}
 
 
     //blocking

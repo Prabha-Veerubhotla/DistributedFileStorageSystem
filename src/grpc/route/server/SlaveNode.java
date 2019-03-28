@@ -43,7 +43,7 @@ public class SlaveNode extends RouteServerImpl {
         byte[] payload = r.getPayload().toByteArray();
         String seqID = Long.toString(r.getSeq());
         String fileName = getFileName(r.getPath());
-        logger.info("Put details: " + userName + " filename: " + r.getPath() + " seq num: " + seqID);
+        logger.info("Put details: " + userName  + " seq num: " + seqID);
         //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName, fileName, seqID, payload);
         return true;

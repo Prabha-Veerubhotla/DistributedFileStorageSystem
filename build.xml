@@ -48,7 +48,7 @@
            <arg value="conf/server.conf" />
            <jvmarg value = '-server' />
            <jvmarg value = '-Xms500m' />
-           <jvmarg value = '-Xmx1000m' />
+           <jvmarg value = '-Xmx4g' />
        </java>
    </target>
 
@@ -60,7 +60,7 @@
             <arg value="conf/slave.conf" />
             <jvmarg value = '-server' />
             <jvmarg value = '-Xms500m' />
-            <jvmarg value = '-Xmx1000m' />
+            <jvmarg value = '-Xmx4g' />
         </java>
     </target>
 
@@ -71,8 +71,8 @@
           <classpath refid="project.classpath" />
           <arg value="localhost" />
           <jvmarg value = '-client' />
-          <jvmarg value = '-Xms96m' />
-          <jvmarg value =  '-Xmx512m' />
+          <jvmarg value = '-Xms512m' />
+          <jvmarg value =  '-Xmx4g' />
       </java>
    </target>
 

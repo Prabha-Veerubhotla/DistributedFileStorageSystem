@@ -18,13 +18,13 @@ import java.util.concurrent.TimeUnit;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2346";
+    static String slave1port = "2345";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceStub stub;
     private static String myIp;
     private static String username;
-    private static Route response = Route.newBuilder().setDestination("server").build();
+    private static Route response = Route.newBuilder().build();
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
@@ -39,8 +39,8 @@ public class MasterNode extends RouteServerImpl {
 
     public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        //slave1 = slaveip.get(0);
-        slave1 = "localhost"; // local testing
+        slave1 = slaveip.get(0);
+        //slave1 = "localhost"; // local testing
 
     }
 
@@ -52,7 +52,7 @@ public class MasterNode extends RouteServerImpl {
     }
 
     // send any message to slave
-    public static void sendMessageToSlaves(Route r) {
+    public static Route sendMessageToSlaves(Route r) {
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
         CountDownLatch latch = new CountDownLatch(1);
@@ -73,6 +73,10 @@ public class MasterNode extends RouteServerImpl {
             public void onCompleted() {
                 logger.info("sendMessageToSlaves:Slave is done sending data.!");
                 latch.countDown();
+//                synchronized (response) {
+//                    logger.info("notifying response");
+                   // response.notify();
+               // }
             }
         });
 
@@ -85,7 +89,7 @@ public class MasterNode extends RouteServerImpl {
         bld.setType(r.getType());
         bld.setPath(r.getPath());
         bld.setSeq(r.getSeq());
-        logger.info("sending seq num: "+bld.getSeq()+ " to slave");
+        logger.info("sending seq num: " + bld.getSeq() + " to slave");
         requestObserver.onNext(bld.build());
         requestObserver.onCompleted();
 
@@ -94,6 +98,7 @@ public class MasterNode extends RouteServerImpl {
         } catch (InterruptedException ie) {
             logger.info("sendMessageToSlaves:Exception while waiting for count down latch: " + ie);
         }
+        return response;
     }
 
     // collecting data(chunks) from slaves -- for get call
@@ -101,20 +106,12 @@ public class MasterNode extends RouteServerImpl {
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
         CountDownLatch latch = new CountDownLatch(1);
-        Route r1 = r;
         StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
             //handle response from server here
             @Override
             public void onNext(Route route) {
                 logger.info("collectDataFromSlaves: Received response from slave: " + route.getPayload());
-                synchronized (response) {
-                    try {
-                        response.wait();
-                        response = route.toBuilder().build();
-                    } catch (InterruptedException ie) {
-                        logger.info("collectDataFromSlaves:exception while waiting for reponse");
-                    }
-                }
+                response = route.toBuilder().build();
             }
 
             @Override
@@ -127,10 +124,6 @@ public class MasterNode extends RouteServerImpl {
             public void onCompleted() {
                 logger.info("collectDataFromSlaves:Slave is done sending data");
                 latch.countDown();
-                response = r1;
-                synchronized (response) {
-                    response.notify();
-                }
             }
         });
 
@@ -146,13 +139,13 @@ public class MasterNode extends RouteServerImpl {
         logger.info("Sending request to slave to retrieve file: " + r.getPath());
         requestObserver.onNext(bld.build());
         requestObserver.onCompleted();
-
         return response;
     }
 
     public static void put(Route r) {
         logger.info("sending file to slave with seq num: " + r.getSeq());
         sendMessageToSlaves(r);
+        //logger.info("put status: " + new String(response.getPayload().toByteArray()));
     }
 
     public static byte[] get(Route r) {
@@ -186,7 +179,7 @@ public class MasterNode extends RouteServerImpl {
     public static boolean complete(Route r) {
         logger.info("complete: sending complete message to slave");
         sendMessageToSlaves(r);
-        logger.info("response is: " + response.getPayload());
+        logger.info("response is: " + new String(response.getPayload().toByteArray()));
         if (response.getPayload() != null) {
             String payload = new String(response.getPayload().toByteArray());
             if (payload.equalsIgnoreCase("success")) {

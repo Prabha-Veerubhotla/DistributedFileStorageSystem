@@ -37,7 +37,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
     static RedisHandler rh = new RedisHandler();
     private ManagedChannel ch;
     private RouteServiceGrpc.RouteServiceStub stub;
-    private Route response;
+    private Route response = Route.newBuilder().build();
 
     /**
      * TODO refactor this!
@@ -295,7 +295,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         bld.setSeq(bld.getSeq());
         requestObserver.onNext(bld.build());
         requestObserver.onCompleted();
-        return response;
+        return bld.build();
     }
 
 
@@ -328,30 +328,6 @@ public class RouteServerImpl extends RouteServiceImplBase {
     }
 
     private Route completeResponse(Route route) {
-        ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
-        stub = RouteServiceGrpc.newStub(ch);
-        CountDownLatch latch = new CountDownLatch(1);
-        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
-            //handle response from server here
-            @Override
-            public void onNext(Route route) {
-                response = route.toBuilder().build();
-                logger.info("completeResponse: received response from master: " + new String(route.getPayload().toByteArray()));
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("completeResponse:Exception in the response from master: " + throwable);
-                latch.countDown();
-            }
-
-            @Override
-            public void onCompleted() {
-                logger.info("completeResponse: Master is done sending data");
-                latch.countDown();
-            }
-        });
-
         Route.Builder bld = Route.newBuilder();
         bld.setUsername(route.getUsername());
         bld.setOrigin(myIp);
@@ -361,9 +337,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         logger.info("request type is: " + bld.getType());
         bld.setPath(route.getPath());
         bld.setSeq(route.getSeq());
-        requestObserver.onNext(bld.build());
-        requestObserver.onCompleted();
-        return response;
+        return bld.build();
     }
 
     private Route handleComplete(Route route) {
