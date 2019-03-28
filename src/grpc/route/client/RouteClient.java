@@ -36,7 +36,8 @@ import utility.FetchConfig;
  * the License.
  */
 
-//TODO: make all calls aynschronous
+//TODO: make get, put , list, update asynchronous
+//TODO: make the rem, calls blocking -- done
 //TODO: listen continuously for messages from server on a background thread
 
 public class RouteClient {
@@ -47,7 +48,6 @@ public class RouteClient {
     private String name;
     private static String myIp = "client"; // intially , later master node will assign an ip
     protected static Logger logger = LoggerFactory.getLogger("client");
-    private List<String> msgTypes = new ArrayList<>();
     private Route response = Route.newBuilder().setDestination("server").build();
 
     public RouteClient(Properties setup) {
@@ -74,12 +74,12 @@ public class RouteClient {
         stub = RouteServiceGrpc.newStub(ch);
         blockingStub = RouteServiceGrpc.newBlockingStub(ch);
         System.out.println("Client running...");
-        msgTypes = FetchConfig.getMsgTypes();
         //request ip from node running dhcp-server
-        requestIp();
+        //requestIp(); // blocking
         //reply node info stating that you are client
-        sendNodeInfo();
+        //sendNodeInfo(); //blocking
     }
+
 
     public boolean checkIfFile(String msg) {
         try {
@@ -91,40 +91,29 @@ public class RouteClient {
         return true;
     }
 
+    private route.Route buildError(route.Route request, String msg) {
+        route.Route.Builder builder = route.Route.newBuilder();
+        builder.setOrigin(myIp);
+        builder.setDestination(request.getOrigin());
+        builder.setPath(request.getPath());
+
+        // do the work
+        logger.info("--> Got data from: " + request.getOrigin() + "  content: " + request.getPayload());
+        String reply = "blank";
+        byte[] raw = reply.getBytes();
+        builder.setPayload(ByteString.copyFrom(raw));
+        route.Route rtn = builder.build();
+
+        return rtn;
+    }
+
     private void sendMessageToServer(String type, String path, String payload) {
         CountDownLatch latch = new CountDownLatch(1);
         StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-                if (route.getType().equalsIgnoreCase("get")) {
-                    logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
-                    File file = new File("output-" + route.getPath());
-                    //Create the file
-                    try {
-                        if (file.createNewFile()) {
-                            logger.info("File: " + file + " is created!");
-                        } else {
-                            logger.info("File: " + file + " already exists.");
-                        }
-                        RandomAccessFile f = new RandomAccessFile(file, "rw");
-                        // write into the file , every chunk received from master
-                        f.write(route.getPayload().toByteArray());
-                        f.close();
-                    } catch (IOException io) {
-                        io.printStackTrace();
-                    }
-                    synchronized (response) {
-                        try {
-                            response.wait();
-                            response = route.toBuilder().build();
-                        } catch (InterruptedException ie) {
-                            ie.printStackTrace();
-                        }
-                    }
-                } else {
-                    response = route.toBuilder().build();
-                }
+                response = route.toBuilder().build();
             }
 
             @Override
@@ -137,9 +126,6 @@ public class RouteClient {
             public void onCompleted() {
                 logger.info("Server is done sending data");
                 latch.countDown();
-                /*synchronized (response) {
-                    response.notifyAll();
-                }*/
             }
         });
 
@@ -150,8 +136,9 @@ public class RouteClient {
         bld.setType(type);
         bld.setUsername(name);
         bld.setPath(path);
+
         // if msg is put, if it is a file, stream it
-        if (type.equalsIgnoreCase(msgTypes.get(2))) {
+        if (type.equalsIgnoreCase("put")) {
             if (payload == null)
                 return;
             if (checkIfFile(payload)) {
@@ -168,14 +155,13 @@ public class RouteClient {
                         int n = fis.read(raw, 0, blen);
                         if (n <= 0)
                             break;
-                        System.out.println("n: " + n);
                         // identifying sequence number
                         seq++;
+                        logger.info("Streaming seq num: " + seq);
                         bld.setPayload(ByteString.copyFrom(raw, 0, n));
+                        logger.info("seq num is: "+seq);
                         bld.setSeq(seq);
                         logger.info("Sending file data to server with seq num: " + seq);
-                        // convert string to byte string,
-                        // to be compatible with protobuf format
 
                         requestObserver.onNext(bld.build());
                     }
@@ -189,21 +175,13 @@ public class RouteClient {
                         ; // ignore
                     }
                 }
-                logger.info("Streaming file is done");
-
-                //say to server that file streaming is done
-                //Route.Builder bld1 = Route.newBuilder();
-                bld.setOrigin(myIp);
-                bld.setDestination(setup.getProperty("host")); // from the args , when we start client
-                bld.setType(type);
-                bld.setUsername(name);
-                bld.setPath(path);
+                logger.info("Streaming file: " + payload + " is done");
+                bld.setType("complete");
+                bld.setSeq(1);
                 bld.setPayload(ByteString.copyFrom("complete".getBytes()));
-                //bld.setUsername(name);
-                logger.info("request type is: "+ type);
-                logger.info("sending complete to master");
+                logger.info("calling on next-client");
                 requestObserver.onNext(bld.build());
-                logger.info("Sent complete to master");
+                logger.info("Sending complete message to master");
 
             } else {
                 bld.setPayload(ByteString.copyFrom(payload.getBytes()));
@@ -217,39 +195,37 @@ public class RouteClient {
             requestObserver.onNext(bld.build());
 
         }
+        logger.info("calling oncompleted()");
+        requestObserver.onCompleted();
 
-        //if (!bld.getType().equalsIgnoreCase("get")) {
-            requestObserver.onCompleted();
-        //}
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
             logger.info("Exception while waiting for count down latch: " + ie);
         }
-
     }
+
 
     public Route sendBlockingMessageToServer(String type, String path, String payload) {
-            Route.Builder bld = Route.newBuilder();
-            bld.setOrigin(myIp);
-            bld.setDestination(setup.getProperty("host")); // from the args , when we start client
-            bld.setType(type);
-            bld.setUsername(name);
-            bld.setPath(path);
-            bld.setPayload(ByteString.copyFrom(payload.getBytes()));
-            bld.setSeq(0);
-            // to be compatible with protobuf format
-
-            // blocking!
-            return RouteClient.blockingStub.blockingrequest(bld.build());
+        Route.Builder bld = Route.newBuilder();
+        bld.setOrigin(myIp);
+        logger.info("destination is: " + setup.getProperty("host") + " type:" + type + " path:" + path + " payload:" + payload);
+        bld.setDestination(setup.getProperty("host")); // from the args , when we start client
+        bld.setType(type);
+        bld.setUsername(name);
+        bld.setPath(path);
+        bld.setPayload(ByteString.copyFrom(payload.getBytes()));
+        bld.setSeq(0);
+        // blocking!
+        return RouteClient.blockingStub.blockingrequest(bld.build());
     }
 
+    //blocking
     public boolean join() {
-        String type = msgTypes.get(0);
+        String type = "join";
         String payload = "joining";
         String path = "/client/joining";
         Route response = sendBlockingMessageToServer(type, path, payload);
-        //TODO: use some kind of wait, notify
         logger.info("reply from master node: " + new String(response.getPayload().toByteArray()));
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("welcome")) {
             return true;
@@ -262,17 +238,19 @@ public class RouteClient {
         ch.shutdown();
     }
 
+    //blocking
     public void requestIp() {
-        String type = msgTypes.get(5);
+        String type = "request-ip";
         String path = "requesting/client/ip";
         String payload = "/requesting";
         Route response = sendBlockingMessageToServer(type, path, payload);
         myIp = new String(response.getPayload().toByteArray());
-        logger.info("my ip is: "+myIp);
+        logger.info("my ip is: " + myIp);
     }
 
+    //blocking
     public void sendNodeInfo() {
-        String type = msgTypes.get(6);
+        String type = "save-client-ip";
         String path = "sending/node/info";
         String payload = "client";
         Route response = sendBlockingMessageToServer(type, path, payload);
@@ -282,34 +260,28 @@ public class RouteClient {
         }
     }
 
-
+    //non blocking
     public boolean put(String msg) {
-        String type = msgTypes.get(2);
+        String type = "put";
         String path = msg;
         String payload = msg;
         boolean putStatus = false;
         System.out.println("Streaming: " + msg);
         sendMessageToServer(type, path, payload);
-        // synchronized (response) {
-        //  try {
-        //response.wait();
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
             putStatus = true;
             logger.info("Successfully saved: " + msg);
         } else {
             logger.info("Could not save: " + msg);
         }
-            /*} catch (InterruptedException ie) {
-                ie.printStackTrace();
-            }*/
-
         return putStatus;
     }
 
 
+    //blocking
     public boolean delete(String msg) {
         boolean deleteStatus = false;
-        String type = msgTypes.get(4);
+        String type = "delete";
         String path = msg;
         String payload = msg;
         sendMessageToServer(type, path, payload);
@@ -322,8 +294,9 @@ public class RouteClient {
         return deleteStatus;
     }
 
+    //non blocking
     public File get(String msg) {
-        String type = msgTypes.get(1);
+        String type = "get";
         String path = msg;
         String payload = msg;
         sendMessageToServer(type, path, payload);
@@ -338,8 +311,9 @@ public class RouteClient {
         return new File("output-" + msg);
     }
 
+    //blocking
     public List<String> list() {
-        String type = msgTypes.get(3);
+        String type = "list";
         String path = "/list/messages";
         String payload = "listing";
         sendMessageToServer(type, path, payload);
@@ -348,4 +322,33 @@ public class RouteClient {
         return new ArrayList<>(Arrays.asList(payload.split(",")));
     }
 }
+
+
+
+   /*             if (route.getType().equalsIgnoreCase("get")) {
+                        logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
+                        File file = new File("output-" + route.getPath());
+                        //Create the file
+                        try {
+                        if (file.createNewFile()) {
+                        logger.info("File: " + file + " is created!");
+                        } else {
+                        logger.info("File: " + file + " already exists.");
+                        }
+                        RandomAccessFile f = new RandomAccessFile(file, "rw");
+                        // write into the file , every chunk received from master
+                        f.write(route.getPayload().toByteArray());
+                        f.close();
+                        } catch (IOException io) {
+                        io.printStackTrace();
+                        }
+synchronized (response) {
+        try {
+        response.wait();
+        response = route.toBuilder().build();
+        } catch (InterruptedException ie) {
+        ie.printStackTrace();
+        }
+        }
+        }*/
 

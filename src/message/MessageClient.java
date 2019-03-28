@@ -1,6 +1,7 @@
 package message;
 
 import grpc.route.client.RouteClient;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -27,12 +28,12 @@ public class MessageClient {
         try {
 
             BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-            if (choice.equalsIgnoreCase("post")) {
+            if (choice.equalsIgnoreCase("put")) {
                 System.out.print("Enter file path: ");
                 String msg = br.readLine();
-                boolean msgstatus = rc.put(msg);
-                if (msgstatus) {
-                    System.out.println(msg + " saved successfully");
+                boolean putstatus = rc.put(msg);
+                if (putstatus) {
+                    System.out.println(msg + " saved successfully !");
                 } else {
                     System.out.println(msg + " not saved successfully");
                 }
@@ -49,7 +50,7 @@ public class MessageClient {
                         System.out.println(s);
                     }
                 } else {
-                    System.out.println("no files saved from this user: " + clientname);
+                    System.out.println("No files saved from this user: " + clientname);
                 }
             } else if (choice.equalsIgnoreCase("delete")) {
                 System.out.print("Enter file name to delete: ");
@@ -60,10 +61,12 @@ public class MessageClient {
                 } else {
                     System.out.println("Delete operation failed for: " + msg);
                 }
-            } else {
+            }
+            //TODO: handle update choice here
+            else {
 
-                // if the choice is not one of the above options { get, post, list, delete }
-                // the default is post
+                // if the choice is not one of the above options { get, put, list, delete }
+                // the default is put
                 rc.put(choice);
             }
         } catch (IOException ie) {
@@ -97,8 +100,8 @@ public class MessageClient {
         rc.setName(name);
         clientname = name;
         rc.startClientSession();
-        boolean joinStatus  = rc.join();
-        System.out.println("join status is: "+joinStatus);
+        boolean joinStatus = rc.join();
+        System.out.println("join status is: " + joinStatus);
         if (!joinStatus) {
             rc.stopClientSession();
             System.exit(0);
@@ -108,11 +111,12 @@ public class MessageClient {
         System.out.println("Commands");
         System.out.println("-----------------------------------------------");
         System.out.println("help - show this menu");
-        System.out.println("post - send a file or message(default)");
         System.out.println("whoami - list my settings");
-        System.out.println("get - retrieve a stored message or file");
-        System.out.println("list - list all stored messages or files");
-        System.out.println("delete - delete a stored message or file");
+        System.out.println("put - send a file (default)");
+        System.out.println("get - retrieve a stored  file");
+        System.out.println("update - update a stored file");
+        System.out.println("list - list all stored  files");
+        System.out.println("delete - delete a stored file");
         System.out.println("exit - end session");
         System.out.println("");
 
@@ -136,11 +140,13 @@ public class MessageClient {
                     System.out.println("Commands");
                     System.out.println("-------------------------------");
                     System.out.println("help - show this menu");
-                    System.out.println("post - save a message or file(default)");
                     System.out.println("whoami - list my settings");
-                    System.out.println("get - retrieve a stored message or file");
-                    System.out.println("list - list all stored messages or files");
-                    System.out.println("delete - delete a stored message or file");
+                    System.out.println("put - send a file (default)");
+                    System.out.println("get - retrieve a stored  file");
+                    //TODO: implement update
+                    System.out.println("update - update a stored file");
+                    System.out.println("list - list all stored  files");
+                    System.out.println("delete - delete a stored file");
                     System.out.println("exit - end session");
                     System.out.println("");
                 } else {
@@ -152,9 +158,9 @@ public class MessageClient {
                 forever = false;
             }
         }
-            System.out.println("\nGoodbye");
-            rc.stopClientSession();
-            System.exit(0);
+        System.out.println("\nGoodbye");
+        rc.stopClientSession();
+        System.exit(0);
 
     }
 

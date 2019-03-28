@@ -5,10 +5,12 @@ import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import javafx.scene.chart.BubbleChart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
 import route.RouteServiceGrpc;
+
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -16,13 +18,13 @@ import java.util.concurrent.TimeUnit;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2345";
+    static String slave1port = "2346";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceStub stub;
     private static String myIp;
     private static String username;
-    private static Route response;
+    private static Route response = Route.newBuilder().setDestination("server").build();
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
@@ -37,13 +39,13 @@ public class MasterNode extends RouteServerImpl {
 
     public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        slave1 = slaveip.get(0);
-        //slave1 = "localhost"; // local testing
+        //slave1 = slaveip.get(0);
+        slave1 = "localhost"; // local testing
 
     }
 
     //Method for round robin IP - Sharding data among 3 Slaves
-    public synchronized static String roundRobinIP(){
+    public synchronized static String roundRobinIP() {
         currentIP = slaveip.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
         return currentIP;
@@ -55,22 +57,22 @@ public class MasterNode extends RouteServerImpl {
         stub = RouteServiceGrpc.newStub(ch);
         CountDownLatch latch = new CountDownLatch(1);
         StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
-            //handle response from server here
             @Override
             public void onNext(Route route) {
-                logger.info("Received response from slave: " + route.getPayload());
-                response = route;
+                logger.info("sendMessageToSlaves:Received response from slave: " + route.getPayload());
+                logger.info("sendMessageToSlaves:Received response from slave: " + route.getPayload());
+                response = route.toBuilder().build();
             }
 
             @Override
             public void onError(Throwable throwable) {
-                logger.info("Exception in the response from slaves: " + throwable);
+                logger.info("sendMessageToSlaves:Exception in the response from slaves: " + throwable);
                 latch.countDown();
             }
 
             @Override
             public void onCompleted() {
-                logger.info("Slave is done sending data.!");
+                logger.info("sendMessageToSlaves:Slave is done sending data.!");
                 latch.countDown();
             }
         });
@@ -86,20 +88,12 @@ public class MasterNode extends RouteServerImpl {
         bld.setSeq(r.getSeq());
 
         requestObserver.onNext(bld.build());
+        requestObserver.onCompleted();
 
-        if(r.getType().equalsIgnoreCase("put")) {
-            logger.info("entering put");
-logger.info("payload is: "+r.getPayload());
-            if (new String(r.getPayload().toByteArray()).equalsIgnoreCase("complete") ) {
-                requestObserver.onCompleted();
-            } else {
-                logger.info("put still going on...");
-            }
-        }
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
-            logger.info("Exception while waiting for count down latch: " + ie);
+            logger.info("sendMessageToSlaves:Exception while waiting for count down latch: " + ie);
         }
     }
 
@@ -108,24 +102,36 @@ logger.info("payload is: "+r.getPayload());
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
         CountDownLatch latch = new CountDownLatch(1);
+        Route r1 = r;
         StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-                logger.info("Received response from slave: " + route.getPayload());
-                response = route.toBuilder().build();
+                logger.info("collectDataFromSlaves: Received response from slave: " + route.getPayload());
+                synchronized (response) {
+                    try {
+                        response.wait();
+                        response = route.toBuilder().build();
+                    } catch (InterruptedException ie) {
+                        logger.info("collectDataFromSlaves:exception while waiting for reponse");
+                    }
+                }
             }
 
             @Override
             public void onError(Throwable throwable) {
-                logger.info("Exception in the response from slave: " + throwable);
+                logger.info("collectDataFromSlaves:Exception in the response from slave: " + throwable);
                 latch.countDown();
             }
 
             @Override
             public void onCompleted() {
-                logger.info("Slave is done sending data");
+                logger.info("collectDataFromSlaves:Slave is done sending data");
                 latch.countDown();
+                response = r1;
+                synchronized (response) {
+                    response.notify();
+                }
             }
         });
 
@@ -135,42 +141,50 @@ logger.info("payload is: "+r.getPayload());
         bld.setDestination(slave1);
         bld.setPayload(ByteString.copyFrom(r.getPayload().toByteArray()));
         bld.setType(r.getType());
-        logger.info("request type is: "+r.getType());
+        logger.info("request type is: " + r.getType());
         bld.setPath(r.getPath());
         bld.setSeq(r.getSeq());
         logger.info("Sending request to slave to retrieve file: " + r.getPath());
         requestObserver.onNext(bld.build());
-        //if(!bld.getType().equalsIgnoreCase("get")) {
-            requestObserver.onCompleted();
-        //}
+        requestObserver.onCompleted();
+
         return response;
     }
 
-    public static boolean put(Route r) {
-        logger.info("Saving file in node: " + slave1);
+    public static void put(Route r) {
         logger.info("sending file to slave with seq num: " + r.getSeq());
         sendMessageToSlaves(r);
-        String payload = new String(response.getPayload().toByteArray());
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException ie) {
+            logger.info("put: exception :" + ie + " while waiting for response to be notified");
+
+        }
+        /*logger.info("response is: " + response);
+        String payload = "blank";
+        if (response != null) {
+            payload = new String(response.getPayload().toByteArray());
+        }
         logger.info("Received response from slave node: " + payload);
         if (payload.equalsIgnoreCase("success")) {
             return true;
         }
-        return false;
+        return false;*/
     }
 
     public static byte[] get(Route r) {
-        logger.info("retrieving message from  node: " + slave1);
+        logger.info("get: retrieving message from  node: " + slave1);
         sendMessageToSlaves(r);
         String payload = new String(response.getPayload().toByteArray());
-        logger.info("Received response from slave node: " + payload);
+        logger.info("get: Received response from slave node: " + payload);
         return response.getPayload().toByteArray();
     }
 
     public static String list(Route r) {
-        logger.info("retrieving all message of user: " + r.getUsername() + " from  node: " + slave1);
+        logger.info("list: retrieving all message of user: " + r.getUsername() + " from  node: " + slave1);
         sendMessageToSlaves(r);
         String payload = new String(response.getPayload().toByteArray());
-        logger.info("Received response from slave node: " + payload);
+        logger.info("list: Received response from slave node: " + payload);
         logger.info("list of messages or files are: " + new ArrayList<>(Arrays.asList(payload.split(","))));
         return response.getPayload().toString();
     }
@@ -179,9 +193,22 @@ logger.info("payload is: "+r.getPayload());
         logger.info("deleting message or file: " + r.getPayload() + " from:" + slave1);
         sendMessageToSlaves(r);
         String payload = new String(response.getPayload().toByteArray());
-        logger.info("Received response from slave node: " + payload);
+        logger.info("delete: Received response from slave node: " + payload);
         if (payload.equalsIgnoreCase("success")) {
             return true;
+        }
+        return false;
+    }
+
+    public static boolean complete(Route r) {
+        logger.info("complete: sending complete message to slave");
+        sendMessageToSlaves(r);
+        logger.info("response is: " + response.getPayload());
+        if (response.getPayload() != null) {
+            String payload = new String(response.getPayload().toByteArray());
+            if (payload.equalsIgnoreCase("success")) {
+                return true;
+            }
         }
         return false;
     }

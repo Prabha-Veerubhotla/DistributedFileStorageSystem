@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
+import java.util.concurrent.CountDownLatch;
+
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -31,9 +33,10 @@ public class RouteServerImpl extends RouteServiceImplBase {
     private static String myIp = "server";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
-    private List<String> msgTypes = FetchConfig.getMsgTypes();
     static MongoDBHandler mh = new MongoDBHandler();
     static RedisHandler rh = new RedisHandler();
+    private ManagedChannel ch;
+    private RouteServiceGrpc.RouteServiceStub stub;
 
     /**
      * TODO refactor this!
@@ -41,66 +44,90 @@ public class RouteServerImpl extends RouteServiceImplBase {
      * @return
      */
 
+
+    private String join(Route r) {
+        //save client user name
+        name = r.getUsername();
+        logger.info("--> join: " + name);
+        myIp = r.getDestination();
+        logger.info("my ip is: " + myIp);
+        MasterNode.setMasterIp(myIp);
+        MasterNode.setUsername(name);
+        //TODO: run a background theread continuously monitoring slave ip list
+        getSlaveIpList();
+        return "WELCOME";
+    }
+
+    private String put(Route r) {
+        logger.info("--> Message from: " + name + " asking to save: " + r.getPath());
+        MasterNode.put(r);
+        return "success";
+    }
+
+    private String list(Route r) {
+        logger.info("--> Message from: " + name + " asking to list all messages or files");
+        return MasterNode.list(r);
+    }
+
+    private String delete(Route r) {
+        String message = new String(r.getPayload().toByteArray());
+        logger.info("--> Message from: " + name + " asking to delete: " + message);
+        if (MasterNode.delete(r)) {
+            return "success";
+        }
+        return "failure";
+    }
+
+    private String requestIp() {
+        logger.info("--> Message from: " + name + " asking to assign ip");
+        return MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
+    }
+
+    private String nodeInfo(Route r) {
+        logger.info("--> Message from: " + name + " asking to save client information");
+        if (dhcp_lease_test.updateCurrentNodeMapping(r, r.getOrigin())) {
+            return "success";
+        }
+        return "failure";
+    }
+
+    private String complete(Route r) {
+        logger.info("--> Message from client, saying streaming of file is completed");
+        if (MasterNode.complete(r)) {
+            return "success";
+        }
+        return "failure";
+    }
+
+
     protected ByteString processMaster(route.Route msg) {
-
         String reply;
-        logger.info("msg type: "+msg.getType());
+        logger.info("master: Message type: " + msg.getType());
+        if (msg.getType().equalsIgnoreCase("join")) {
+            reply = join(msg);
 
-        if (msg.getType().equalsIgnoreCase(msgTypes.get(0))) {
-            //save client user name
-            name = msg.getUsername();
-            logger.info("--> join: " + name);
-            reply = "WELCOME";
-            myIp = msg.getDestination();
-            MasterNode.setMasterIp(myIp);
-            MasterNode.setUsername(name);
-            //TODO: run a background theread continuously monitoring slave ip list
-            getSlaveIpList();
+        } else if (msg.getType().equalsIgnoreCase("put")) {
+            reply = put(msg);
 
-        } /*else if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
-            String message = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: " + name + " asking to retrieve: " + message);
-            reply = MasterNode.get(msg).toString();
+        } else if (msg.getType().equalsIgnoreCase("list")) {
+            reply = list(msg);
 
-        }*/ else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
-            String payload = new String(msg.getPayload().toByteArray());
-            if (payload.equalsIgnoreCase("complete")) {
-                logger.info("client sent complete");
-            }
-            logger.info("--> Message from: " + name + " asking to save: " + msg.getPath());
-            if (MasterNode.put(msg)) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
+        } else if (msg.getType().equalsIgnoreCase("delete")) {
+            reply = delete(msg);
 
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
-            logger.info("--> Message from: " + name + " asking to list all messages or files");
-            reply = MasterNode.list(msg);
+        } else if (msg.getType().equalsIgnoreCase("request-ip")) {
+            reply = requestIp();
 
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
-            String message = new String(msg.getPayload().toByteArray());
-            logger.info("--> Message from: " + name + " asking to delete: " + message);
-            if (MasterNode.delete(msg)) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(5))) {
-            logger.info("--> Message from: " + name + " asking to assign ip");
-            reply = MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(6))) {
-            logger.info("--> Message from: " + name + " asking to save client information");
-            if (dhcp_lease_test.updateCurrentNodeMapping(msg, msg.getOrigin())) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
+        } else if (msg.getType().equalsIgnoreCase("save-client-ip")) {
+            reply = nodeInfo(msg);
 
+        } else if (msg.getType().equalsIgnoreCase("complete")) {
+            reply = complete(msg);
         } else {
             logger.info("--> Got data from: " + msg.getOrigin() + "  path: " + msg.getPath());
-            reply = "blank";
+            reply = "no-type";
         }
+
         byte[] raw = reply.getBytes();
         return ByteString.copyFrom(raw);
     }
@@ -114,57 +141,49 @@ public class RouteServerImpl extends RouteServiceImplBase {
         MasterNode.assignSlaveIp(slaveips);
     }
 
+    private String listSlave(Route r) {
+        String actualmessage = new String(r.getPayload().toByteArray());
+        logger.info("--> Message from: master asking to list messages or files of: " + r.getUsername());
+        //TODO: implement list
+        //           reply = SlaveNode.list(r).toString();
+        return new String();
+    }
+
+    private String deleteSlave(Route r) {
+        String actualmessage = new String(r.getPayload().toByteArray());
+        logger.info("--> Message from: master asking to delete: " + actualmessage);
+        if (SlaveNode.delete(r)) {
+            return "success";
+        }
+        return "failure";
+    }
+
+    private String slaveIp(Route r) {
+        logger.info("Got a message from master of type: " + r.getType() + " with payload: " + r.getPayload());
+        myIp = new String(r.getPayload().toByteArray());
+        logger.info("Assigned ip: " + myIp + " by DHCP server node");
+        return "slave";
+    }
+
 
     protected ByteString processSlave(route.Route msg) {
-        logger.info("processing msg of type: " + msg.getType() + "with: " + msg.getPayload());
-
+        logger.info("Slave: Processing msg of type: " + msg.getType() + "with: " + msg.getPayload());
         name = msg.getUsername();
-
         String reply = null;
+        if (msg.getType().equalsIgnoreCase("list")) {
+            listSlave(msg);
 
-        /*if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: master asking to retrieve: " + actualmessage);
-            reply = SlaveNode.get(msg).toString();
+        } else if (msg.getType().equalsIgnoreCase("delete")) {
+            deleteSlave(msg);
 
-        }*/
-        /*if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: master asking to save: " + msg.getPath());
-            logger.info("received message from master asking to save seq num: " + msg.getSeq());
-            if (SlaveNode.put(msg)) {
-                logger.info("--saved message: " + actualmessage + " from: " + name + " successfully");
-                reply = "success";
-            } else {
-                reply = "failure";
-                logger.info("--unable to save message: " + actualmessage + "from: " + name);
-            }
-        }*/
-        if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> Message from: master asking to list messages or files of: " + msg.getUsername());
-//            reply = SlaveNode.list(msg).toString();
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> Message from: master asking to delete: " + actualmessage);
-            if (SlaveNode.delete(msg)) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(7))) {
-            logger.info("got a message from master of type: " + msg.getType() + " with payload: " + msg.getPayload());
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            myIp = actualmessage;
-            logger.info("Assigned ip: " + myIp + " by dhcp server node");
-            reply = "slave";
+        } else if (msg.getType().equalsIgnoreCase("slave-ip")) {
+            slaveIp(msg);
+
         } else {
-            // TODO placeholder
-//            String content = new String(msg.getPayload().toByteArray());
-            logger.info("Got content: from: " + msg.getOrigin() + " path: " + msg.getPath());
-            reply = "blank";
+            String content = new String(msg.getPayload().toByteArray());
+            logger.info("Got content: " + content + " from: " + msg.getOrigin() + " path: " + msg.getPath());
+            reply = "no-type";
         }
-
         if (reply == null) {
             reply = "";
         }
@@ -184,9 +203,9 @@ public class RouteServerImpl extends RouteServiceImplBase {
         final RouteServerImpl impl = new RouteServerImpl();
         if (conf.getProperty("server.name").equalsIgnoreCase("master")) {
             isMaster = true;
-            logger.info("Running as master node");
+            logger.info("Running as Master node");
         } else {
-            logger.info("Running as slave node");
+            logger.info("Running as Slave node");
         }
         impl.start();
         impl.blockUntilShutdown();
@@ -228,46 +247,74 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.awaitTermination();
     }
 
-    /*public void sendStreamingDataToSlave(Route r) {
-        logger.info("Sending file chunk with seq num: "+ r.getSeq()+" to slave");
-        MasterNode.sendMessageToSlaves(r);
-
-    }*/
-
     public void collectStreamingDataInSlave(Route r) {
         logger.info("Saving chunk with seq num: " + r.getSeq() + " in slave");
-        //receiving each chunk in slave and writing into a file
-       boolean putStatus = SlaveNode.put(r);
-       if(putStatus){
-           logger.info("successfully saved chunk in slave");
-       }
+        boolean putStatus = SlaveNode.put(r);
+        if (putStatus) {
+            logger.info("Successfully saved chunk in slave");
+        }
+
+        ch = ManagedChannelBuilder.forAddress(r.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
+        stub = RouteServiceGrpc.newStub(ch);
+
+
+        CountDownLatch latch = new CountDownLatch(1);
+        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
+            @Override
+            public void onNext(Route route) {
+                logger.info("collectStreamingDataInSlave:received response from master: " + new String(route.getPayload().toByteArray()));
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("collectStreamingDataInSlave: Exception in the response from master while: " + throwable);
+                latch.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("collectStreamingDataInSlave: Master is done sending data");
+                latch.countDown();
+            }
+        });
+
+        Route.Builder bld = Route.newBuilder();
+        bld.setUsername(r.getUsername());
+        bld.setOrigin(myIp);
+        bld.setDestination(r.getOrigin());
+        String status = "failure";
+        if (putStatus) {
+            status = "success";
+        }
+        bld.setPayload(ByteString.copyFrom(status.getBytes()));
+        logger.info("sending response to master: " + status);
+        bld.setType(r.getType());
+        logger.info("request type is: " + bld.getType());
+        bld.setPath(bld.getPath());
+        bld.setSeq(bld.getSeq());
+        requestObserver.onNext(bld.build());
+        requestObserver.onCompleted();
     }
 
-    public Route collectDataFromSlavesInChunks(Route r) {
-        Route route = MasterNode.collectDataFromSlaves(r);
-        logger.info("received data from slave: " + r.getSeq());
-        return route;
-    }
 
     public void sendDataToMasterInChunks(Route r) {
-        logger.info("request from master, asking to retrieve: " + r.getPath());
+        logger.info("Request from master, asking to retrieve: " + r.getPath());
         SlaveNode.returnFileInchunks(r);
     }
 
     //respond to a request
     @Override
     public void blockingrequest(route.Route request, StreamObserver<route.Route> responseObserver) {
-
-        // TODO refactor to use RouteServer to isolate implementation from
-        // transportation
-
         route.Route.Builder builder = route.Route.newBuilder();
         builder.setPath(request.getPath());
 
         // do the work
         if (isMaster) {
             builder.setPayload(processMaster(request));
-            builder.setOrigin(myIp);
+            logger.info("my ip is: " + myIp);
+            if (myIp != null) {
+                builder.setOrigin(myIp);
+            }
             builder.setDestination(request.getOrigin());
         } else {
             builder.setPayload(processSlave(request));
@@ -276,8 +323,46 @@ public class RouteServerImpl extends RouteServiceImplBase {
         }
         route.Route rtn = builder.build();
         responseObserver.onNext(rtn);
-       responseObserver.onCompleted();
+        responseObserver.onCompleted();
+    }
 
+    private void completeResponse(Route route) {
+        ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
+        stub = RouteServiceGrpc.newStub(ch);
+        CountDownLatch latch = new CountDownLatch(1);
+        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
+            //handle response from server here
+            @Override
+            public void onNext(Route route) {
+                //logger.info("Received response from slave: " + route.getPayload());
+                // response = route.toBuilder().build();
+                logger.info("completeResponse: received response from master: " + new String(route.getPayload().toByteArray()));
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("completeResponse:Exception in the response from master: " + throwable);
+                latch.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("completeResponse: Master is done sending data");
+                latch.countDown();
+            }
+        });
+
+        Route.Builder bld = Route.newBuilder();
+        bld.setUsername(route.getUsername());
+        bld.setOrigin(myIp);
+        bld.setDestination(route.getOrigin());
+        bld.setPayload(ByteString.copyFrom("success".getBytes()));
+        bld.setType(route.getType());
+        logger.info("request type is: " + bld.getType());
+        bld.setPath(bld.getPath());
+        bld.setSeq(bld.getSeq());
+        requestObserver.onNext(bld.build());
+        requestObserver.onCompleted();
     }
 
 
@@ -293,6 +378,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
             //handle requests from client here
             @Override
             public void onNext(Route route) {
+                logger.info("on next called");
                 userName = route.getUsername();
                 filePath = route.getPath();
                 methodType = route.getType();
@@ -301,47 +387,45 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 route.Route.Builder builder = Route.newBuilder();
                 builder.setPath(route.getPath());
 
-
-                if (route.getType().equalsIgnoreCase("put")) {
+                if (methodType.equalsIgnoreCase("complete")) {
                     if (isMaster) {
-                        logger.info("Receiving file data with seq num: " + route.getSeq() + " from: " + name);
+                        logger.info("origin: " + route.getOrigin());
+                        logger.info("Received complete message from client-master");
                         builder.setPayload(processMaster(route));
                         builder.setOrigin(myIp);
                         builder.setDestination(route.getOrigin());
                     } else {
+                        logger.info("Entering complete- slave");
+                        SlaveNode.put(route.getUsername(), route.getPath());
+                        completeResponse(route);
+                    }
+
+                } else if (route.getType().equalsIgnoreCase("put")) {
+                    if (isMaster) {
+                        logger.info("Receiving file data with seq num: " + route.getSeq() + " from: " + name);
+                        ByteString msg = processMaster(route);
+                        builder.setPayload(msg);
+                        builder.setOrigin(myIp);
+                        builder.setDestination(route.getOrigin());
+                        logger.info("put: received response from slave: " + new String(msg.toByteArray()));
+                    } else {
                         collectStreamingDataInSlave(route);
                     }
-                } else if (route.getType().equalsIgnoreCase("get")) {
-                    logger.info("receiving request get");
-                    if (isMaster) {
-                        if (new String(route.getPayload().toByteArray()).equalsIgnoreCase("complete")) {
-                            isComplete = true;
-                        } else {
-                            Route route1 = collectDataFromSlavesInChunks(route);
-                            logger.info("sending data to client");
-                            responseObserver.onNext(route1);
-                        }
-                    } else {
-                        logger.info("received request from master of type: " + route.getType());
-                        sendDataToMasterInChunks(route);
-
-                    }
-                    //   responseObserver.onNext(route);
-
                 } else {
                     if (isMaster) {
                         builder.setPayload(processMaster(route));
                         builder.setOrigin(myIp);
                         builder.setDestination(route.getOrigin());
+                        responseObserver.onNext(builder.build());
                     } else {
-                        if(methodType.equalsIgnoreCase("slave-ip")) {
+                        if (methodType.equalsIgnoreCase("slave-ip")) {
                             builder.setPayload(processSlave(route));
                             builder.setOrigin(myIp);
                             builder.setDestination(route.getOrigin());
                             ManagedChannel ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
                             RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
                             Route r = blockingStub.blockingrequest(builder.build());
-
+                            logger.info("--got: " + new String(r.getPayload().toByteArray()) + " from: " + r.getOrigin());
                         } else {
                             builder.setPayload(processSlave(route));
                             builder.setOrigin(myIp);
@@ -350,7 +434,6 @@ public class RouteServerImpl extends RouteServiceImplBase {
                             responseObserver.onNext(rtn);
                         }
                     }
-
                 }
             }
 
@@ -362,39 +445,41 @@ public class RouteServerImpl extends RouteServiceImplBase {
             @Override
             public void onCompleted() {
                 logger.info("Node is done sending messages");
-                if (!isMaster && methodType.equalsIgnoreCase("put")) {
-                    SlaveNode.put(userName, filePath);
-                }
-                if (isMaster && methodType.equalsIgnoreCase("put")) {
-                    logger.info("received all data from client");
-                    route.Route.Builder builder = Route.newBuilder();
-                    builder.setPath(filePath);
-                    builder.setUsername(userName);
-                    //builder.setDestination()
-                    builder.setOrigin(myIp);
-                    builder.setPayload(ByteString.copyFrom("complete".getBytes()));
-                    builder.setType("put");
-                    MasterNode.put(builder.build());
-                }
-                /*if(isMaster && methodType.equalsIgnoreCase("put")) {
-                    String received  = new String(payload.toByteArray());
-                    logger.info("Received response from slave node: " + payload);
-                    if (received.equalsIgnoreCase("success")) {
-                        //return true;
-                    }
-                    //return false;
-                }*/
-                if(isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
-                    logger.info("received all the data from slave");
-                    //
-                } else {
-
-                    responseObserver.onCompleted();
-                }
-
+                responseObserver.onCompleted();
             }
         };
         return requestObserver;
     }
 }
 
+
+
+/*else if (route.getType().equalsIgnoreCase("get")) {
+        logger.info("receiving request get");
+        if (isMaster) {
+        if (new String(route.getPayload().toByteArray()).equalsIgnoreCase("complete")) {
+        isComplete = true;
+        } else {
+        Route route1 = collectDataFromSlavesInChunks(route);
+        logger.info("sending data to client");
+        responseObserver.onNext(route1);
+        }
+        } else {
+        logger.info("received request from master of type: " + route.getType());
+        sendDataToMasterInChunks(route);
+
+        }
+        }*/
+
+  /*  public Route collectDataFromSlavesInChunks(Route r) {
+        Route route = MasterNode.collectDataFromSlaves(r);
+        logger.info("Received data from slave: " + r.getSeq());
+        return route;
+    }
+
+    if (isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
+                    logger.info("master: Received all the data from slave");
+                } else {
+                    responseObserver.onCompleted();
+                }
+*/
