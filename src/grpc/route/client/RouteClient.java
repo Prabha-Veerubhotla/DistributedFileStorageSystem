@@ -115,6 +115,24 @@ public class RouteClient {
             public void onNext(Route route) {
                 response = route.toBuilder().build();
                 logger.info("received response from server: " + new String(response.getPayload().toByteArray()));
+                if(route.getType().equalsIgnoreCase("get-complete")) {
+                    logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
+                    File file = new File("output-" + route.getPath());
+                    //Create the file
+                    try {
+                        if (file.createNewFile()) {
+                            logger.info("File: " + file + " is created!");
+                        } else {
+                            logger.info("File: " + file + " already exists.");
+                        }
+                        RandomAccessFile f = new RandomAccessFile(file, "rw");
+                        // write into the file , every chunk received from master
+                        f.write(route.getPayload().toByteArray());
+                        f.close();
+                    } catch (IOException io) {
+                        io.printStackTrace();
+                    }
+                }
             }
 
             @Override
@@ -176,7 +194,7 @@ public class RouteClient {
                     }
                 }
                 logger.info("Streaming file: " + payload + " is done");
-                bld.setType("complete");
+                bld.setType("put-complete");
                 bld.setSeq(1);
                 bld.setPayload(ByteString.copyFrom("complete".getBytes()));
                 logger.info("calling on next-client");
@@ -303,13 +321,6 @@ public class RouteClient {
         String payload = msg;
         sendMessageToServer(type, path, payload);
         logger.info("Retrieved information about: " + msg + "  from slaves");
-        synchronized (response) {
-            try {
-                response.wait();
-            } catch (InterruptedException ie) {
-                ie.printStackTrace();
-            }
-        }
         return new File("output-" + msg);
     }
 

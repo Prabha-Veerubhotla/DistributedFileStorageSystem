@@ -59,7 +59,7 @@ public class MasterNode extends RouteServerImpl {
         StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
             @Override
             public void onNext(Route route) {
-                logger.info("sendMessageToSlaves:Received response from slave: " + route.getPayload());
+                logger.info("sendMessageToSlaves:Received response from slave: " + new String(route.getPayload().toByteArray()));
                 response = route.toBuilder().build();
             }
 
@@ -73,10 +73,6 @@ public class MasterNode extends RouteServerImpl {
             public void onCompleted() {
                 logger.info("sendMessageToSlaves:Slave is done sending data.!");
                 latch.countDown();
-//                synchronized (response) {
-//                    logger.info("notifying response");
-                   // response.notify();
-               // }
             }
         });
 
@@ -98,6 +94,7 @@ public class MasterNode extends RouteServerImpl {
         } catch (InterruptedException ie) {
             logger.info("sendMessageToSlaves:Exception while waiting for count down latch: " + ie);
         }
+        //logger.info("payload is "+ new String(response.getPayload().toByteArray()));
         return response;
     }
 
@@ -112,6 +109,7 @@ public class MasterNode extends RouteServerImpl {
             public void onNext(Route route) {
                 logger.info("collectDataFromSlaves: Received response from slave: " + route.getPayload());
                 response = route.toBuilder().build();
+                logger.info("payload is "+ new String(response.getPayload().toByteArray()));
             }
 
             @Override
@@ -138,7 +136,13 @@ public class MasterNode extends RouteServerImpl {
         bld.setSeq(r.getSeq());
         logger.info("Sending request to slave to retrieve file: " + r.getPath());
         requestObserver.onNext(bld.build());
-        requestObserver.onCompleted();
+        //requestObserver.onCompleted();
+        try {
+            latch.await(3, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            logger.info("sendMessageToSlaves:Exception while waiting for count down latch: " + ie);
+        }
+        logger.info("payload is "+ new String(response.getPayload().toByteArray()));
         return response;
     }
 
@@ -166,8 +170,8 @@ public class MasterNode extends RouteServerImpl {
     }
 
     public static boolean delete(Route r) {
-        logger.info("deleting message or file: " + r.getPayload() + " from:" + slave1);
-        sendMessageToSlaves(r);
+        logger.info("deleting message or file: " + new String(r.getPayload().toByteArray()) + " from:" + slave1);
+        response = sendMessageToSlaves(r);
         String payload = new String(response.getPayload().toByteArray());
         logger.info("delete: Received response from slave node: " + payload);
         if (payload.equalsIgnoreCase("success")) {

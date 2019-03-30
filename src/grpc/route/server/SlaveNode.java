@@ -95,10 +95,11 @@ public class SlaveNode extends RouteServerImpl {
         boolean status = false;
         String userName = r.getUsername();
         String fileName = getFileName(r.getPath());
-        logger.info("deleting file " + fileName + "from Redis.");
+        logger.info("deleting file " + fileName + " from Redis.");
         status = rh.remove(userName, fileName);
-        logger.info("deleting file " + fileName + "from Mongo.");
+        logger.info("deleting file " + fileName + " from Mongo.");
         mh.remove(userName, fileName);
+        logger.info("delete status: "+status);
         return status;
     }
 
@@ -201,7 +202,7 @@ public class SlaveNode extends RouteServerImpl {
         builder.setOrigin(r.getDestination());
         builder.setDestination(r.getOrigin());
         builder.setSeq(0);
-        builder.setType(r.getType());
+        builder.setType("get-complete");
         logger.info("Sending complete message to master");
         requestObserver.onNext(builder.build());
 

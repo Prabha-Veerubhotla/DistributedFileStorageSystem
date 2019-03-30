@@ -38,6 +38,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
     private ManagedChannel ch;
     private RouteServiceGrpc.RouteServiceStub stub;
     private Route response = Route.newBuilder().build();
+    private String clientIp = "localhost";
 
     /**
      * TODO refactor this!
@@ -85,6 +86,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
 
     private String nodeInfo(Route r) {
         logger.info("--> Message from: " + name + " asking to save client information");
+        clientIp = r.getOrigin();
         if (dhcp_lease_test.updateCurrentNodeMapping(r, r.getOrigin())) {
             return "success";
         }
@@ -121,7 +123,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
         } else if (msg.getType().equalsIgnoreCase("save-client-ip")) {
             reply = nodeInfo(msg);
 
-        } else if (msg.getType().equalsIgnoreCase("complete")) {
+        } else if (msg.getType().equalsIgnoreCase("put-complete")) {
             reply = complete(msg);
         } else {
             logger.info("--> Got data from: " + msg.getOrigin() + "  path: " + msg.getPath());
@@ -153,8 +155,10 @@ public class RouteServerImpl extends RouteServiceImplBase {
         String actualmessage = new String(r.getPayload().toByteArray());
         logger.info("--> Message from: master asking to delete: " + actualmessage);
         if (SlaveNode.delete(r)) {
+            logger.info("success-slave-delete");
             return "success";
         }
+        logger.info("failure-slave-delete");
         return "failure";
     }
 
@@ -171,13 +175,13 @@ public class RouteServerImpl extends RouteServiceImplBase {
         name = msg.getUsername();
         String reply = null;
         if (msg.getType().equalsIgnoreCase("list")) {
-            listSlave(msg);
+            reply = listSlave(msg);
 
         } else if (msg.getType().equalsIgnoreCase("delete")) {
-            deleteSlave(msg);
+            reply = deleteSlave(msg);
 
         } else if (msg.getType().equalsIgnoreCase("slave-ip")) {
-            slaveIp(msg);
+            reply = slaveIp(msg);
 
         } else {
             String content = new String(msg.getPayload().toByteArray());
@@ -392,6 +396,40 @@ public class RouteServerImpl extends RouteServiceImplBase {
         logger.info("--got: " + new String(r.getPayload().toByteArray()) + " from: " + r.getOrigin());
     }
 
+    private void handleGet(Route r) {
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(clientIp, Integer.parseInt("2345".trim())).usePlaintext(true).build();
+        RouteServiceGrpc.RouteServiceStub stub = RouteServiceGrpc.newStub(ch);
+        CountDownLatch latch = new CountDownLatch(1);
+        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
+            @Override
+            public void onNext(Route route) {
+                logger.info("handleGet:received response from client: " + new String(route.getPayload().toByteArray()));
+                response = route;
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("√: Exception in the response from client while: " + throwable);
+                latch.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("handleGet: client is done sending data");
+                latch.countDown();
+            }
+        });
+
+        Route.Builder builder = Route.newBuilder();
+        builder.setPayload(r.getPayload());
+        builder.setOrigin(myIp);
+        builder.setDestination(clientIp);
+        builder.setPath(r.getPath());
+        builder.setUsername(r.getUsername());
+        builder.setSeq(r.getSeq());
+        logger.info("sending seq no: " + r.getSeq());
+    }
+
 
     @Override
     public StreamObserver<Route> request(StreamObserver<route.Route> responseObserver) {
@@ -413,12 +451,28 @@ public class RouteServerImpl extends RouteServiceImplBase {
                 route.Route.Builder builder = Route.newBuilder();
                 builder.setPath(route.getPath());
 
-                if (methodType.equalsIgnoreCase("complete")) {
+                if (methodType.equalsIgnoreCase("put-complete")) {
+                    logger.info("in put-complete");
                     responseObserver.onNext(handleComplete(route));
-
                 } else if (route.getType().equalsIgnoreCase("put")) {
                     responseObserver.onNext(handlePut(route));
 
+                } else if (route.getType().equalsIgnoreCase("get-complete")) {
+                    responseObserver.onNext(route);
+                } else if (route.getType().equalsIgnoreCase("get")) {
+                    if (isMaster) {
+                        logger.info("entering master get");
+                        Route r = MasterNode.collectDataFromSlaves(route);
+                        logger.info("received response");
+                        responseObserver.onNext(r);
+                        logger.info("sent data to client");
+                    } else {
+                        logger.info("entering slave get");
+                        SlaveNode.returnFileInchunks(route);
+                    }
+
+                } else if (methodType.equalsIgnoreCase("get-complete")) {
+                    responseObserver.onNext(route);
                 } else {
                     if (isMaster) {
                         builder.setPayload(processMaster(route));
@@ -434,6 +488,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
                             builder.setOrigin(myIp);
                             builder.setDestination(route.getOrigin());
                             route.Route rtn = builder.build();
+                            logger.info("sending reply with payload: "+ new String(builder.getPayload().toByteArray()));
                             responseObserver.onNext(rtn);
                         }
                     }
