@@ -43,7 +43,7 @@ public class SlaveNode extends RouteServerImpl {
         byte[] payload = r.getPayload().toByteArray();
         String seqID = Long.toString(r.getSeq());
         String fileName = getFileName(r.getPath());
-        logger.info("Put details: " + userName  + " seq num: " + seqID);
+        logger.info("Put details: " + userName + " seq num: " + seqID);
         //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName, fileName, seqID, payload);
         return true;
@@ -99,7 +99,7 @@ public class SlaveNode extends RouteServerImpl {
         status = rh.remove(userName, fileName);
         logger.info("deleting file " + fileName + " from Mongo.");
         mh.remove(userName, fileName);
-        logger.info("delete status: "+status);
+        logger.info("delete status: " + status);
         return status;
     }
 

@@ -10,10 +10,6 @@ import route.Route;
 import route.RouteServiceGrpc;
 
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -115,7 +111,7 @@ public class RouteClient {
             public void onNext(Route route) {
                 response = route.toBuilder().build();
                 logger.info("received response from server: " + new String(response.getPayload().toByteArray()));
-                if(route.getType().equalsIgnoreCase("get-complete")) {
+                if (route.getType().equalsIgnoreCase("get-complete")) {
                     logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
                     File file = new File("output-" + route.getPath());
                     //Create the file
@@ -295,7 +291,7 @@ public class RouteClient {
         }
 
         return putStatus;
-}
+    }
 
 
     //blocking
@@ -312,6 +308,21 @@ public class RouteClient {
             logger.info("Could not delete: " + msg);
         }
         return deleteStatus;
+    }
+
+    public boolean update(String msg) {
+        boolean updateStatus = false;
+        String type = "update";
+        String path = msg;
+        String payload = msg;
+        sendMessageToServer(type, path, payload);
+        if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
+            updateStatus = true;
+            logger.info("Successfully updated: " + msg);
+        } else {
+            logger.info("Could not update: " + msg);
+        }
+        return updateStatus;
     }
 
     //non blocking
@@ -335,33 +346,3 @@ public class RouteClient {
         return new ArrayList<>(Arrays.asList(payload.split(",")));
     }
 }
-
-
-
-   /*             if (route.getType().equalsIgnoreCase("get")) {
-                        logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
-                        File file = new File("output-" + route.getPath());
-                        //Create the file
-                        try {
-                        if (file.createNewFile()) {
-                        logger.info("File: " + file + " is created!");
-                        } else {
-                        logger.info("File: " + file + " already exists.");
-                        }
-                        RandomAccessFile f = new RandomAccessFile(file, "rw");
-                        // write into the file , every chunk received from master
-                        f.write(route.getPayload().toByteArray());
-                        f.close();
-                        } catch (IOException io) {
-                        io.printStackTrace();
-                        }
-synchronized (response) {
-        try {
-        response.wait();
-        response = route.toBuilder().build();
-        } catch (InterruptedException ie) {
-        ie.printStackTrace();
-        }
-        }
-        }*/
-

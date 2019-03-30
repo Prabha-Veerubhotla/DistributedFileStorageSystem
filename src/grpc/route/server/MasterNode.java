@@ -5,7 +5,6 @@ import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import javafx.scene.chart.BubbleChart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.Route;
@@ -109,7 +108,7 @@ public class MasterNode extends RouteServerImpl {
             public void onNext(Route route) {
                 logger.info("collectDataFromSlaves: Received response from slave: " + route.getPayload());
                 response = route.toBuilder().build();
-                logger.info("payload is "+ new String(response.getPayload().toByteArray()));
+                logger.info("payload is " + new String(response.getPayload().toByteArray()));
             }
 
             @Override
@@ -142,7 +141,7 @@ public class MasterNode extends RouteServerImpl {
         } catch (InterruptedException ie) {
             logger.info("sendMessageToSlaves:Exception while waiting for count down latch: " + ie);
         }
-        logger.info("payload is "+ new String(response.getPayload().toByteArray()));
+        logger.info("payload is " + new String(response.getPayload().toByteArray()));
         return response;
     }
 

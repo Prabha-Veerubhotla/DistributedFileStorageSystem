@@ -488,7 +488,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
                             builder.setOrigin(myIp);
                             builder.setDestination(route.getOrigin());
                             route.Route rtn = builder.build();
-                            logger.info("sending reply with payload: "+ new String(builder.getPayload().toByteArray()));
+                            logger.info("sending reply with payload: " + new String(builder.getPayload().toByteArray()));
                             responseObserver.onNext(rtn);
                         }
                     }
@@ -509,35 +509,3 @@ public class RouteServerImpl extends RouteServiceImplBase {
         return requestObserver;
     }
 }
-
-
-
-/*else if (route.getType().equalsIgnoreCase("get")) {
-        logger.info("receiving request get");
-        if (isMaster) {
-        if (new String(route.getPayload().toByteArray()).equalsIgnoreCase("complete")) {
-        isComplete = true;
-        } else {
-        Route route1 = collectDataFromSlavesInChunks(route);
-        logger.info("sending data to client");
-        responseObserver.onNext(route1);
-        }
-        } else {
-        logger.info("received request from master of type: " + route.getType());
-        sendDataToMasterInChunks(route);
-
-        }
-        }*/
-
-  /*  public Route collectDataFromSlavesInChunks(Route r) {
-        Route route = MasterNode.collectDataFromSlaves(r);
-        logger.info("Received data from slave: " + r.getSeq());
-        return route;
-    }
-
-    if (isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
-                    logger.info("master: Received all the data from slave");
-                } else {
-                    responseObserver.onCompleted();
-                }
-*/

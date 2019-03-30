@@ -61,8 +61,16 @@ public class MessageClient {
                 } else {
                     System.out.println("Delete operation failed for: " + msg);
                 }
+            } else if (choice.equalsIgnoreCase("update")) {
+                System.out.print("Enter file name to update: ");
+                String msg = br.readLine();
+                boolean updateStatus = rc.update(msg);
+                if (updateStatus) {
+                    System.out.println("File  " + msg + " successfully updated");
+                } else {
+                    System.out.println("Update operation failed for: " + msg);
+                }
             }
-            //TODO: handle update choice here
             else {
 
                 // if the choice is not one of the above options { get, put, list, delete }
@@ -143,7 +151,6 @@ public class MessageClient {
                     System.out.println("whoami - list my settings");
                     System.out.println("put - send a file (default)");
                     System.out.println("get - retrieve a stored  file");
-                    //TODO: implement update
                     System.out.println("update - update a stored file");
                     System.out.println("list - list all stored  files");
                     System.out.println("delete - delete a stored file");
