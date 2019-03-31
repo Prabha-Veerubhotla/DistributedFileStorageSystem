@@ -6,6 +6,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -31,7 +32,7 @@ public class MessageClient {
             if (choice.equalsIgnoreCase("put")) {
                 System.out.print("Enter file path: ");
                 String msg = br.readLine();
-                boolean putstatus = rc.put(msg);
+                boolean putstatus = rc.streamFileToServer(msg);
                 if (putstatus) {
                     System.out.println(msg + " saved successfully !");
                 } else {
@@ -41,10 +42,10 @@ public class MessageClient {
             } else if (choice.equalsIgnoreCase("get")) {
                 System.out.print("Enter file name to retrieve: ");
                 String msg = br.readLine();
-                File f = rc.get(msg);
+                File f = new File("sample.txt"); //= rc.download(msg);
                 System.out.println("Retrieved file: " + f);
             } else if (choice.equalsIgnoreCase("list")) {
-                List<String> msgList = rc.list();
+                List<String> msgList = new ArrayList<>();// = rc.list();
                 if (msgList.size() != 0) {
                     for (String s : msgList) {
                         System.out.println(s);
@@ -55,7 +56,7 @@ public class MessageClient {
             } else if (choice.equalsIgnoreCase("delete")) {
                 System.out.print("Enter file name to delete: ");
                 String msg = br.readLine();
-                boolean deleteStatus = rc.delete(msg);
+                boolean deleteStatus = rc.deleteFileFromServer(msg);
                 if (deleteStatus) {
                     System.out.println("File  " + msg + " successfully deleted");
                 } else {
@@ -64,18 +65,28 @@ public class MessageClient {
             } else if (choice.equalsIgnoreCase("update")) {
                 System.out.print("Enter file name to update: ");
                 String msg = br.readLine();
-                boolean updateStatus = rc.update(msg);
+                boolean updateStatus = false;
                 if (updateStatus) {
                     System.out.println("File  " + msg + " successfully updated");
                 } else {
                     System.out.println("Update operation failed for: " + msg);
                 }
+            } else if(choice.equalsIgnoreCase("search")) {
+                System.out.print("Enter file name to update: ");
+                String msg = br.readLine();
+                boolean searchResult = rc.searchFileInServer(msg);
+                if(searchResult) {
+                    System.out.println("File "+ msg+ " is present. Enter get and file name to retrieve it");
+                } else {
+                    System.out.println("File: "+msg+" is not present in the server");
+                }
+
             }
             else {
 
                 // if the choice is not one of the above options { get, put, list, delete }
                 // the default is put
-                rc.put(choice);
+                rc.streamFileToServer(choice);
             }
         } catch (IOException ie) {
             System.out.println("Exception: " + ie + " while handling the client choice: " + choice);
@@ -108,12 +119,7 @@ public class MessageClient {
         rc.setName(name);
         clientname = name;
         rc.startClientSession();
-        boolean joinStatus = rc.join();
-        System.out.println("join status is: " + joinStatus);
-        if (!joinStatus) {
-            rc.stopClientSession();
-            System.exit(0);
-        }
+
 
         System.out.println("\nWelcome " + name + "\n");
         System.out.println("Commands");
@@ -125,6 +131,7 @@ public class MessageClient {
         System.out.println("update - update a stored file");
         System.out.println("list - list all stored  files");
         System.out.println("delete - delete a stored file");
+        System.out.println("search - know if a file is present");
         System.out.println("exit - end session");
         System.out.println("");
 
@@ -154,6 +161,7 @@ public class MessageClient {
                     System.out.println("update - update a stored file");
                     System.out.println("list - list all stored  files");
                     System.out.println("delete - delete a stored file");
+                    System.out.println("search - to know if a file is present");
                     System.out.println("exit - end session");
                     System.out.println("");
                 } else {

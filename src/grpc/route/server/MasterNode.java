@@ -7,9 +7,9 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.Route;
-import route.RouteServiceGrpc;
+import route.*;
 
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -17,29 +17,24 @@ import java.util.concurrent.TimeUnit;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2345";
+    static String slave1port = "2346";
     static String slave1 = null;
     private static ManagedChannel ch;
-    private static RouteServiceGrpc.RouteServiceStub stub;
-    private static String myIp;
-    private static String username;
-    private static Route response = Route.newBuilder().build();
+    private static FileServiceGrpc.FileServiceStub ayncStub;
+    private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
+    private static boolean ackStatus;
+    private static String ackMessage;
 
-    public static void setMasterIp(String ip) {
-        myIp = ip;
-    }
-
-    public static void setUsername(String name) {
-        username = name;
-    }
 
     public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        slave1 = slaveip.get(0);
-        //slave1 = "localhost"; // local testing
+        //slave1 = slaveip.get(0);
+        slave1 = "localhost"; // local testing
+
+        //TODO: create channels for all the slaves
 
     }
 
@@ -50,147 +45,57 @@ public class MasterNode extends RouteServerImpl {
         return currentIP;
     }
 
-    // send any message to slave
-    public static Route sendMessageToSlaves(Route r) {
+    public static void createChannel() {
+        logger.info("creating channel for slave");
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
-        stub = RouteServiceGrpc.newStub(ch);
-        CountDownLatch latch = new CountDownLatch(1);
-        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
+        ayncStub = FileServiceGrpc.newStub(ch);
+        blockingStub = FileServiceGrpc.newBlockingStub(ch);
+    }
+
+
+    public static boolean streamFileToServer(FileData fileData, boolean complete) {
+        CountDownLatch cdl = new CountDownLatch(1);
+        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+            boolean ackStatus;
+
             @Override
-            public void onNext(Route route) {
-                logger.info("sendMessageToSlaves:Received response from slave: " + new String(route.getPayload().toByteArray()));
-                response = route.toBuilder().build();
+            public void onNext(Ack ack) {
+                ackStatus = ack.getSuccess();
+                logger.info("Received ack status from the server: " + ack.getSuccess());
+                logger.info("Received ack  message from the server: " + ack.getMessage());
             }
 
             @Override
             public void onError(Throwable throwable) {
-                logger.info("sendMessageToSlaves:Exception in the response from slaves: " + throwable);
-                latch.countDown();
+                logger.info("Exception in the response from server: " + throwable);
+                cdl.countDown();
             }
 
             @Override
             public void onCompleted() {
-                logger.info("sendMessageToSlaves:Slave is done sending data.!");
-                latch.countDown();
+                logger.info("Server is done sending data");
+                cdl.countDown();
             }
-        });
+        };
 
-        Route.Builder bld = Route.newBuilder();
-        bld.setUsername(username);
-        bld.setOrigin(myIp);
-        //MasterMetaData Methods (userName, fileName, seqID, IP);
-        bld.setDestination(slave1);
-        bld.setPayload(ByteString.copyFrom(r.getPayload().toByteArray()));
-        bld.setType(r.getType());
-        bld.setPath(r.getPath());
-        bld.setSeq(r.getSeq());
-        logger.info("sending seq num: " + bld.getSeq() + " to slave");
-        requestObserver.onNext(bld.build());
-        requestObserver.onCompleted();
+        StreamObserver<FileData> fileDataStreamObserver = ayncStub.uploadFile(ackStreamObserver);
 
+        if (complete) {
+            fileDataStreamObserver.onNext(fileData);
+            fileDataStreamObserver.onCompleted();
+        } else {
+            fileDataStreamObserver.onNext(fileData);
+            logger.info("sent data to slave");
+        }
         try {
-            latch.await(3, TimeUnit.SECONDS);
+            cdl.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
-            logger.info("sendMessageToSlaves:Exception while waiting for count down latch: " + ie);
+            logger.info("Exception while waiting for count down latch: " + ie);
         }
-        //logger.info("payload is "+ new String(response.getPayload().toByteArray()));
-        return response;
+
+        return ackStatus;
     }
 
-    // collecting data(chunks) from slaves -- for get call
-    public static Route collectDataFromSlaves(Route r) {
-        ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
-        stub = RouteServiceGrpc.newStub(ch);
-        CountDownLatch latch = new CountDownLatch(1);
-        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
-            //handle response from server here
-            @Override
-            public void onNext(Route route) {
-                logger.info("collectDataFromSlaves: Received response from slave: " + route.getPayload());
-                response = route.toBuilder().build();
-                logger.info("payload is " + new String(response.getPayload().toByteArray()));
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("collectDataFromSlaves:Exception in the response from slave: " + throwable);
-                latch.countDown();
-            }
-
-            @Override
-            public void onCompleted() {
-                logger.info("collectDataFromSlaves:Slave is done sending data");
-                latch.countDown();
-            }
-        });
-
-        Route.Builder bld = Route.newBuilder();
-        bld.setUsername(username);
-        bld.setOrigin(myIp);
-        bld.setDestination(slave1);
-        bld.setPayload(ByteString.copyFrom(r.getPayload().toByteArray()));
-        bld.setType(r.getType());
-        logger.info("request type is: " + r.getType());
-        bld.setPath(r.getPath());
-        bld.setSeq(r.getSeq());
-        logger.info("Sending request to slave to retrieve file: " + r.getPath());
-        requestObserver.onNext(bld.build());
-        //requestObserver.onCompleted();
-        try {
-            latch.await(3, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-            logger.info("sendMessageToSlaves:Exception while waiting for count down latch: " + ie);
-        }
-        logger.info("payload is " + new String(response.getPayload().toByteArray()));
-        return response;
-    }
-
-    public static void put(Route r) {
-        logger.info("sending file to slave with seq num: " + r.getSeq());
-        sendMessageToSlaves(r);
-        //logger.info("put status: " + new String(response.getPayload().toByteArray()));
-    }
-
-    public static byte[] get(Route r) {
-        logger.info("get: retrieving message from  node: " + slave1);
-        sendMessageToSlaves(r);
-        String payload = new String(response.getPayload().toByteArray());
-        logger.info("get: Received response from slave node: " + payload);
-        return response.getPayload().toByteArray();
-    }
-
-    public static String list(Route r) {
-        logger.info("list: retrieving all message of user: " + r.getUsername() + " from  node: " + slave1);
-        sendMessageToSlaves(r);
-        String payload = new String(response.getPayload().toByteArray());
-        logger.info("list: Received response from slave node: " + payload);
-        logger.info("list of messages or files are: " + new ArrayList<>(Arrays.asList(payload.split(","))));
-        return response.getPayload().toString();
-    }
-
-    public static boolean delete(Route r) {
-        logger.info("deleting message or file: " + new String(r.getPayload().toByteArray()) + " from:" + slave1);
-        response = sendMessageToSlaves(r);
-        String payload = new String(response.getPayload().toByteArray());
-        logger.info("delete: Received response from slave node: " + payload);
-        if (payload.equalsIgnoreCase("success")) {
-            return true;
-        }
-        return false;
-    }
-
-    public static boolean complete(Route r) {
-        logger.info("complete: sending complete message to slave");
-        sendMessageToSlaves(r);
-        logger.info("response is: " + new String(response.getPayload().toByteArray()));
-        if (response.getPayload() != null) {
-            String payload = new String(response.getPayload().toByteArray());
-            if (payload.equalsIgnoreCase("success")) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     public static String sendIpToNode(Map<String, List<String>> map, List<String> ipList) {
         //TODO: modify to accommodate client or slave ip
@@ -210,6 +115,20 @@ public class MasterNode extends RouteServerImpl {
         clientIp = (String) array1[array1.length - 1];
         return clientIp;
     }
+
+    public static boolean deleteFileFromServer(FileInfo fileInfo) {
+        logger.info("deleting file: " + fileInfo.getFilename().getFilename());
+        Ack ack = blockingStub.deleteFile(fileInfo);
+        return ack.getSuccess();
+    }
+
+    public static boolean searchFileInServer(FileInfo fileInfo) {
+        logger.info("deleting file: " + fileInfo.getFilename().getFilename());
+        Ack ack = blockingStub.searchFile(fileInfo);
+        return ack.getSuccess();
+    }
+
+
 }
 
 // 1. save meta data of files (which partition on which slave)

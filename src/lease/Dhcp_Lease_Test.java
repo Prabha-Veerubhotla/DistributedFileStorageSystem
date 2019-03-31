@@ -1,28 +1,26 @@
 package lease;
 
-import com.google.protobuf.ByteString;
-import io.grpc.stub.StreamObserver;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import route.FileServiceGrpc;
+import route.NodeInfo;
+import route.NodeName;
 import utility.FetchConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import route.Route;
-import route.RouteServiceGrpc;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
+
 
 public class Dhcp_Lease_Test {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> oldIpList = new ArrayList<>();
     Map<String, List<String>> nodesInNetwork = new HashMap<>();
     List<String> newIpList = new ArrayList<>();
-
 
 
     public static void main(String args[]) {
@@ -41,7 +39,7 @@ public class Dhcp_Lease_Test {
         for (String old : oldIpList) {
             set.add(old);
         }
-        String server_port = null;
+        String server_port = "2345";
 
         StringBuffer sb = new StringBuffer();
         for (String ip : newIpList) {
@@ -59,51 +57,41 @@ public class Dhcp_Lease_Test {
             }
 
             ManagedChannel ch = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(server_port.trim())).usePlaintext(true).build();
-            RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
+            FileServiceGrpc.FileServiceBlockingStub blockingStub = FileServiceGrpc.newBlockingStub(ch);
 
             if (!set.contains(newip)) {
                 logger.info("Sending hello to new node!");
                 logger.info("New node ip is: " + newip);
 
-                Route.Builder bld = Route.newBuilder();
-                bld.setOrigin("master");
-                // destinatoion = ip address of new node joined
-                bld.setDestination(newip);
-                bld.setPath("/update/from/dhcp/lease/new/node");
-                byte[] ipmessage = newip.getBytes();
-                bld.setType("slave-ip"); // slave-ip
-                bld.setPayload(ByteString.copyFrom(ipmessage));
-                Route response = blockingStub.blockingrequest(bld.build());
-                logger.info("sending payload: " + newip + " to node");
-                String payload = "blank";
-                payload = new String(response.getPayload().toByteArray());
+                NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
+                nodeInfo.setIp(newip);
+                nodeInfo.setPort(server_port);
 
-                String nodereply = payload; // indicating whether node is a slave or client
-                if (nodesInNetwork.containsKey(nodereply)) {
-                    List<String> slaves = nodesInNetwork.get(nodereply);
+                String nodeName = blockingStub.assignNodeIp(nodeInfo.build()).getName();
+
+                if (nodesInNetwork.containsKey(nodeName)) {
+                    List<String> slaves = nodesInNetwork.get(nodeName);
                     slaves.add(newip);
-                    nodesInNetwork.put(nodereply, slaves);
+                    nodesInNetwork.put(nodeName, slaves);
                 } else {
                     List<String> nodes = new ArrayList<>();
                     nodes.add(newip);
-                    nodesInNetwork.put(nodereply, nodes);
+                    nodesInNetwork.put(nodeName, nodes);
                 }
-                logger.info("reply: " + payload + ", from: " + response.getOrigin());
+                logger.info("reply: " + nodeName + ", from: " + newip);
             }
 
             // update all the nodes with current ips in the network ( if new node | one node is removed)
             logger.info("Sending current ip updates in the network to all nodes");
 
-            Route.Builder bld1 = Route.newBuilder();
-            bld1.setOrigin("master");
-            bld1.setType("update-nodes");
-            bld1.setDestination(newip);
-            bld1.setPath("/update/from/dhcp/lease");
-            byte[] hello = ("These are the current nodes in the network: " + sb.toString()).getBytes();
-            bld1.setPayload(ByteString.copyFrom(hello));
-            Route response1 = blockingStub.blockingrequest(bld1.build());
-            String payload = new String(response1.getPayload().toByteArray());
-            logger.info("reply: " + payload + ", from: " + response1.getOrigin());
+
+            NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
+            nodeInfo.setIp(sb.toString());
+            nodeInfo.setPort("2345");
+
+            String nodeName = blockingStub.assignNodeIp(nodeInfo.build()).getName();
+
+            logger.info("reply: " + nodeName + ", from: " + newip);
         }
     }
 
@@ -146,17 +134,17 @@ public class Dhcp_Lease_Test {
         return newIpList;
     }
 
-    public boolean updateCurrentNodeMapping(Route r, String ip) {
-        String nodename = r.getPayload().toString();
-        logger.info("Adding: " + ip + " to the current node list as " + nodename);
+    public boolean updateCurrentNodeMapping(NodeInfo nodeInfo, NodeName nodeName) {
+        String nodename = nodeName.getName();
+        logger.info("Adding: " + nodeInfo.getIp() + " to the current node list as " + nodename);
         if (nodesInNetwork.containsKey(nodename)) {
             List<String> clientlist = nodesInNetwork.get(nodename);
-            clientlist.add(ip);
+            clientlist.add(nodeInfo.getIp());
             nodesInNetwork.put(nodename, clientlist);
 
         } else {
             List<String> clientList = new ArrayList<>();
-            clientList.add(ip);
+            clientList.add(nodeInfo.getIp());
             nodesInNetwork.put(nodename, clientList);
         }
         return true;

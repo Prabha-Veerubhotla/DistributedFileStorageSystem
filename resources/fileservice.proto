@@ -18,6 +18,12 @@ service FileService {
     }
     rpc updateFile (stream FileData) returns (Ack) {
     }
+    // to all nodes
+    rpc assignNodeIp (NodeInfo) returns (NodeName) {
+    }
+    //  only client
+    rpc requestNodeIp (NodeName) returns (NodeInfo) {
+    }
 }
 
 message FileData {
@@ -45,5 +51,15 @@ message UserInfo {
 
 message FileResponse {
     string filename = 1;
+}
+
+
+message NodeInfo {
+    string ip = 1;
+    string port = 2;
+}
+
+message NodeName {
+    string name = 1;
 }
 

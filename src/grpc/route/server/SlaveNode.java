@@ -7,9 +7,9 @@ import io.grpc.stub.StreamObserver;
 import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.Route;
-import route.RouteServiceGrpc;
-
+import route.FileData;
+import route.FileInfo;
+import route.UserInfo;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -20,7 +20,7 @@ public class SlaveNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-slave");
     static Map<String, List<String>> map = new HashMap<>();
     private static ManagedChannel ch;
-    private static RouteServiceGrpc.RouteServiceStub stub;
+   // private static RouteServiceGrpc.RouteServiceStub stub;
 
 
     /**
@@ -38,14 +38,15 @@ public class SlaveNode extends RouteServerImpl {
      * @param r route
      * @return
      */
-    public static boolean put(Route r) {
-        String userName = r.getUsername();
-        byte[] payload = r.getPayload().toByteArray();
-        String seqID = Long.toString(r.getSeq());
-        String fileName = getFileName(r.getPath());
+    public static boolean put(FileData fileData) {
+        UserInfo userName = fileData.getUsername();
+        byte[] payload = fileData.getContent().toByteArray();
+        String seqID = Long.toString(fileData.getSeqnum());
+        String fileName = getFileName(fileData.getFilename().getFilename());
         logger.info("Put details: " + userName + " seq num: " + seqID);
+        logger.info("content: "+ new String(payload));
         //TODO: store the file in db from method : writeChunksIntoFile -- done
-        rh.put(userName, fileName, seqID, payload);
+        rh.put(userName.getUsername(), fileName, seqID, payload);
         return true;
     }
 
@@ -72,7 +73,7 @@ public class SlaveNode extends RouteServerImpl {
      * @param r
      * @return
      */
-    public static FileEntity get(Route r) {
+    /*public static FileEntity get(Route r) {
         logger.info("SlaveNode.GET");
         String userName = r.getUsername();
         String fileName = getFileName(r.getPath());
@@ -83,14 +84,14 @@ public class SlaveNode extends RouteServerImpl {
             return new FileEntity(fileName, result);
         }
         return mh.get(userName, fileName);
-    }
+    }*/
 
     /**
      * delete a file
      *
      * @param r route coming from somewhere
      * @return
-     */
+   /*  *//*
     public static boolean delete(Route r) {
         boolean status = false;
         String userName = r.getUsername();
@@ -101,7 +102,7 @@ public class SlaveNode extends RouteServerImpl {
         mh.remove(userName, fileName);
         logger.info("delete status: " + status);
         return status;
-    }
+    }*/
 
     //TODO: Move to client - wrote here for testing purposes
     @SuppressWarnings("unchecked")
@@ -128,8 +129,28 @@ public class SlaveNode extends RouteServerImpl {
         return b;
     }
 
+    public static boolean delete(FileInfo fileInfo) {
+        boolean status = false;
+        String userName = fileInfo.getUsername().getUsername();
+        String fileName = getFileName(fileInfo.getFilename().getFilename());
+        logger.info("deleting file " + fileName + " from Redis.");
+        status = rh.remove(userName, fileName);
+        logger.info("deleting file " + fileName + " from Mongo.");
+        mh.remove(userName, fileName);
+        logger.info("delete status: " + status);
+        return status;
+    }
+
+
+    public static boolean search(FileInfo fileInfo) {
+        //TODO: implement search from db here
+        return true;
+    }
+
+
+
     //return file in chunks to the master
-    public static void returnFileInchunks(Route r) {
+    /*public static void returnFileInchunks(Route r) {
         logger.info("returnFileInchunks");
         ch = ManagedChannelBuilder.forAddress(r.getOrigin(), Integer.parseInt("2345")).usePlaintext(true).build();
         stub = RouteServiceGrpc.newStub(ch);
@@ -207,7 +228,7 @@ public class SlaveNode extends RouteServerImpl {
         requestObserver.onNext(builder.build());
 
         requestObserver.onCompleted();
-    }
+    }*/
 }
 
 
