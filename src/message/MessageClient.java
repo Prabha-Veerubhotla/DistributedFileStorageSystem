@@ -32,12 +32,7 @@ public class MessageClient {
             if (choice.equalsIgnoreCase("put")) {
                 System.out.print("Enter file path: ");
                 String msg = br.readLine();
-                boolean putstatus = rc.streamFileToServer(msg);
-                if (putstatus) {
-                    System.out.println(msg + " saved successfully !");
-                } else {
-                    System.out.println(msg + " not saved successfully");
-                }
+                System.out.println(rc.streamFileToServer(msg));
 
             } else if (choice.equalsIgnoreCase("get")) {
                 System.out.print("Enter file name to retrieve: ");
@@ -45,11 +40,9 @@ public class MessageClient {
                 File f = new File("sample.txt"); //= rc.download(msg);
                 System.out.println("Retrieved file: " + f);
             } else if (choice.equalsIgnoreCase("list")) {
-                List<String> msgList = new ArrayList<>();// = rc.list();
-                if (msgList.size() != 0) {
-                    for (String s : msgList) {
-                        System.out.println(s);
-                    }
+                String list = rc.listFilesInServer(clientname);
+                if( list!= null) {
+                    System.out.println(list);
                 } else {
                     System.out.println("No files saved from this user: " + clientname);
                 }
@@ -65,18 +58,14 @@ public class MessageClient {
             } else if (choice.equalsIgnoreCase("update")) {
                 System.out.print("Enter file name to update: ");
                 String msg = br.readLine();
-                boolean updateStatus = false;
-                if (updateStatus) {
-                    System.out.println("File  " + msg + " successfully updated");
-                } else {
-                    System.out.println("Update operation failed for: " + msg);
-                }
+                String updateStatus = rc.updateFileInServer(msg);
+                System.out.println(updateStatus);
             } else if(choice.equalsIgnoreCase("search")) {
                 System.out.print("Enter file name to update: ");
                 String msg = br.readLine();
                 boolean searchResult = rc.searchFileInServer(msg);
                 if(searchResult) {
-                    System.out.println("File "+ msg+ " is present. Enter get and file name to retrieve it");
+                    System.out.println("File "+ msg+ " is present. Enter put and file name to save it");
                 } else {
                     System.out.println("File: "+msg+" is not present in the server");
                 }

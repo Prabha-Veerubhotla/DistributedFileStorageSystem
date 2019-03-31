@@ -82,80 +82,87 @@ public class RouteClient {
         return true;
     }
 
-    public boolean streamFileToServer(String filename) {
-        CountDownLatch cdl = new CountDownLatch(1);
-        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+    public String streamFileToServer(String filename) {
+        if (searchFileInServer(filename)) {
+            return "File already present";
+        } else {
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
-            @Override
-            public void onNext(Ack ack) {
-                ackStatus = ack.getSuccess();
-                logger.info("Received ack status from the server: " + ack.getSuccess());
-                logger.info("Received ack  message from the server: " + ack.getMessage());
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("Exception in the response from server: " + throwable);
-                cdl.countDown();
-            }
-
-            @Override
-            public void onCompleted() {
-                logger.info("Server is done sending data");
-                cdl.countDown();
-            }
-        };
-
-        route.FileData.Builder fileData = FileData.newBuilder();
-        route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
-        fileData.setFilename(fileResponse.build());
-        route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
-        fileData.setUsername(userInfo.build());
-
-        StreamObserver<FileData> fileDataStreamObserver = asyncStub.uploadFile(ackStreamObserver);
-        if (checkIfFile(filename)) {
-            logger.info(filename + " is a file");
-            File fn = new File(filename);
-            FileInputStream fis = null;
-            try {
-                fis = new FileInputStream(fn);
-                long seq = 0l;
-                final int blen = 10024;
-                byte[] raw = new byte[blen];
-                boolean done = false;
-                while (!done) {
-                    int n = fis.read(raw, 0, blen);
-                    if (n <= 0)
-                        break;
-                    // identifying sequence number
-                    seq++;
-                    logger.info("Streaming seq num: " + seq);
-                    fileData.setContent(ByteString.copyFrom(raw, 0, n));
-                    logger.info("seq num is: " + seq);
-                    fileData.setSeqnum(seq);
-                    logger.info("Sending file data to server with seq num: " + seq);
-                    fileDataStreamObserver.onNext(fileData.build());
+                @Override
+                public void onNext(Ack ack) {
+                    ackStatus = ack.getSuccess();
+                    logger.info("Received ack status from the server: " + ack.getSuccess());
+                    logger.info("Received ack  message from the server: " + ack.getMessage());
                 }
-            } catch (IOException e) {
-                ; // ignore? really?
-                fileDataStreamObserver.onError(e);
-            } finally {
+
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    logger.info("Server is done sending data");
+                    cdl.countDown();
+                }
+            };
+
+            route.FileData.Builder fileData = FileData.newBuilder();
+            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
+            fileData.setFilename(fileResponse.build());
+            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileData.setUsername(userInfo.build());
+
+            StreamObserver<FileData> fileDataStreamObserver = asyncStub.uploadFile(ackStreamObserver);
+            if (checkIfFile(filename)) {
+                logger.info(filename + " is a file");
+                File fn = new File(filename);
+                FileInputStream fis = null;
                 try {
-                    fis.close();
+                    fis = new FileInputStream(fn);
+                    long seq = 0l;
+                    final int blen = 10024;
+                    byte[] raw = new byte[blen];
+                    boolean done = false;
+                    while (!done) {
+                        int n = fis.read(raw, 0, blen);
+                        if (n <= 0)
+                            break;
+                        // identifying sequence number
+                        seq++;
+                        logger.info("Streaming seq num: " + seq);
+                        fileData.setContent(ByteString.copyFrom(raw, 0, n));
+                        logger.info("seq num is: " + seq);
+                        fileData.setSeqnum(seq);
+                        logger.info("Sending file data to server with seq num: " + seq);
+                        fileDataStreamObserver.onNext(fileData.build());
+                    }
                 } catch (IOException e) {
-                    ; // ignore
+                    ; // ignore? really?
+                    fileDataStreamObserver.onError(e);
+                } finally {
+                    try {
+                        fis.close();
+                    } catch (IOException e) {
+                        ; // ignore
+                    }
                 }
             }
-        }
-        fileDataStreamObserver.onCompleted();
+            fileDataStreamObserver.onCompleted();
 
-        try {
-            cdl.await(3, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-            logger.info("Exception while waiting for count down latch: " + ie);
+            try {
+                cdl.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                logger.info("Exception while waiting for count down latch: " + ie);
+            }
         }
 
-        return ackStatus;
+        if (ackStatus) {
+            return "success";
+        }
+        return "Unable to save file";
     }
 
 
@@ -194,4 +201,93 @@ public class RouteClient {
         myIp = new String(nodeInfo.getIp());
         logger.info("my ip is: " + myIp);
     }
+
+    public String listFilesInServer(String userName) {
+        UserInfo.Builder userInfo = UserInfo.newBuilder();
+        userInfo.setUsername(userName);
+        FileResponse fileResponse = blockingStub.listFile(userInfo.build());
+        return fileResponse.getFilename();
+    }
+
+    public String updateFileInServer(String filename) {
+        if (searchFileInServer(filename)) {
+
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+                @Override
+                public void onNext(Ack ack) {
+                    ackStatus = ack.getSuccess();
+                    logger.info("Received ack status from the server: " + ack.getSuccess());
+                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    logger.info("Server is done sending data");
+                    cdl.countDown();
+                }
+            };
+
+            route.FileData.Builder fileData = FileData.newBuilder();
+            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
+            fileData.setFilename(fileResponse.build());
+            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileData.setUsername(userInfo.build());
+
+            StreamObserver<FileData> fileDataStreamObserver = asyncStub.updateFile(ackStreamObserver);
+            if (checkIfFile(filename)) {
+                logger.info(filename + " is a file");
+                File fn = new File(filename);
+                FileInputStream fis = null;
+                try {
+                    fis = new FileInputStream(fn);
+                    long seq = 0l;
+                    final int blen = 10024;
+                    byte[] raw = new byte[blen];
+                    boolean done = false;
+                    while (!done) {
+                        int n = fis.read(raw, 0, blen);
+                        if (n <= 0)
+                            break;
+                        // identifying sequence number
+                        seq++;
+                        logger.info("Streaming seq num: " + seq);
+                        fileData.setContent(ByteString.copyFrom(raw, 0, n));
+                        logger.info("seq num is: " + seq);
+                        fileData.setSeqnum(seq);
+                        logger.info("Sending file data to server with seq num: " + seq);
+                        fileDataStreamObserver.onNext(fileData.build());
+                    }
+                } catch (IOException e) {
+                    ; // ignore? really?
+                    fileDataStreamObserver.onError(e);
+                } finally {
+                    try {
+                        fis.close();
+                    } catch (IOException e) {
+                        ; // ignore
+                    }
+                }
+            }
+            fileDataStreamObserver.onCompleted();
+
+            try {
+                cdl.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                logger.info("Exception while waiting for count down latch: " + ie);
+            }
+            if (ackStatus) {
+                return "success";
+            }
+        }
+        return "Unable to save file";
+    }
+
 }

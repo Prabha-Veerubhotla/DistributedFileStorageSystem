@@ -1,27 +1,17 @@
 package grpc.route.server;
 
-import com.google.protobuf.ByteString;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.stub.StreamObserver;
 import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.FileData;
 import route.FileInfo;
 import route.UserInfo;
-import java.io.*;
+
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 
 public class SlaveNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-slave");
-    static Map<String, List<String>> map = new HashMap<>();
-    private static ManagedChannel ch;
-   // private static RouteServiceGrpc.RouteServiceStub stub;
-
 
     /**
      *
@@ -44,7 +34,7 @@ public class SlaveNode extends RouteServerImpl {
         String seqID = Long.toString(fileData.getSeqnum());
         String fileName = getFileName(fileData.getFilename().getFilename());
         logger.info("Put details: " + userName + " seq num: " + seqID);
-        logger.info("content: "+ new String(payload));
+        logger.info("content: " + new String(payload));
         //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName.getUsername(), fileName, seqID, payload);
         return true;
@@ -90,8 +80,8 @@ public class SlaveNode extends RouteServerImpl {
      * delete a file
      *
      * @param r route coming from somewhere
-     * @return
-   /*  *//*
+     * @return /*
+     *//*
     public static boolean delete(Route r) {
         boolean status = false;
         String userName = r.getUsername();
@@ -147,6 +137,10 @@ public class SlaveNode extends RouteServerImpl {
         return true;
     }
 
+    public static String list(UserInfo userInfo) {
+        //TODO: implement list of files from db here
+        return "blank";
+    }
 
 
     //return file in chunks to the master

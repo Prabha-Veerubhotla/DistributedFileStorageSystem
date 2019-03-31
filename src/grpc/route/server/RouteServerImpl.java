@@ -206,7 +206,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             }
 
         } else {
-            ackStatus = SlaveNode.delete(fileInfo);
+            ackStatus = SlaveNode.search(fileInfo);
             if (ackStatus) {
                 ackMessage = "success";
             }
@@ -243,5 +243,83 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         nodeNameStreamObserver.onNext(nodeName.build());
         nodeNameStreamObserver.onCompleted();
     }
+
+    @Override
+    public void listFile(UserInfo userInfo, StreamObserver<FileResponse> fileResponseStreamObserver) {
+        FileResponse.Builder fileResponse = FileResponse.newBuilder();
+
+        if (isMaster) {
+            fileResponse.setFilename(MasterNode.listFilesInServer(userInfo));
+
+        } else {
+            fileResponse.setFilename(SlaveNode.list(userInfo));
+
+        }
+
+        fileResponseStreamObserver.onNext(fileResponse.build());
+        fileResponseStreamObserver.onCompleted();
+    }
+
+
+    @Override
+    public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
+        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+            boolean ackStatus;
+            String ackMessage;
+            String username;
+            String filepath;
+            FileData fd;
+
+            @Override
+            public void onNext(FileData fileData) {
+                fd = fileData;
+                username = fileData.getUsername().getUsername();
+                filepath = fileData.getFilename().getFilename();
+                if (isMaster) {
+                    ackStatus = MasterNode.streamFileToServer(fileData, false);
+                    if (ackStatus) {
+                        ackMessage = "success";
+                    } else {
+                        ackMessage = "Unable to update file";
+                    }
+                } else {
+                    logger.info("received data from master");
+                    ackStatus = SlaveNode.put(fileData);
+                    if (ackStatus) {
+                        ackMessage = "success";
+                    } else {
+                        ackMessage = "Unable to update file";
+                    }
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the request from node: " + throwable);
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("Node is done sending messages");
+                if (isMaster) {
+                    if (MasterNode.streamFileToServer(fd, true)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
+                    }
+                    ackStreamObserver.onCompleted();
+                } else {
+                    if (SlaveNode.put(username, filepath)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
+                    }
+                    ackStreamObserver.onCompleted();
+                }
+            }
+        };
+        return fileDataStreamObserver;
+    }
+
 
 }

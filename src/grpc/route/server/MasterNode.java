@@ -8,8 +8,6 @@ import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
-
-import java.io.File;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -25,14 +23,12 @@ public class MasterNode extends RouteServerImpl {
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
-    private static boolean ackStatus;
-    private static String ackMessage;
 
 
     public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        //slave1 = slaveip.get(0);
-        slave1 = "localhost"; // local testing
+        slave1 = slaveip.get(0);
+        //slave1 = "localhost"; // local testing
 
         //TODO: create channels for all the slaves
 
@@ -126,6 +122,12 @@ public class MasterNode extends RouteServerImpl {
         logger.info("deleting file: " + fileInfo.getFilename().getFilename());
         Ack ack = blockingStub.searchFile(fileInfo);
         return ack.getSuccess();
+    }
+
+    public static String listFilesInServer(UserInfo userInfo) {
+        logger.info("listing files of user : " + userInfo.getUsername());
+        FileResponse fileResponse = blockingStub.listFile(userInfo);
+        return fileResponse.getFilename();
     }
 
 
