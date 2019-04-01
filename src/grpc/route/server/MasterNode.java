@@ -30,9 +30,10 @@ public class MasterNode extends RouteServerImpl {
 
     public static void assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        slave1 = slaveip.get(0);
+        if(slaveiplist.size() != 0) {
+            slave1 = slaveip.get(0);
+        } slave1 = "localhost";
         //slave1 = "localhost"; // local testing
-
         //TODO: create channels for all the slaves
 
     }

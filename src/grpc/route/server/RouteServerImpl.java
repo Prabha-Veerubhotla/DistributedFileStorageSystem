@@ -129,6 +129,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
+        slaveIpThread();
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -189,6 +190,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void deleteFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
+        slaveIpThread();
         Ack.Builder ack = Ack.newBuilder();
         boolean ackStatus;
         String ackMessage = "Unable to save file";
@@ -213,6 +215,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void searchFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
+        slaveIpThread();
         Ack.Builder ack = Ack.newBuilder();
         boolean ackStatus;
         String ackMessage = "File is not present";
@@ -263,6 +266,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void listFile(UserInfo userInfo, StreamObserver<FileResponse> fileResponseStreamObserver) {
+        slaveIpThread();
         FileResponse.Builder fileResponse = FileResponse.newBuilder();
 
         if (isMaster) {
@@ -280,6 +284,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
+        slaveIpThread();
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -340,6 +345,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void downloadFile(FileInfo fileInfo, StreamObserver<FileData> fileDataStreamObserver) {
+        slaveIpThread();
         if (isMaster) {
             logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
             CountDownLatch cdl = new CountDownLatch(1);
