@@ -13,7 +13,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
@@ -38,9 +37,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     static MongoDBHandler mh = new MongoDBHandler();
     static RedisHandler rh = new RedisHandler();
-    private static boolean done = false;
     private static String slave1 = "localhost";
-    private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static ManagedChannel ch1;
     private static MasterMetaData masterMetaData = new MasterMetaData();
@@ -95,7 +92,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             public void run() {
                 logger.info("Fetching Ip List of Nodes...");
                 getSlaveIpList();
-                ch1 = MasterNode.createChannel();
+                ch1 = MasterNode.createChannel(slave1);
             }
         };
         thread.start();
@@ -190,6 +187,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     }
                     ackStreamObserver.onCompleted();
 
+
                     logger.info("putting metadata of file, slave in master");
                     logger.info("username: "+username);
                     logger.info("filepath: "+filepath);
@@ -214,7 +212,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void deleteFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
-        slaveIpThread();
+        ch1 = slaveIpThread();
         Ack.Builder ack = Ack.newBuilder();
         boolean ackStatus;
         String ackMessage = "Unable to save file";
@@ -235,6 +233,12 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
         ackStreamObserver.onNext(ack.build());
         ackStreamObserver.onCompleted();
+        logger.info("putting metadata of file, slave in master");
+        logger.info("username: "+ fileInfo.getUsername().getUsername());
+        logger.info("filepath: "+fileInfo.getFilename().getFilename());
+        logger.info("ip: "+ slave1);
+        logger.info("file name: "+getFileName(fileInfo.getFilename().getFilename()));
+        masterMetaData.putMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()),slave1);
         ch1.shutdown();
     }
 
@@ -311,7 +315,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
-        slaveIpThread();
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -325,6 +328,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 username = fileData.getUsername().getUsername();
                 filepath = fileData.getFilename().getFilename();
                 if (isMaster) {
+                    List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
+                    ch1 = MasterNode.createChannel(ips.get(0));
                     ackStatus = MasterNode.streamFileToServer(fileData, false);
                     if (ackStatus) {
                         ackMessage = "success";
@@ -357,6 +362,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
+                    ch1.shutdown();
                 } else {
                     if (SlaveNode.put(username, filepath)) {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());

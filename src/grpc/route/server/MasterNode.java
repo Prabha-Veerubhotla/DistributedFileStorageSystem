@@ -48,7 +48,7 @@ public class MasterNode extends RouteServerImpl {
         return currentIP;
     }
 
-    public static ManagedChannel createChannel() {
+    public static ManagedChannel createChannel(String slave1) {
         logger.info("creating channel for slave");
         logger.info("slave 1 ip is: "+slave1);
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();

@@ -81,9 +81,10 @@ public class SlaveNode extends RouteServerImpl {
 
     /**
      * update file contents
+     *
      * @param r
      */
-    public static boolean update(FileData fileData){
+    public static boolean update(FileData fileData) {
         String userName = fileData.getUsername().getUsername();
         String fileName = getFileName(fileData.getFilename().getFilename());
         String seqID = Long.toString(fileData.getSeqnum());
@@ -139,103 +140,20 @@ public class SlaveNode extends RouteServerImpl {
 
 
     public static boolean search(FileInfo fileInfo) {
-        //TODO: implement search from db here
         logger.info("Searching for file: " + fileInfo.getFilename().getFilename() + " in DB.");
-        return false;
+        return new MasterMetaData().checkIfFileExists(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+
     }
 
     public static String list(UserInfo userInfo) {
         //TODO: implement list of files from db here
         logger.info("Listing files for user: " + userInfo.getUsername() + " in DB.");
-        return "blank";
+        return new MasterMetaData().getAllFiles(userInfo.getUsername()).toString();
     }
-
-
-
-
-
-
-    //return file in chunks to the master
-    /*public static void returnFileInchunks(Route r) {
-        logger.info("returnFileInchunks");
-        ch = ManagedChannelBuilder.forAddress(r.getOrigin(), Integer.parseInt("2345")).usePlaintext(true).build();
-        stub = RouteServiceGrpc.newStub(ch);
-        CountDownLatch latch = new CountDownLatch(1);
-        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
-            //handle response from server here
-            @Override
-            public void onNext(Route route) {
-                logger.info("returnFileInchunks: Received response from master: " + route.getPayload());
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("returnFileInchunks:Exception in the response from master: " + throwable);
-                latch.countDown();
-            }
-
-            @Override
-            public void onCompleted() {
-                logger.info("returnFileInchunks: Server is done sending data");
-                latch.countDown();
-            }
-        });
-        try {
-            latch.await(3, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-            logger.info("Exception while waiting for count down latch: " + ie);
-        }
-        logger.info("Streaming file: " + new String(r.getPayload().toByteArray()));
-        FileEntity fileEntity = get(r);
-        File fn = new File(fileEntity.getFileName());
-        FileInputStream fis = null;
-        try {
-            fis = new FileInputStream(fn);
-            long seq = 0l;
-            final int blen = 10024;
-            byte[] raw = new byte[blen];
-            boolean done = false;
-            while (!done) {
-                int n = fis.read(raw, 0, blen);
-                if (n <= 0)
-                    break;
-                System.out.println("n: " + n);
-                // identifying sequence number
-                seq++;
-
-                route.Route.Builder builder = Route.newBuilder();
-                builder.setPath(r.getPath());
-                builder.setPayload(ByteString.copyFrom(raw, 0, n));
-                builder.setOrigin(r.getDestination());
-                builder.setDestination(r.getOrigin());
-                builder.setSeq(seq);
-                builder.setType(r.getType());
-                logger.info("Sending file data to master with seq num: " + seq);
-                requestObserver.onNext(builder.build());
-            }
-        } catch (IOException e) {
-            ; // ignore? really? ...yes
-            requestObserver.onError(e);
-        } finally {
-            try {
-                fis.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        route.Route.Builder builder = Route.newBuilder();
-        builder.setPath(r.getPath());
-        builder.setPayload(ByteString.copyFrom("complete".getBytes()));
-        builder.setOrigin(r.getDestination());
-        builder.setDestination(r.getOrigin());
-        builder.setSeq(0);
-        builder.setType("get-complete");
-        logger.info("Sending complete message to master");
-        requestObserver.onNext(builder.build());
-
-        requestObserver.onCompleted();
-    }*/
 }
+
+
+
 
 
 /*
