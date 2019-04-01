@@ -326,21 +326,11 @@ public class RouteClient {
                 logger.info("File: " + file + " is created!");
             } else {
                 logger.info("File: " + file + " already exists.");
-            }} catch (IOException io) {
-            io.printStackTrace();;
-        }
+            }
         if(!checkIfFile(filename)) {
             logger.info("file not present. returning empty file");
             return file;
         }
-
-        //Create the file
-        try {
-            if (file.createNewFile()) {
-                logger.info("File: " + file + " is created!");
-            } else {
-                logger.info("File: " + file + " already exists.");
-            }
             RandomAccessFile f = new RandomAccessFile(file, "rw");
 
             CountDownLatch cdl = new CountDownLatch(1);

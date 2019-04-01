@@ -210,11 +210,12 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void deleteFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
-        ch1 = slaveIpThread();
         Ack.Builder ack = Ack.newBuilder();
         boolean ackStatus;
         String ackMessage = "Unable to save file";
         if (isMaster) {
+            List<String> ips = masterMetaData.getMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+            ch1 = MasterNode.createChannel(ips.get(0));
             ackStatus = MasterNode.deleteFileFromServer(fileInfo);
             if (ackStatus) {
                 ackMessage = "success";
@@ -228,15 +229,13 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         }
         ack.setMessage(ackMessage);
         ack.setSuccess(ackStatus);
-
         ackStreamObserver.onNext(ack.build());
         ackStreamObserver.onCompleted();
         logger.info("putting metadata of file, slave in master");
         logger.info("username: "+ fileInfo.getUsername().getUsername());
         logger.info("filepath: "+fileInfo.getFilename().getFilename());
-        logger.info("ip: "+ slave1);
         logger.info("file name: "+getFileName(fileInfo.getFilename().getFilename()));
-        masterMetaData.putMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()),slave1);
+        masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
         ch1.shutdown();
     }
 
