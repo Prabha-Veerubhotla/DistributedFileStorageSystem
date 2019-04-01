@@ -97,9 +97,7 @@ public class SlaveNode extends RouteServerImpl {
         String fileName = getFileName(filePath);
         Map<String, byte[]> result = rh.get(username, fileName);
         FileEntity fileEntity;
-
-            fileEntity = new FileEntity(fileName, result);
-
+        fileEntity = new FileEntity(fileName, result);
         return mh.update(username, fileEntity);
     }
 

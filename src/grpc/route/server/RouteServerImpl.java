@@ -136,10 +136,10 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
-        if(isMaster) {
-            ch1 = slaveIpThread();
+        if(isMaster) { ch1 = slaveIpThread();
 
         }
+        logger.info("calling upload file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -310,6 +310,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
+        logger.info("calling update file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -325,7 +326,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 if (isMaster) {
                     List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
                     ch1 = MasterNode.createChannel(ips.get(0));
-                    ackStatus = MasterNode.streamFileToServer(fileData, false);
+                    ackStatus = MasterNode.updateFileToServer(fileData, false);
                     if (ackStatus) {
                         ackMessage = "success";
                     } else {
@@ -351,7 +352,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             public void onCompleted() {
                 logger.info("Node is done sending messages");
                 if (isMaster) {
-                    if (MasterNode.streamFileToServer(fd, true)) {
+                    if (MasterNode.updateFileToServer(fd, true)) {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());

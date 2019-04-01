@@ -101,6 +101,48 @@ public class MasterNode extends RouteServerImpl {
         return ackStatus;
     }
 
+    public static boolean updateFileToServer(FileData fileData, boolean complete) {
+        CountDownLatch cdl = new CountDownLatch(1);
+        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+            @Override
+            public void onNext(Ack ack) {
+                ackStatus = ack.getSuccess();
+                logger.info("Received ack status from the server: " + ack.getSuccess());
+                logger.info("Received ack  message from the server: " + ack.getMessage());
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the response from server: " + throwable);
+                cdl.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("Server is done sending data");
+                cdl.countDown();
+            }
+        };
+
+        StreamObserver<FileData> fileDataStreamObserver = ayncStub.updateFile(ackStreamObserver);
+
+        if (complete) {
+            fileDataStreamObserver.onNext(fileData);
+            logger.info("sending completed to slave");
+            fileDataStreamObserver.onCompleted();
+        } else {
+            fileDataStreamObserver.onNext(fileData);
+            logger.info("sent data with seq num:  "+fileData.getSeqnum()+" to slave");
+        }
+        try {
+            cdl.await(3, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            logger.info("Exception while waiting for count down latch: " + ie);
+        }
+        return ackStatus;
+    }
+
 
     public static String sendIpToNode(Map<String, List<String>> map, List<String> ipList) {
         //TODO: modify to accommodate client or slave ip
