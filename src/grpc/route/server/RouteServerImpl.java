@@ -221,22 +221,23 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 ackMessage = "success";
             }
 
+            ackStreamObserver.onCompleted();
+            logger.info("putting metadata of file, slave in master");
+            logger.info("username: "+ fileInfo.getUsername().getUsername());
+            logger.info("filepath: "+fileInfo.getFilename().getFilename());
+            logger.info("file name: "+getFileName(fileInfo.getFilename().getFilename()));
+            masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+            ch1.shutdown();
+
         } else {
             ackStatus = SlaveNode.delete(fileInfo);
             if (ackStatus) {
                 ackMessage = "success";
             }
+            ack.setMessage(ackMessage);
+            ack.setSuccess(ackStatus);
+            ackStreamObserver.onNext(ack.build());
         }
-        ack.setMessage(ackMessage);
-        ack.setSuccess(ackStatus);
-        ackStreamObserver.onNext(ack.build());
-        ackStreamObserver.onCompleted();
-        logger.info("putting metadata of file, slave in master");
-        logger.info("username: "+ fileInfo.getUsername().getUsername());
-        logger.info("filepath: "+fileInfo.getFilename().getFilename());
-        logger.info("file name: "+getFileName(fileInfo.getFilename().getFilename()));
-        masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
-        ch1.shutdown();
     }
 
     public static boolean search(FileInfo fileInfo) {
