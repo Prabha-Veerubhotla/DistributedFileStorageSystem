@@ -42,6 +42,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private static String slave1 = "localhost";
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
+    private static ManagedChannel ch1;
 
 
     public void getSlaveIpList() {
@@ -72,8 +73,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             logger.info("Running as Slave node");
         }
         impl.start();
-        ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(myPort.trim())).usePlaintext(true).build();
-        ayncStub = FileServiceGrpc.newStub(ch);
+       // ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(myPort.trim())).usePlaintext(true).build();
+        //ayncStub = FileServiceGrpc.newStub(ch);
         impl.blockUntilShutdown();
     }
 
@@ -87,15 +88,16 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         thread.start();
     }
 
-    private void slaveIpThread() {
+    private ManagedChannel slaveIpThread() {
         Thread thread = new Thread() {
             public void run() {
                 logger.info("Fetching Ip List of Nodes...");
                 getSlaveIpList();
-                MasterNode.createChannel();
+                ch1 = MasterNode.createChannel();
             }
         };
         thread.start();
+        return ch1;
     }
 
     private void start() throws Exception {
@@ -129,7 +131,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
-        slaveIpThread();
+        if(isMaster) {
+            ch1 = slaveIpThread();
+        }
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -175,6 +179,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
+                    logger.info("channel is shutitng down");
+                    ch1.shutdown();
+
                 } else {
                     if (SlaveNode.put(username, filepath)) {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
@@ -182,6 +189,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
+                    //ch1.shutdown();
                 }
             }
         };
@@ -211,6 +219,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
         ackStreamObserver.onNext(ack.build());
         ackStreamObserver.onCompleted();
+        ch1.shutdown();
     }
 
     @Override
@@ -236,6 +245,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
         ackStreamObserver.onNext(ack.build());
         ackStreamObserver.onCompleted();
+        ch1.shutdown();
     }
 
     @Override
@@ -279,6 +289,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
         fileResponseStreamObserver.onNext(fileResponse.build());
         fileResponseStreamObserver.onCompleted();
+        ch1.shutdown();
     }
 
 
@@ -337,6 +348,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
+                    ch1.shutdown();
                 }
             }
         };
@@ -345,8 +357,12 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void downloadFile(FileInfo fileInfo, StreamObserver<FileData> fileDataStreamObserver) {
-        slaveIpThread();
+
+
         if (isMaster) {
+            logger.info("creating channel -download");
+            ch1 = slaveIpThread();
+            ayncStub = FileServiceGrpc.newStub(ch1);
             logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
             CountDownLatch cdl = new CountDownLatch(1);
             StreamObserver<FileData> fileDataStreamObserver1 = new StreamObserver<FileData>() {
@@ -368,6 +384,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     cdl.countDown();
                     logger.info("calling on completed");
                     fileDataStreamObserver.onCompleted();
+                    logger.info("shutting down channel");
+                    ch1.shutdown();
                 }
             };
             ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
@@ -377,6 +395,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             } catch (InterruptedException ie) {
                 logger.info("Exception while waiting for count down latch: " + ie);
             }
+
         } else {
             FileData.Builder fileData1 = FileData.newBuilder();
             FileEntity fileEntity = SlaveNode.get(fileInfo);
@@ -407,6 +426,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             }
             logger.info("calling on completed");
             fileDataStreamObserver.onCompleted();
+
 
         }
 

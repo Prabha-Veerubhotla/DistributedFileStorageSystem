@@ -32,7 +32,9 @@ public class MasterNode extends RouteServerImpl {
         slaveip = slaveiplist;
         if(slaveiplist.size() != 0) {
             slave1 = slaveip.get(0);
-        } slave1 = "localhost";
+        } else {
+            slave1 = "localhost";
+        }
         //slave1 = "localhost"; // local testing
         //TODO: create channels for all the slaves
 
@@ -45,11 +47,14 @@ public class MasterNode extends RouteServerImpl {
         return currentIP;
     }
 
-    public static void createChannel() {
+    public static ManagedChannel createChannel() {
         logger.info("creating channel for slave");
+        logger.info("slave 1 ip is: "+slave1);
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         ayncStub = FileServiceGrpc.newStub(ch);
+        logger.info("creating async stub ");
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
+        return ch;
     }
 
 
