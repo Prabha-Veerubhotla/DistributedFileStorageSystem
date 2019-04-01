@@ -28,13 +28,14 @@ public class MasterNode extends RouteServerImpl {
     private static boolean done = false;
 
 
-    public static void assignSlaveIp(List<String> slaveiplist) {
+    public static String assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
         if(slaveiplist.size() != 0) {
             slave1 = slaveip.get(0);
         } else {
             slave1 = "localhost";
         }
+        return slave1;
         //slave1 = "localhost"; // local testing
         //TODO: create channels for all the slaves
 

@@ -43,6 +43,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static ManagedChannel ch1;
+    private static MasterMetaData masterMetaData;
 
 
     public void getSlaveIpList() {
@@ -51,7 +52,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             slaveips = map.get("slave");
         }
         //slave1 = slaveips.get(0); -- local testing
-        MasterNode.assignSlaveIp(slaveips);
+        slave1 =  MasterNode.assignSlaveIp(slaveips);
+
 
     }
 
@@ -133,6 +135,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
         if(isMaster) {
             ch1 = slaveIpThread();
+
         }
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
@@ -179,6 +182,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
+
+                    logger.info("putting metadata of file, slave in master");
+                    masterMetaData.putMetaData(username, filepath,slave1);
                     logger.info("channel is shutitng down");
                     ch1.shutdown();
 
@@ -189,7 +195,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
-                    //ch1.shutdown();
                 }
             }
         };
