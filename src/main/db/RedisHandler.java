@@ -73,6 +73,7 @@ public class RedisHandler {
      */
     @SuppressWarnings("unchecked")
     public String put(@NotNull String userName, @NotNull String fileName, String seqID, byte[] content) {
+        logger.info("Inside PUT redis handler");
         byte[] userNameByte = serialize(userName);
         try {
             if (redisConnector.exists(userNameByte)) {
@@ -134,11 +135,13 @@ public class RedisHandler {
      * @return
      */
     public Map<String, byte[]> get(@NotNull String userName, @NotNull String fileName) {
+        logger.info("Inside GET redis handler");
         Map<String, Map<String, byte[]>> tempMap = getFilesMap(userName);
         if(tempMap == null || tempMap.isEmpty() || !tempMap.containsKey(fileName)){
             return null;
         }
         Map<String, byte[]> res = tempMap.get(fileName);
+        logger.info("Sending file to client!");
         return res;
     }
 
@@ -149,6 +152,7 @@ public class RedisHandler {
      * @return
      */
     public boolean remove(@NotNull String userName, @NotNull String fileName){
+        logger.info("Inside REMOVE redis handler");
         Map<String, Map<String, byte[]>> tempMap = getFilesMap(userName);
         if(tempMap == null || tempMap.isEmpty() || !tempMap.containsKey(fileName)){
             return false;
@@ -168,6 +172,7 @@ public class RedisHandler {
     }
 
     public void update(@NotNull String userName, @NotNull String fileName, String seqID, byte[] content) {
+        logger.info("Inside UPDATE redis handler");
         if(FIRST_UPDATE_CALL){
             remove(userName, fileName);
             FIRST_UPDATE_CALL = false;
