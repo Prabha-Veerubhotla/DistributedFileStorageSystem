@@ -6,6 +6,8 @@ package route;
 // a service interface (contract)
 
 service RouteService {
+
+   rpc blockingrequest(Route) returns (Route) {}
    rpc request(stream Route) returns (stream Route) {}
 }
 

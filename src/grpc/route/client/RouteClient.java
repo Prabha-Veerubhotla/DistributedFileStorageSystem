@@ -42,6 +42,7 @@ import utility.FetchConfig;
 public class RouteClient {
     private static ManagedChannel ch;
     private static RouteServiceGrpc.RouteServiceStub stub;
+    private static RouteServiceGrpc.RouteServiceBlockingStub blockingStub;
     private Properties setup;
     private String name;
     private static String myIp = "client"; // intially , later master node will assign an ip
@@ -55,7 +56,7 @@ public class RouteClient {
 
     public void setName(String clientName) {
         name = clientName;
-        logger.info("setting client name as: " + name);
+        logger.info("Setting client name as: " + name);
     }
 
     public String getName() {
@@ -69,8 +70,9 @@ public class RouteClient {
             throw new RuntimeException("Missing port and/or host");
         }
         ch = ManagedChannelBuilder.forAddress(host, Integer.parseInt(port)).usePlaintext(true).build();
-        //TODO: make it async stub
+        //TODO: make it async stub -- done
         stub = RouteServiceGrpc.newStub(ch);
+        blockingStub = RouteServiceGrpc.newBlockingStub(ch);
         System.out.println("Client running...");
         msgTypes = FetchConfig.getMsgTypes();
         //request ip from node running dhcp-server
@@ -95,9 +97,8 @@ public class RouteClient {
             //handle response from server here
             @Override
             public void onNext(Route route) {
-
                 if (route.getType().equalsIgnoreCase("get")) {
-                    logger.info("recevied data from master: " + new String(route.getPayload().toByteArray()));
+                    logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
                     File file = new File("output-" + route.getPath());
                     //Create the file
                     try {
@@ -142,14 +143,14 @@ public class RouteClient {
             }
         });
 
-        logger.info("sending request to server of type: " + type);
+        logger.info("Sending request to server of type: " + type);
         Route.Builder bld = Route.newBuilder();
         bld.setOrigin(myIp);
         bld.setDestination(setup.getProperty("host")); // from the args , when we start client
         bld.setType(type);
         bld.setUsername(name);
         bld.setPath(path);
-        // if msg is post, if it is a file, stream it
+        // if msg is put, if it is a file, stream it
         if (type.equalsIgnoreCase(msgTypes.get(2))) {
             if (payload == null)
                 return;
@@ -176,11 +177,7 @@ public class RouteClient {
                         // convert string to byte string,
                         // to be compatible with protobuf format
 
-                        // blocking!
-
                         requestObserver.onNext(bld.build());
-
-
                     }
                 } catch (IOException e) {
                     ; // ignore? really?
@@ -192,6 +189,22 @@ public class RouteClient {
                         ; // ignore
                     }
                 }
+                logger.info("Streaming file is done");
+
+                //say to server that file streaming is done
+                //Route.Builder bld1 = Route.newBuilder();
+                bld.setOrigin(myIp);
+                bld.setDestination(setup.getProperty("host")); // from the args , when we start client
+                bld.setType(type);
+                bld.setUsername(name);
+                bld.setPath(path);
+                bld.setPayload(ByteString.copyFrom("complete".getBytes()));
+                //bld.setUsername(name);
+                logger.info("request type is: "+ type);
+                logger.info("sending complete to master");
+                requestObserver.onNext(bld.build());
+                logger.info("Sent complete to master");
+
             } else {
                 bld.setPayload(ByteString.copyFrom(payload.getBytes()));
                 logger.info("Sending request to server with payload: " + payload);
@@ -204,7 +217,10 @@ public class RouteClient {
             requestObserver.onNext(bld.build());
 
         }
-        requestObserver.onCompleted();
+
+        //if (!bld.getType().equalsIgnoreCase("get")) {
+            requestObserver.onCompleted();
+        //}
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
@@ -213,11 +229,26 @@ public class RouteClient {
 
     }
 
+    public Route sendBlockingMessageToServer(String type, String path, String payload) {
+            Route.Builder bld = Route.newBuilder();
+            bld.setOrigin(myIp);
+            bld.setDestination(setup.getProperty("host")); // from the args , when we start client
+            bld.setType(type);
+            bld.setUsername(name);
+            bld.setPath(path);
+            bld.setPayload(ByteString.copyFrom(payload.getBytes()));
+            bld.setSeq(0);
+            // to be compatible with protobuf format
+
+            // blocking!
+            return RouteClient.blockingStub.blockingrequest(bld.build());
+    }
+
     public boolean join() {
         String type = msgTypes.get(0);
         String payload = "joining";
         String path = "/client/joining";
-        sendMessageToServer(type, path, payload);
+        Route response = sendBlockingMessageToServer(type, path, payload);
         //TODO: use some kind of wait, notify
         logger.info("reply from master node: " + new String(response.getPayload().toByteArray()));
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("welcome")) {
@@ -235,18 +266,19 @@ public class RouteClient {
         String type = msgTypes.get(5);
         String path = "requesting/client/ip";
         String payload = "/requesting";
-        sendMessageToServer(type, path, payload);
+        Route response = sendBlockingMessageToServer(type, path, payload);
         myIp = new String(response.getPayload().toByteArray());
+        logger.info("my ip is: "+myIp);
     }
 
     public void sendNodeInfo() {
         String type = msgTypes.get(6);
         String path = "sending/node/info";
         String payload = "client";
-        sendMessageToServer(type, path, payload);
+        Route response = sendBlockingMessageToServer(type, path, payload);
         if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
             logger.info("Got node information from master node");
-            logger.info("my ip is: " + myIp);
+            logger.info("My IP is: " + myIp);
         }
     }
 

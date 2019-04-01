@@ -42,7 +42,7 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
-    //Method for round robin IP - Sharding data among 3 Slaves
+    //Method for round robin IP  among 3 Slaves
     public synchronized static String roundRobinIP(){
         currentIP = slaveip.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
@@ -87,7 +87,15 @@ public class MasterNode extends RouteServerImpl {
 
         requestObserver.onNext(bld.build());
 
-        requestObserver.onCompleted();
+        if(r.getType().equalsIgnoreCase("put")) {
+            logger.info("entering put");
+logger.info("payload is: "+r.getPayload());
+            if (new String(r.getPayload().toByteArray()).equalsIgnoreCase("complete") ) {
+                requestObserver.onCompleted();
+            } else {
+                logger.info("put still going on...");
+            }
+        }
         try {
             latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
@@ -127,11 +135,14 @@ public class MasterNode extends RouteServerImpl {
         bld.setDestination(slave1);
         bld.setPayload(ByteString.copyFrom(r.getPayload().toByteArray()));
         bld.setType(r.getType());
+        logger.info("request type is: "+r.getType());
         bld.setPath(r.getPath());
         bld.setSeq(r.getSeq());
-        logger.info("sending request to slave to retrieve chunk: " + r.getPath());
+        logger.info("Sending request to slave to retrieve file: " + r.getPath());
         requestObserver.onNext(bld.build());
-        requestObserver.onCompleted();
+        //if(!bld.getType().equalsIgnoreCase("get")) {
+            requestObserver.onCompleted();
+        //}
         return response;
     }
 
