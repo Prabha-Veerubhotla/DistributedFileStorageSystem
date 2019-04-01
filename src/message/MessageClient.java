@@ -49,12 +49,7 @@ public class MessageClient {
             } else if (choice.equalsIgnoreCase("delete")) {
                 System.out.print("Enter file name to delete: ");
                 String msg = br.readLine();
-                boolean deleteStatus = rc.deleteFileFromServer(msg);
-                if (deleteStatus) {
-                    System.out.println("File  " + msg + " successfully deleted");
-                } else {
-                    System.out.println("Delete operation failed for: " + msg);
-                }
+                System.out.println(rc.deleteFileFromServer(msg));
             } else if (choice.equalsIgnoreCase("update")) {
                 System.out.print("Enter file name to update: ");
                 String msg = br.readLine();

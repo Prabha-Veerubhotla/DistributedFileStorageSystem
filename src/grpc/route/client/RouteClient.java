@@ -6,14 +6,12 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
 import route.*;
-import sun.reflect.FieldInfo;
+
 
 
 /**
@@ -45,6 +43,9 @@ public class RouteClient {
     private static String myIp = "client"; // intially , later master node will assign an ip
     protected static Logger logger = LoggerFactory.getLogger("client");
     boolean ackStatus = false;
+    boolean putCompleted = false;
+    boolean updateCompleted = false;
+    boolean getCompleted = false;
 
     public RouteClient(Properties setup) {
         this.setup = setup;
@@ -108,6 +109,7 @@ public class RouteClient {
                 @Override
                 public void onCompleted() {
                     logger.info("Server is done sending data");
+                    putCompleted = true;
                     cdl.countDown();
                 }
             };
@@ -162,6 +164,14 @@ public class RouteClient {
             }
         }
 
+        while(!putCompleted) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            }
+        }
+
         if (ackStatus) {
             return "success";
         }
@@ -169,15 +179,17 @@ public class RouteClient {
     }
 
 
-    public boolean deleteFileFromServer(String msg) {
-        route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
-        route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
-        fileInfo.setFilename(fileResponse.build());
-        route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
-        fileInfo.setUsername(userInfo.build());
+    public String deleteFileFromServer(String msg) {
+        if(searchFileInServer(msg)) {
+            route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
+            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
+            fileInfo.setFilename(fileResponse.build());
+            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileInfo.setUsername(userInfo.build());
 
-        Ack ack = blockingStub.deleteFile(fileInfo.build());
-        return ack.getSuccess();
+            Ack ack = blockingStub.deleteFile(fileInfo.build());
+            return "success";
+        } return "File not present";
     }
 
     public boolean searchFileInServer(String msg) {
@@ -236,6 +248,7 @@ public class RouteClient {
                 public void onCompleted() {
                     logger.info("Server is done sending data");
                     cdl.countDown();
+                    updateCompleted = true;
                 }
             };
 
@@ -287,6 +300,15 @@ public class RouteClient {
             } catch (InterruptedException ie) {
                 logger.info("Exception while waiting for count down latch: " + ie);
             }
+
+            while(!updateCompleted) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    ie.printStackTrace();
+                }
+            }
+
             if (ackStatus) {
                 return "success";
             }
@@ -311,7 +333,7 @@ public class RouteClient {
                 public void onNext(FileData fileData) {
                     // write into the file , every chunk received from master
                     try {
-                        logger.info(new String(fileData.getContent().toByteArray()));
+                        //logger.info(new String(fileData.getContent().toByteArray()));
 
                         logger.info("writing seq num: " + fileData.getSeqnum()+" into file");
                         f.write(fileData.getContent().toByteArray());
@@ -334,6 +356,7 @@ public class RouteClient {
                         ie.printStackTrace();
                     }
                     cdl.countDown();
+                    getCompleted = true;
                 }
             };
             FileInfo.Builder fileInfo = FileInfo.newBuilder();
@@ -343,6 +366,15 @@ public class RouteClient {
         } catch (IOException io) {
             io.printStackTrace();
         }
+
+        while(!getCompleted) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            }
+        }
+
         return file;
     }
 }

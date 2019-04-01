@@ -1,15 +1,24 @@
 package grpc.route.server;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
 import main.db.RedisHandler;
+import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
@@ -24,11 +33,15 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
-    private static String myPort = "2345";
+    private static String myPort = "2346";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     static MongoDBHandler mh = new MongoDBHandler();
     static RedisHandler rh = new RedisHandler();
+    private static boolean done = false;
+    private static String slave1 = "localhost";
+    private static ManagedChannel ch;
+    private static FileServiceGrpc.FileServiceStub ayncStub;
 
 
     public void getSlaveIpList() {
@@ -36,7 +49,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         if (map.containsKey("slave")) {
             slaveips = map.get("slave");
         }
+        //slave1 = slaveips.get(0); -- local testing
         MasterNode.assignSlaveIp(slaveips);
+
     }
 
 
@@ -57,6 +72,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             logger.info("Running as Slave node");
         }
         impl.start();
+        ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(myPort.trim())).usePlaintext(true).build();
+        ayncStub = FileServiceGrpc.newStub(ch);
         impl.blockUntilShutdown();
     }
 
@@ -323,16 +340,69 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void downloadFile(FileInfo fileInfo, StreamObserver<FileData> fileDataStreamObserver) {
-        FileData fileData;
-        if(isMaster) {
-            fileData = MasterNode.getFileFromServer(fileInfo);
+        if (isMaster) {
+            logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<FileData> fileDataStreamObserver1 = new StreamObserver<FileData>() {
+                @Override
+                public void onNext(FileData fileData) {
+                    logger.info("received file data with seq num: " + fileData.getSeqnum());
+                    fileDataStreamObserver.onNext(fileData);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    logger.info("Slave is done sending data");
+                    cdl.countDown();
+                    logger.info("calling on completed");
+                    fileDataStreamObserver.onCompleted();
+                }
+            };
+            ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
+            //logger.info("content: "+ new String(result.getContent().toByteArray()));
+            try {
+                cdl.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                logger.info("Exception while waiting for count down latch: " + ie);
+            }
         } else {
-            fileData = SlaveNode.getFileFromServer(fileInfo);
+            FileData.Builder fileData1 = FileData.newBuilder();
+            FileEntity fileEntity = SlaveNode.get(fileInfo);
+            File fn = new File(fileEntity.getFileName());
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(fn);
+                long seq = 0l;
+                final int blen = 10024;
+                byte[] raw = new byte[blen];
+                boolean done = false;
+                while (!done) {
+                    int n = fis.read(raw, 0, blen);
+                    if (n <= 0)
+                        break;
+                    System.out.println("n: " + n);
+                    // identifying sequence number
+                    fileData1.setContent(ByteString.copyFrom(raw, 0, n));
+                    fileData1.setSeqnum(seq);
+                    fileData1.setUsername(fileInfo.getUsername());
+                    fileData1.setFilename(fileInfo.getFilename());
+                    seq++;
+                    fileDataStreamObserver.onNext(fileData1.build());
+                    logger.info("sending data with seq num: "+fileData1.getSeqnum());
+                }
+            } catch (IOException io) {
+                io.printStackTrace();
+            }
+            logger.info("calling on completed");
+            fileDataStreamObserver.onCompleted();
+
         }
-        logger.info("sending data");
-        fileDataStreamObserver.onNext(fileData);
-        logger.info("calling on completed");
-        fileDataStreamObserver.onCompleted();
 
     }
 

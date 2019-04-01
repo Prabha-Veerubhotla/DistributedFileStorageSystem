@@ -24,6 +24,8 @@ public class MasterNode extends RouteServerImpl {
     private static int NOOFSHARDS = 3;
     private static boolean ackStatus;
     private static FileData result;
+    private static boolean next = false;
+    private static boolean done = false;
 
 
     public static void assignSlaveIp(List<String> slaveiplist) {
@@ -78,17 +80,17 @@ public class MasterNode extends RouteServerImpl {
 
         if (complete) {
             fileDataStreamObserver.onNext(fileData);
+            logger.info("sending completed to slave");
             fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData);
-            logger.info("sent data to slave");
+            logger.info("sent data with seq num:  "+fileData.getSeqnum()+" to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
             logger.info("Exception while waiting for count down latch: " + ie);
         }
-
         return ackStatus;
     }
 
@@ -130,47 +132,12 @@ public class MasterNode extends RouteServerImpl {
         return fileResponse.getFilename();
     }
 
-    public static FileData getFileFromServer(FileInfo fileInfo) {
-        logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
-        CountDownLatch cdl = new CountDownLatch(1);
-        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
-            @Override
-            public void onNext(FileData fileData) {
-                logger.info("received file data with seq num: " + fileData.getSeqnum());
-                result = fileData;
-            }
 
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("Exception in the response from server: " + throwable);
-                cdl.countDown();
-            }
-
-            @Override
-            public void onCompleted() {
-                logger.info("Slave is done sending data");
-                cdl.countDown();
-            }
-        };
-        ayncStub.downloadFile(fileInfo, fileDataStreamObserver);
-
-        try {
-            cdl.await(3, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-            logger.info("Exception while waiting for count down latch: " + ie);
+    public static boolean checkDoneStatus() {
+        while(!done){
+            return false;
         }
-
-        logger.info("content: "+ new String(result.getContent().toByteArray()));
-
-        while(new String(result.getContent().toByteArray()).equalsIgnoreCase("")) {
-            try {
-                logger.info("waiting");
-                Thread.sleep(1000);
-            } catch (InterruptedException ie) {
-                ie.printStackTrace();
-            }
-        }
-        return result;
+        return true;
     }
 
 

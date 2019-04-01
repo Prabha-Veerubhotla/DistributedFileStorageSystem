@@ -15,9 +15,7 @@ import java.util.*;
 
 public class SlaveNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-slave");
-    private static long seq = 01;
-    static final int blen = 10024;
-    static int currentOffset = 0;
+
 
     /**
      *
@@ -40,7 +38,7 @@ public class SlaveNode extends RouteServerImpl {
         String seqID = Long.toString(fileData.getSeqnum());
         String fileName = getFileName(fileData.getFilename().getFilename());
         logger.info("Put details: " + userName + " seq num: " + seqID);
-        logger.info("content: " + new String(payload));
+        //logger.info("content: " + new String(payload));
         //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName.getUsername(), fileName, seqID, payload);
         return true;
@@ -130,7 +128,7 @@ public class SlaveNode extends RouteServerImpl {
     public static boolean search(FileInfo fileInfo) {
         //TODO: implement search from db here
         logger.info("Searching for file: " + fileInfo.getFilename().getFilename() + " in DB.");
-        return true;
+        return false;
     }
 
     public static String list(UserInfo userInfo) {
@@ -139,42 +137,9 @@ public class SlaveNode extends RouteServerImpl {
         return "blank";
     }
 
-    public static FileData getFileFromServer(FileInfo fileInfo) {
-        FileData.Builder fileData = FileData.newBuilder();
-        FileEntity fileEntity = get(fileInfo);
-        File fn = new File(fileEntity.getFileName());
-        FileInputStream fis;
-        try {
-            fis = new FileInputStream(fn);
-
-            byte[] raw = new byte[blen];
-            boolean done = false;
-
-                int n = fis.read(raw, currentOffset, blen);
-                if(n<=0) {
-                    fileData.setContent(ByteString.copyFrom("no data to return".getBytes()));
-                    return fileData.build();
-                } else {
-                    logger.info("n: " + n);
-                    // identifying sequence number
-                    seq++;
-                    fileData.setContent(ByteString.copyFrom(raw));
-                    logger.info("content: " + new String(fileData.getContent().toByteArray()));
-                    currentOffset = blen+1;
-
-                }
-        } catch (IOException fe) {
-            fe.printStackTrace();
-        }
-
-        fileData.setUsername(fileInfo.getUsername());
-        fileData.setFilename(fileInfo.getFilename());
-        fileData.setSeqnum(seq);
-
-        return fileData.build();
 
 
-    }
+
 
 
     //return file in chunks to the master
