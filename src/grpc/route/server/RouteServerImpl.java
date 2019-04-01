@@ -1,109 +1,47 @@
 package grpc.route.server;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.lang.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
 import main.db.RedisHandler;
+import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.Route;
-import route.RouteServiceGrpc;
+import route.*;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-import io.grpc.stub.StreamObserver;
-import route.RouteServiceGrpc.RouteServiceImplBase;
 
 
-public class RouteServerImpl extends RouteServiceImplBase {
+public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     protected static Logger logger = LoggerFactory.getLogger("server");
     private Server svr;
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
+    private static String myPort = "2346";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
-    private List<String> msgTypes = FetchConfig.getMsgTypes();
     static MongoDBHandler mh = new MongoDBHandler();
     static RedisHandler rh = new RedisHandler();
-
-    /**
-     * TODO refactor this!
-     *
-     * @return
-     */
-
-    protected ByteString processMaster(route.Route msg) {
-
-        String reply;
-        logger.info("msg type: "+msg.getType());
-
-        if (msg.getType().equalsIgnoreCase(msgTypes.get(0))) {
-            //save client user name
-            name = msg.getUsername();
-            logger.info("--> join: " + name);
-            reply = "WELCOME";
-            myIp = msg.getDestination();
-            MasterNode.setMasterIp(myIp);
-            MasterNode.setUsername(name);
-            //TODO: run a background theread continuously monitoring slave ip list
-            getSlaveIpList();
-
-        } /*else if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
-            String message = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: " + name + " asking to retrieve: " + message);
-            reply = MasterNode.get(msg).toString();
-
-        }*/ else if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
-            String payload = new String(msg.getPayload().toByteArray());
-            if (payload.equalsIgnoreCase("complete")) {
-                logger.info("client sent complete");
-            }
-            logger.info("--> Message from: " + name + " asking to save: " + msg.getPath());
-            if (MasterNode.put(msg)) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
-
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
-            logger.info("--> Message from: " + name + " asking to list all messages or files");
-            reply = MasterNode.list(msg);
-
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
-            String message = new String(msg.getPayload().toByteArray());
-            logger.info("--> Message from: " + name + " asking to delete: " + message);
-            if (MasterNode.delete(msg)) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(5))) {
-            logger.info("--> Message from: " + name + " asking to assign ip");
-            reply = MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList());
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(6))) {
-            logger.info("--> Message from: " + name + " asking to save client information");
-            if (dhcp_lease_test.updateCurrentNodeMapping(msg, msg.getOrigin())) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
-
-        } else {
-            logger.info("--> Got data from: " + msg.getOrigin() + "  path: " + msg.getPath());
-            reply = "blank";
-        }
-        byte[] raw = reply.getBytes();
-        return ByteString.copyFrom(raw);
-    }
+    private static boolean done = false;
+    private static String slave1 = "localhost";
+    private static ManagedChannel ch;
+    private static FileServiceGrpc.FileServiceStub ayncStub;
 
 
     public void getSlaveIpList() {
@@ -111,66 +49,11 @@ public class RouteServerImpl extends RouteServiceImplBase {
         if (map.containsKey("slave")) {
             slaveips = map.get("slave");
         }
+        //slave1 = slaveips.get(0); -- local testing
         MasterNode.assignSlaveIp(slaveips);
+
     }
 
-
-    protected ByteString processSlave(route.Route msg) {
-        logger.info("processing msg of type: " + msg.getType() + "with: " + msg.getPayload());
-
-        name = msg.getUsername();
-
-        String reply = null;
-
-        /*if (msg.getType().equalsIgnoreCase(msgTypes.get(1))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: master asking to retrieve: " + actualmessage);
-            reply = SlaveNode.get(msg).toString();
-
-        }*/
-        /*if (msg.getType().equalsIgnoreCase(msgTypes.get(2))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> message from: master asking to save: " + msg.getPath());
-            logger.info("received message from master asking to save seq num: " + msg.getSeq());
-            if (SlaveNode.put(msg)) {
-                logger.info("--saved message: " + actualmessage + " from: " + name + " successfully");
-                reply = "success";
-            } else {
-                reply = "failure";
-                logger.info("--unable to save message: " + actualmessage + "from: " + name);
-            }
-        }*/
-        if (msg.getType().equalsIgnoreCase(msgTypes.get(3))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> Message from: master asking to list messages or files of: " + msg.getUsername());
-//            reply = SlaveNode.list(msg).toString();
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(4))) {
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            logger.info("--> Message from: master asking to delete: " + actualmessage);
-            if (SlaveNode.delete(msg)) {
-                reply = "success";
-            } else {
-                reply = "failure";
-            }
-        } else if (msg.getType().equalsIgnoreCase(msgTypes.get(7))) {
-            logger.info("got a message from master of type: " + msg.getType() + " with payload: " + msg.getPayload());
-            String actualmessage = new String(msg.getPayload().toByteArray());
-            myIp = actualmessage;
-            logger.info("Assigned ip: " + myIp + " by dhcp server node");
-            reply = "slave";
-        } else {
-            // TODO placeholder
-//            String content = new String(msg.getPayload().toByteArray());
-            logger.info("Got content: from: " + msg.getOrigin() + " path: " + msg.getPath());
-            reply = "blank";
-        }
-
-        if (reply == null) {
-            reply = "";
-        }
-        byte[] raw = reply.getBytes();
-        return ByteString.copyFrom(raw);
-    }
 
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
@@ -184,11 +67,13 @@ public class RouteServerImpl extends RouteServiceImplBase {
         final RouteServerImpl impl = new RouteServerImpl();
         if (conf.getProperty("server.name").equalsIgnoreCase("master")) {
             isMaster = true;
-            logger.info("Running as master node");
+            logger.info("Running as Master node");
         } else {
-            logger.info("Running as slave node");
+            logger.info("Running as Slave node");
         }
         impl.start();
+        ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(myPort.trim())).usePlaintext(true).build();
+        ayncStub = FileServiceGrpc.newStub(ch);
         impl.blockUntilShutdown();
     }
 
@@ -202,6 +87,17 @@ public class RouteServerImpl extends RouteServiceImplBase {
         thread.start();
     }
 
+    private void slaveIpThread() {
+        Thread thread = new Thread() {
+            public void run() {
+                logger.info("Fetching Ip List of Nodes...");
+                getSlaveIpList();
+                MasterNode.createChannel();
+            }
+        };
+        thread.start();
+    }
+
     private void start() throws Exception {
         svr = ServerBuilder.forPort(RouteServer.getInstance().getServerPort()).addService(new RouteServerImpl())
                 .build();
@@ -210,7 +106,9 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.start();
         if (isMaster) {
             invokeDhcpMonitorThread();
+            slaveIpThread();
         }
+
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
@@ -228,129 +126,36 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.awaitTermination();
     }
 
-    /*public void sendStreamingDataToSlave(Route r) {
-        logger.info("Sending file chunk with seq num: "+ r.getSeq()+" to slave");
-        MasterNode.sendMessageToSlaves(r);
-
-    }*/
-
-    public void collectStreamingDataInSlave(Route r) {
-        logger.info("Saving chunk with seq num: " + r.getSeq() + " in slave");
-        //receiving each chunk in slave and writing into a file
-       boolean putStatus = SlaveNode.put(r);
-       if(putStatus){
-           logger.info("successfully saved chunk in slave");
-       }
-    }
-
-    public Route collectDataFromSlavesInChunks(Route r) {
-        Route route = MasterNode.collectDataFromSlaves(r);
-        logger.info("received data from slave: " + r.getSeq());
-        return route;
-    }
-
-    public void sendDataToMasterInChunks(Route r) {
-        logger.info("request from master, asking to retrieve: " + r.getPath());
-        SlaveNode.returnFileInchunks(r);
-    }
-
-    //respond to a request
-    @Override
-    public void blockingrequest(route.Route request, StreamObserver<route.Route> responseObserver) {
-
-        // TODO refactor to use RouteServer to isolate implementation from
-        // transportation
-
-        route.Route.Builder builder = route.Route.newBuilder();
-        builder.setPath(request.getPath());
-
-        // do the work
-        if (isMaster) {
-            builder.setPayload(processMaster(request));
-            builder.setOrigin(myIp);
-            builder.setDestination(request.getOrigin());
-        } else {
-            builder.setPayload(processSlave(request));
-            builder.setOrigin(myIp);
-            builder.setDestination(request.getOrigin());
-        }
-        route.Route rtn = builder.build();
-        responseObserver.onNext(rtn);
-       responseObserver.onCompleted();
-
-    }
-
 
     @Override
-    public StreamObserver<Route> request(StreamObserver<route.Route> responseObserver) {
-        StreamObserver<Route> requestObserver = new StreamObserver<Route>() {
-            String userName;
-            String filePath;
-            String methodType;
-            ByteString payload;
-            boolean isComplete = false;
+    public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
+        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+            boolean ackStatus;
+            String ackMessage;
+            String username;
+            String filepath;
+            FileData fd;
 
-            //handle requests from client here
             @Override
-            public void onNext(Route route) {
-                userName = route.getUsername();
-                filePath = route.getPath();
-                methodType = route.getType();
-                payload = route.getPayload();
-
-                route.Route.Builder builder = Route.newBuilder();
-                builder.setPath(route.getPath());
-
-
-                if (route.getType().equalsIgnoreCase("put")) {
-                    if (isMaster) {
-                        logger.info("Receiving file data with seq num: " + route.getSeq() + " from: " + name);
-                        builder.setPayload(processMaster(route));
-                        builder.setOrigin(myIp);
-                        builder.setDestination(route.getOrigin());
+            public void onNext(FileData fileData) {
+                fd = fileData;
+                username = fileData.getUsername().getUsername();
+                filepath = fileData.getFilename().getFilename();
+                if (isMaster) {
+                    ackStatus = MasterNode.streamFileToServer(fileData, false);
+                    if (ackStatus) {
+                        ackMessage = "success";
                     } else {
-                        collectStreamingDataInSlave(route);
+                        ackMessage = "Unable to save file";
                     }
-                } else if (route.getType().equalsIgnoreCase("get")) {
-                    logger.info("receiving request get");
-                    if (isMaster) {
-                        if (new String(route.getPayload().toByteArray()).equalsIgnoreCase("complete")) {
-                            isComplete = true;
-                        } else {
-                            Route route1 = collectDataFromSlavesInChunks(route);
-                            logger.info("sending data to client");
-                            responseObserver.onNext(route1);
-                        }
-                    } else {
-                        logger.info("received request from master of type: " + route.getType());
-                        sendDataToMasterInChunks(route);
-
-                    }
-                    //   responseObserver.onNext(route);
-
                 } else {
-                    if (isMaster) {
-                        builder.setPayload(processMaster(route));
-                        builder.setOrigin(myIp);
-                        builder.setDestination(route.getOrigin());
+                    logger.info("received data from master");
+                    ackStatus = SlaveNode.put(fileData);
+                    if (ackStatus) {
+                        ackMessage = "success";
                     } else {
-                        if(methodType.equalsIgnoreCase("slave-ip")) {
-                            builder.setPayload(processSlave(route));
-                            builder.setOrigin(myIp);
-                            builder.setDestination(route.getOrigin());
-                            ManagedChannel ch = ManagedChannelBuilder.forAddress(route.getOrigin(), Integer.parseInt("2345".trim())).usePlaintext(true).build();
-                            RouteServiceGrpc.RouteServiceBlockingStub blockingStub = RouteServiceGrpc.newBlockingStub(ch);
-                            Route r = blockingStub.blockingrequest(builder.build());
-
-                        } else {
-                            builder.setPayload(processSlave(route));
-                            builder.setOrigin(myIp);
-                            builder.setDestination(route.getOrigin());
-                            route.Route rtn = builder.build();
-                            responseObserver.onNext(rtn);
-                        }
+                        ackMessage = "Unable to save file";
                     }
-
                 }
             }
 
@@ -362,39 +167,244 @@ public class RouteServerImpl extends RouteServiceImplBase {
             @Override
             public void onCompleted() {
                 logger.info("Node is done sending messages");
-                if (!isMaster && methodType.equalsIgnoreCase("put")) {
-                    SlaveNode.put(userName, filePath);
-                }
-                if (isMaster && methodType.equalsIgnoreCase("put")) {
-                    logger.info("received all data from client");
-                    route.Route.Builder builder = Route.newBuilder();
-                    builder.setPath(filePath);
-                    builder.setUsername(userName);
-                    //builder.setDestination()
-                    builder.setOrigin(myIp);
-                    builder.setPayload(ByteString.copyFrom("complete".getBytes()));
-                    builder.setType("put");
-                    MasterNode.put(builder.build());
-                }
-                /*if(isMaster && methodType.equalsIgnoreCase("put")) {
-                    String received  = new String(payload.toByteArray());
-                    logger.info("Received response from slave node: " + payload);
-                    if (received.equalsIgnoreCase("success")) {
-                        //return true;
+                if (isMaster) {
+                    if (MasterNode.streamFileToServer(fd, true)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
                     }
-                    //return false;
-                }*/
-                if(isMaster && isComplete && methodType.equalsIgnoreCase("get")) {
-                    logger.info("received all the data from slave");
-                    //
+                    ackStreamObserver.onCompleted();
                 } else {
-
-                    responseObserver.onCompleted();
+                    if (SlaveNode.put(username, filepath)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
+                    }
+                    ackStreamObserver.onCompleted();
                 }
-
             }
         };
-        return requestObserver;
+        return fileDataStreamObserver;
     }
-}
 
+    @Override
+    public void deleteFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
+        Ack.Builder ack = Ack.newBuilder();
+        boolean ackStatus;
+        String ackMessage = "Unable to save file";
+        if (isMaster) {
+            ackStatus = MasterNode.deleteFileFromServer(fileInfo);
+            if (ackStatus) {
+                ackMessage = "success";
+            }
+
+        } else {
+            ackStatus = SlaveNode.delete(fileInfo);
+            if (ackStatus) {
+                ackMessage = "success";
+            }
+        }
+        ack.setMessage(ackMessage);
+        ack.setSuccess(ackStatus);
+
+        ackStreamObserver.onNext(ack.build());
+        ackStreamObserver.onCompleted();
+    }
+
+    @Override
+    public void searchFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
+        Ack.Builder ack = Ack.newBuilder();
+        boolean ackStatus;
+        String ackMessage = "File is not present";
+        if (isMaster) {
+            ackStatus = MasterNode.searchFileInServer(fileInfo);
+            if (ackStatus) {
+                ackMessage = "success";
+            }
+
+        } else {
+            ackStatus = SlaveNode.search(fileInfo);
+            if (ackStatus) {
+                ackMessage = "success";
+            }
+        }
+        ack.setMessage(ackMessage);
+        ack.setSuccess(ackStatus);
+
+        ackStreamObserver.onNext(ack.build());
+        ackStreamObserver.onCompleted();
+    }
+
+    @Override
+    public void requestNodeIp(NodeName nodeName, StreamObserver<NodeInfo> nodeInfoStreamObserver) {
+        NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
+        if (isMaster) {
+            nodeInfo.setIp(MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList()));
+            nodeInfo.setPort("2345");
+            dhcp_lease_test.updateCurrentNodeMapping(nodeInfo.build(), nodeName);
+        }
+        logger.info("Requesting to assign ip, for: " + nodeName.getName());
+        nodeInfoStreamObserver.onNext(nodeInfo.build());
+        nodeInfoStreamObserver.onCompleted();
+    }
+
+    @Override
+    public void assignNodeIp(NodeInfo nodeInfo, StreamObserver<NodeName> nodeNameStreamObserver) {
+        NodeName.Builder nodeName = NodeName.newBuilder();
+        if (!isMaster) {
+            myIp = nodeInfo.getIp();
+            myPort = nodeInfo.getPort();
+        }
+        logger.info("Assigned ip: " + myIp + "  by DHCP server");
+        nodeName.setName("slave");
+        nodeNameStreamObserver.onNext(nodeName.build());
+        nodeNameStreamObserver.onCompleted();
+    }
+
+    @Override
+    public void listFile(UserInfo userInfo, StreamObserver<FileResponse> fileResponseStreamObserver) {
+        FileResponse.Builder fileResponse = FileResponse.newBuilder();
+
+        if (isMaster) {
+            fileResponse.setFilename(MasterNode.listFilesInServer(userInfo));
+
+        } else {
+            fileResponse.setFilename(SlaveNode.list(userInfo));
+
+        }
+
+        fileResponseStreamObserver.onNext(fileResponse.build());
+        fileResponseStreamObserver.onCompleted();
+    }
+
+
+    @Override
+    public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
+        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+            boolean ackStatus;
+            String ackMessage;
+            String username;
+            String filepath;
+            FileData fd;
+
+            @Override
+            public void onNext(FileData fileData) {
+                fd = fileData;
+                username = fileData.getUsername().getUsername();
+                filepath = fileData.getFilename().getFilename();
+                if (isMaster) {
+                    ackStatus = MasterNode.streamFileToServer(fileData, false);
+                    if (ackStatus) {
+                        ackMessage = "success";
+                    } else {
+                        ackMessage = "Unable to update file";
+                    }
+                } else {
+                    logger.info("received data from master");
+                    ackStatus = SlaveNode.put(fileData);
+                    if (ackStatus) {
+                        ackMessage = "success";
+                    } else {
+                        ackMessage = "Unable to update file";
+                    }
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the request from node: " + throwable);
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("Node is done sending messages");
+                if (isMaster) {
+                    if (MasterNode.streamFileToServer(fd, true)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
+                    }
+                    ackStreamObserver.onCompleted();
+                } else {
+                    if (SlaveNode.put(username, filepath)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
+                    }
+                    ackStreamObserver.onCompleted();
+                }
+            }
+        };
+        return fileDataStreamObserver;
+    }
+
+    @Override
+    public void downloadFile(FileInfo fileInfo, StreamObserver<FileData> fileDataStreamObserver) {
+        if (isMaster) {
+            logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<FileData> fileDataStreamObserver1 = new StreamObserver<FileData>() {
+                @Override
+                public void onNext(FileData fileData) {
+                    logger.info("received file data with seq num: " + fileData.getSeqnum());
+                    fileDataStreamObserver.onNext(fileData);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    logger.info("Slave is done sending data");
+                    cdl.countDown();
+                    logger.info("calling on completed");
+                    fileDataStreamObserver.onCompleted();
+                }
+            };
+            ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
+            //logger.info("content: "+ new String(result.getContent().toByteArray()));
+            try {
+                cdl.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                logger.info("Exception while waiting for count down latch: " + ie);
+            }
+        } else {
+            FileData.Builder fileData1 = FileData.newBuilder();
+            FileEntity fileEntity = SlaveNode.get(fileInfo);
+            File fn = new File(fileEntity.getFileName());
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(fn);
+                long seq = 0l;
+                final int blen = 10024;
+                byte[] raw = new byte[blen];
+                boolean done = false;
+                while (!done) {
+                    int n = fis.read(raw, 0, blen);
+                    if (n <= 0)
+                        break;
+                    System.out.println("n: " + n);
+                    // identifying sequence number
+                    fileData1.setContent(ByteString.copyFrom(raw, 0, n));
+                    fileData1.setSeqnum(seq);
+                    fileData1.setUsername(fileInfo.getUsername());
+                    fileData1.setFilename(fileInfo.getFilename());
+                    seq++;
+                    fileDataStreamObserver.onNext(fileData1.build());
+                    logger.info("sending data with seq num: "+fileData1.getSeqnum());
+                }
+            } catch (IOException io) {
+                io.printStackTrace();
+            }
+            logger.info("calling on completed");
+            fileDataStreamObserver.onCompleted();
+
+        }
+
+    }
+
+
+}

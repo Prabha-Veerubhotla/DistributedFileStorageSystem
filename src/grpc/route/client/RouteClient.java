@@ -6,19 +6,13 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.Route;
-import route.RouteServiceGrpc;
-
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import route.*;
 
-import utility.FetchConfig;
+
 
 /**
  * copyright 2018, gash
@@ -36,19 +30,22 @@ import utility.FetchConfig;
  * the License.
  */
 
-//TODO: make all calls aynschronous
+//TODO: make get, put , list, update asynchronous
+//TODO: make the rem, calls blocking -- done
 //TODO: listen continuously for messages from server on a background thread
 
 public class RouteClient {
     private static ManagedChannel ch;
-    private static RouteServiceGrpc.RouteServiceStub stub;
-    private static RouteServiceGrpc.RouteServiceBlockingStub blockingStub;
+    private static FileServiceGrpc.FileServiceStub asyncStub;
+    private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
     private Properties setup;
     private String name;
     private static String myIp = "client"; // intially , later master node will assign an ip
     protected static Logger logger = LoggerFactory.getLogger("client");
-    private List<String> msgTypes = new ArrayList<>();
-    private Route response = Route.newBuilder().setDestination("server").build();
+    boolean ackStatus = false;
+    boolean putCompleted = false;
+    boolean updateCompleted = false;
+    boolean getCompleted = false;
 
     public RouteClient(Properties setup) {
         this.setup = setup;
@@ -71,15 +68,13 @@ public class RouteClient {
         }
         ch = ManagedChannelBuilder.forAddress(host, Integer.parseInt(port)).usePlaintext(true).build();
         //TODO: make it async stub -- done
-        stub = RouteServiceGrpc.newStub(ch);
-        blockingStub = RouteServiceGrpc.newBlockingStub(ch);
-        System.out.println("Client running...");
-        msgTypes = FetchConfig.getMsgTypes();
-        //request ip from node running dhcp-server
+        asyncStub = FileServiceGrpc.newStub(ch);
+        blockingStub = FileServiceGrpc.newBlockingStub(ch);
+        logger.info("Client running...");
+        logger.info("Requesting ip from dhcp server");
         requestIp();
-        //reply node info stating that you are client
-        sendNodeInfo();
     }
+
 
     public boolean checkIfFile(String msg) {
         try {
@@ -91,72 +86,44 @@ public class RouteClient {
         return true;
     }
 
-    private void sendMessageToServer(String type, String path, String payload) {
-        CountDownLatch latch = new CountDownLatch(1);
-        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
-            //handle response from server here
-            @Override
-            public void onNext(Route route) {
-                if (route.getType().equalsIgnoreCase("get")) {
-                    logger.info("Recevied data from master: " + new String(route.getPayload().toByteArray()));
-                    File file = new File("output-" + route.getPath());
-                    //Create the file
-                    try {
-                        if (file.createNewFile()) {
-                            logger.info("File: " + file + " is created!");
-                        } else {
-                            logger.info("File: " + file + " already exists.");
-                        }
-                        RandomAccessFile f = new RandomAccessFile(file, "rw");
-                        // write into the file , every chunk received from master
-                        f.write(route.getPayload().toByteArray());
-                        f.close();
-                    } catch (IOException io) {
-                        io.printStackTrace();
-                    }
-                    synchronized (response) {
-                        try {
-                            response.wait();
-                            response = route.toBuilder().build();
-                        } catch (InterruptedException ie) {
-                            ie.printStackTrace();
-                        }
-                    }
-                } else {
-                    response = route.toBuilder().build();
+    public String streamFileToServer(String filename) {
+        if (searchFileInServer(filename)) {
+            return "File already present";
+        } else {
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+                @Override
+                public void onNext(Ack ack) {
+                    ackStatus = ack.getSuccess();
+                    logger.info("Received ack status from the server: " + ack.getSuccess());
+                    logger.info("Received ack  message from the server: " + ack.getMessage());
                 }
-            }
 
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("Exception in the response from server: " + throwable);
-                latch.countDown();
-            }
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
 
-            @Override
-            public void onCompleted() {
-                logger.info("Server is done sending data");
-                latch.countDown();
-                /*synchronized (response) {
-                    response.notifyAll();
-                }*/
-            }
-        });
+                @Override
+                public void onCompleted() {
+                    logger.info("Server is done sending data");
+                    putCompleted = true;
+                    cdl.countDown();
+                }
+            };
 
-        logger.info("Sending request to server of type: " + type);
-        Route.Builder bld = Route.newBuilder();
-        bld.setOrigin(myIp);
-        bld.setDestination(setup.getProperty("host")); // from the args , when we start client
-        bld.setType(type);
-        bld.setUsername(name);
-        bld.setPath(path);
-        // if msg is put, if it is a file, stream it
-        if (type.equalsIgnoreCase(msgTypes.get(2))) {
-            if (payload == null)
-                return;
-            if (checkIfFile(payload)) {
-                System.out.println("This is a file");
-                File fn = new File(payload);
+            route.FileData.Builder fileData = FileData.newBuilder();
+            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
+            fileData.setFilename(fileResponse.build());
+            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileData.setUsername(userInfo.build());
+
+            StreamObserver<FileData> fileDataStreamObserver = asyncStub.uploadFile(ackStreamObserver);
+            if (checkIfFile(filename)) {
+                logger.info(filename + " is a file");
+                File fn = new File(filename);
                 FileInputStream fis = null;
                 try {
                     fis = new FileInputStream(fn);
@@ -168,20 +135,18 @@ public class RouteClient {
                         int n = fis.read(raw, 0, blen);
                         if (n <= 0)
                             break;
-                        System.out.println("n: " + n);
                         // identifying sequence number
                         seq++;
-                        bld.setPayload(ByteString.copyFrom(raw, 0, n));
-                        bld.setSeq(seq);
+                        logger.info("Streaming seq num: " + seq);
+                        fileData.setContent(ByteString.copyFrom(raw, 0, n));
+                        logger.info("seq num is: " + seq);
+                        fileData.setSeqnum(seq);
                         logger.info("Sending file data to server with seq num: " + seq);
-                        // convert string to byte string,
-                        // to be compatible with protobuf format
-
-                        requestObserver.onNext(bld.build());
+                        fileDataStreamObserver.onNext(fileData.build());
                     }
                 } catch (IOException e) {
                     ; // ignore? really?
-                    requestObserver.onError(e);
+                    fileDataStreamObserver.onError(e);
                 } finally {
                     try {
                         fis.close();
@@ -189,72 +154,54 @@ public class RouteClient {
                         ; // ignore
                     }
                 }
-                logger.info("Streaming file is done");
-
-                //say to server that file streaming is done
-                //Route.Builder bld1 = Route.newBuilder();
-                bld.setOrigin(myIp);
-                bld.setDestination(setup.getProperty("host")); // from the args , when we start client
-                bld.setType(type);
-                bld.setUsername(name);
-                bld.setPath(path);
-                bld.setPayload(ByteString.copyFrom("complete".getBytes()));
-                //bld.setUsername(name);
-                logger.info("request type is: "+ type);
-                logger.info("sending complete to master");
-                requestObserver.onNext(bld.build());
-                logger.info("Sent complete to master");
-
-            } else {
-                bld.setPayload(ByteString.copyFrom(payload.getBytes()));
-                logger.info("Sending request to server with payload: " + payload);
-                requestObserver.onNext(bld.build());
-
             }
-        } else {
-            bld.setPayload(ByteString.copyFrom(payload.getBytes()));
-            logger.info("Sending request to server with payload: " + payload);
-            requestObserver.onNext(bld.build());
+            fileDataStreamObserver.onCompleted();
 
+            try {
+                cdl.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                logger.info("Exception while waiting for count down latch: " + ie);
+            }
         }
 
-        //if (!bld.getType().equalsIgnoreCase("get")) {
-            requestObserver.onCompleted();
-        //}
-        try {
-            latch.await(3, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-            logger.info("Exception while waiting for count down latch: " + ie);
+        while(!putCompleted) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            }
         }
 
+        if (ackStatus) {
+            return "success";
+        }
+        return "Unable to save file";
     }
 
-    public Route sendBlockingMessageToServer(String type, String path, String payload) {
-            Route.Builder bld = Route.newBuilder();
-            bld.setOrigin(myIp);
-            bld.setDestination(setup.getProperty("host")); // from the args , when we start client
-            bld.setType(type);
-            bld.setUsername(name);
-            bld.setPath(path);
-            bld.setPayload(ByteString.copyFrom(payload.getBytes()));
-            bld.setSeq(0);
-            // to be compatible with protobuf format
 
-            // blocking!
-            return RouteClient.blockingStub.blockingrequest(bld.build());
+    public String deleteFileFromServer(String msg) {
+        if(searchFileInServer(msg)) {
+            route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
+            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
+            fileInfo.setFilename(fileResponse.build());
+            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileInfo.setUsername(userInfo.build());
+
+            Ack ack = blockingStub.deleteFile(fileInfo.build());
+            return "success";
+        } return "File not present";
     }
 
-    public boolean join() {
-        String type = msgTypes.get(0);
-        String payload = "joining";
-        String path = "/client/joining";
-        Route response = sendBlockingMessageToServer(type, path, payload);
-        //TODO: use some kind of wait, notify
-        logger.info("reply from master node: " + new String(response.getPayload().toByteArray()));
-        if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("welcome")) {
-            return true;
-        }
-        return false;
+    public boolean searchFileInServer(String msg) {
+        logger.info("searching file in server");
+        route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
+        route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
+        fileInfo.setFilename(fileResponse.build());
+        route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+        fileInfo.setUsername(userInfo.build());
+
+        Ack ack = blockingStub.searchFile(fileInfo.build());
+        return ack.getSuccess();
     }
 
 
@@ -262,90 +209,172 @@ public class RouteClient {
         ch.shutdown();
     }
 
+    //blocking
     public void requestIp() {
-        String type = msgTypes.get(5);
-        String path = "requesting/client/ip";
-        String payload = "/requesting";
-        Route response = sendBlockingMessageToServer(type, path, payload);
-        myIp = new String(response.getPayload().toByteArray());
-        logger.info("my ip is: "+myIp);
+        NodeName.Builder nodeName = NodeName.newBuilder();
+        nodeName.setName("client");
+        NodeInfo nodeInfo = blockingStub.requestNodeIp(nodeName.build());
+        myIp = new String(nodeInfo.getIp());
+        logger.info("my ip is: " + myIp);
     }
 
-    public void sendNodeInfo() {
-        String type = msgTypes.get(6);
-        String path = "sending/node/info";
-        String payload = "client";
-        Route response = sendBlockingMessageToServer(type, path, payload);
-        if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
-            logger.info("Got node information from master node");
-            logger.info("My IP is: " + myIp);
-        }
+    public String listFilesInServer(String userName) {
+        UserInfo.Builder userInfo = UserInfo.newBuilder();
+        userInfo.setUsername(userName);
+        FileResponse fileResponse = blockingStub.listFile(userInfo.build());
+        return fileResponse.getFilename();
     }
 
+    public String updateFileInServer(String filename) {
+        if (searchFileInServer(filename)) {
 
-    public boolean put(String msg) {
-        String type = msgTypes.get(2);
-        String path = msg;
-        String payload = msg;
-        boolean putStatus = false;
-        System.out.println("Streaming: " + msg);
-        sendMessageToServer(type, path, payload);
-        // synchronized (response) {
-        //  try {
-        //response.wait();
-        if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
-            putStatus = true;
-            logger.info("Successfully saved: " + msg);
-        } else {
-            logger.info("Could not save: " + msg);
-        }
-            /*} catch (InterruptedException ie) {
-                ie.printStackTrace();
-            }*/
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
-        return putStatus;
-    }
+                @Override
+                public void onNext(Ack ack) {
+                    ackStatus = ack.getSuccess();
+                    logger.info("Received ack status from the server: " + ack.getSuccess());
+                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                }
 
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
 
-    public boolean delete(String msg) {
-        boolean deleteStatus = false;
-        String type = msgTypes.get(4);
-        String path = msg;
-        String payload = msg;
-        sendMessageToServer(type, path, payload);
-        if (new String(response.getPayload().toByteArray()).equalsIgnoreCase("success")) {
-            deleteStatus = true;
-            logger.info("Successfully deleted: " + msg);
-        } else {
-            logger.info("Could not delete: " + msg);
-        }
-        return deleteStatus;
-    }
+                @Override
+                public void onCompleted() {
+                    logger.info("Server is done sending data");
+                    cdl.countDown();
+                    updateCompleted = true;
+                }
+            };
 
-    public File get(String msg) {
-        String type = msgTypes.get(1);
-        String path = msg;
-        String payload = msg;
-        sendMessageToServer(type, path, payload);
-        logger.info("Retrieved information about: " + msg + "  from slaves");
-        synchronized (response) {
+            route.FileData.Builder fileData = FileData.newBuilder();
+            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
+            fileData.setFilename(fileResponse.build());
+            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileData.setUsername(userInfo.build());
+
+            StreamObserver<FileData> fileDataStreamObserver = asyncStub.updateFile(ackStreamObserver);
+            if (checkIfFile(filename)) {
+                logger.info(filename + " is a file");
+                File fn = new File(filename);
+                FileInputStream fis = null;
+                try {
+                    fis = new FileInputStream(fn);
+                    long seq = 0l;
+                    final int blen = 10024;
+                    byte[] raw = new byte[blen];
+                    boolean done = false;
+                    while (!done) {
+                        int n = fis.read(raw, 0, blen);
+                        if (n <= 0)
+                            break;
+                        // identifying sequence number
+                        seq++;
+                        logger.info("Streaming seq num: " + seq);
+                        fileData.setContent(ByteString.copyFrom(raw, 0, n));
+                        logger.info("seq num is: " + seq);
+                        fileData.setSeqnum(seq);
+                        logger.info("Sending file data to server with seq num: " + seq);
+                        fileDataStreamObserver.onNext(fileData.build());
+                    }
+                } catch (IOException e) {
+                    ; // ignore? really?
+                    fileDataStreamObserver.onError(e);
+                } finally {
+                    try {
+                        fis.close();
+                    } catch (IOException e) {
+                        ; // ignore
+                    }
+                }
+            }
+            fileDataStreamObserver.onCompleted();
+
             try {
-                response.wait();
+                cdl.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                logger.info("Exception while waiting for count down latch: " + ie);
+            }
+
+            while(!updateCompleted) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    ie.printStackTrace();
+                }
+            }
+
+            if (ackStatus) {
+                return "success";
+            }
+        }
+        return "Unable to save file";
+    }
+
+    public File getFileFromServer(String filename) {
+        File file = new File("output-"+filename);
+        //Create the file
+        try {
+            if (file.createNewFile()) {
+                logger.info("File: " + file + " is created!");
+            } else {
+                logger.info("File: " + file + " already exists.");
+            }
+            RandomAccessFile f = new RandomAccessFile(file, "rw");
+
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+                @Override
+                public void onNext(FileData fileData) {
+                    // write into the file , every chunk received from master
+                    try {
+                        //logger.info(new String(fileData.getContent().toByteArray()));
+
+                        logger.info("writing seq num: " + fileData.getSeqnum()+" into file");
+                        f.write(fileData.getContent().toByteArray());
+                    } catch (IOException ie) {
+                        ie.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    try {
+                        f.close();
+                    } catch (IOException ie) {
+                        ie.printStackTrace();
+                    }
+                    cdl.countDown();
+                    getCompleted = true;
+                }
+            };
+            FileInfo.Builder fileInfo = FileInfo.newBuilder();
+            fileInfo.setFilename(FileResponse.newBuilder().setFilename(filename).build());
+            fileInfo.setUsername(UserInfo.newBuilder().setUsername(name).build());
+            asyncStub.downloadFile(fileInfo.build(), fileDataStreamObserver);
+        } catch (IOException io) {
+            io.printStackTrace();
+        }
+
+        while(!getCompleted) {
+            try {
+                Thread.sleep(500);
             } catch (InterruptedException ie) {
                 ie.printStackTrace();
             }
         }
-        return new File("output-" + msg);
-    }
 
-    public List<String> list() {
-        String type = msgTypes.get(3);
-        String path = "/list/messages";
-        String payload = "listing";
-        sendMessageToServer(type, path, payload);
-        payload = response.getPayload().toString();
-        logger.info("Received a list of messages or files for the client: " + name + " from slaves");
-        return new ArrayList<>(Arrays.asList(payload.split(",")));
+        return file;
     }
 }
-

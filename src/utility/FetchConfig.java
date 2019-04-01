@@ -10,7 +10,6 @@ import java.util.Properties;
 
 public class FetchConfig {
     protected static Logger logger = LoggerFactory.getLogger("Fetch-Config");
-    private static List<String> msgTypes = Arrays.asList("join", "get", "put", "list", "delete", "request-ip", "save-client-ip", "slave-ip");
 
 
     public static Properties getConfiguration(final File path) throws IOException {
@@ -34,9 +33,6 @@ public class FetchConfig {
         return rtn;
     }
 
-    public static List<String> getMsgTypes() {
-        return msgTypes;
-    }
 
     public byte[] convertFileContent(String filename) {
         RandomAccessFile f;
