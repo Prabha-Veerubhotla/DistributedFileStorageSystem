@@ -220,8 +220,14 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             if (ackStatus) {
                 ackMessage = "success";
             }
+            logger.info("ack status: "+ackStatus);
+            logger.info("Ack message: "+ ackMessage);
 
+            ack.setMessage(ackMessage);
+            ack.setSuccess(ackStatus);
+            ackStreamObserver.onNext(ack.build());
             ackStreamObserver.onCompleted();
+
             logger.info("putting metadata of file, slave in master");
             logger.info("username: "+ fileInfo.getUsername().getUsername());
             logger.info("filepath: "+fileInfo.getFilename().getFilename());
@@ -237,6 +243,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             ack.setMessage(ackMessage);
             ack.setSuccess(ackStatus);
             ackStreamObserver.onNext(ack.build());
+            ackStreamObserver.onCompleted();
         }
     }
 
