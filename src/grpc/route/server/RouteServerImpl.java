@@ -317,7 +317,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     }
                 } else {
                     logger.info("received data from master");
-                    ackStatus = SlaveNode.put(fileData);
+                    ackStatus = SlaveNode.update(fileData);
                     if (ackStatus) {
                         ackMessage = "success";
                     } else {

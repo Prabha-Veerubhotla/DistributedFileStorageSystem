@@ -83,12 +83,13 @@ public class SlaveNode extends RouteServerImpl {
      * update file contents
      * @param r
      */
-    public static void update(FileData fileData){
+    public static boolean update(FileData fileData){
         String userName = fileData.getUsername().getUsername();
         String fileName = getFileName(fileData.getFilename().getFilename());
         String seqID = Long.toString(fileData.getSeqnum());
         byte[] payload = fileData.getContent().toByteArray();
         rh.update(userName, fileName, seqID, payload);
+        return true;
     }
 
     //TODO: Move to client - wrote here for testing purposes
