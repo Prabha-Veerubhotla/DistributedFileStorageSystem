@@ -137,19 +137,6 @@ public class SlaveNode extends RouteServerImpl {
         logger.info("delete status: " + status);
         return status;
     }
-
-
-    public static boolean search(FileInfo fileInfo) {
-        logger.info("Searching for file: " + fileInfo.getFilename().getFilename() + " in DB.");
-        return new MasterMetaData().checkIfFileExists(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
-
-    }
-
-    public static String list(UserInfo userInfo) {
-        //TODO: implement list of files from db here
-        logger.info("Listing files for user: " + userInfo.getUsername() + " in DB.");
-        return new MasterMetaData().getAllFiles(userInfo.getUsername()).toString();
-    }
 }
 
 

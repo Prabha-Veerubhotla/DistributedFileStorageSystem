@@ -10,7 +10,6 @@ import java.util.Properties;
 import java.lang.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
@@ -187,7 +186,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     }
                     ackStreamObserver.onCompleted();
 
-
                     logger.info("putting metadata of file, slave in master");
                     logger.info("username: "+username);
                     logger.info("filepath: "+filepath);
@@ -242,30 +240,27 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         ch1.shutdown();
     }
 
+    public static boolean search(FileInfo fileInfo) {
+        logger.info("Searching for file: " + fileInfo.getFilename().getFilename() + " in DB.");
+        return new MasterMetaData().checkIfFileExists(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+
+    }
+
     @Override
     public void searchFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
-        slaveIpThread();
         Ack.Builder ack = Ack.newBuilder();
-        boolean ackStatus;
+        boolean ackStatus = false;
         String ackMessage = "File is not present";
         if (isMaster) {
-            ackStatus = MasterNode.searchFileInServer(fileInfo);
+            ackStatus = search(fileInfo);
             if (ackStatus) {
-                ackMessage = "success";
-            }
-
-        } else {
-            ackStatus = SlaveNode.search(fileInfo);
-            if (ackStatus) {
-                ackMessage = "success";
+                ackMessage = "present";
             }
         }
         ack.setMessage(ackMessage);
         ack.setSuccess(ackStatus);
-
         ackStreamObserver.onNext(ack.build());
         ackStreamObserver.onCompleted();
-        ch1.shutdown();
     }
 
     @Override
@@ -296,20 +291,13 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void listFile(UserInfo userInfo, StreamObserver<FileResponse> fileResponseStreamObserver) {
-        slaveIpThread();
+        logger.info("Listing files for user: " + userInfo.getUsername());
         FileResponse.Builder fileResponse = FileResponse.newBuilder();
-
         if (isMaster) {
-            fileResponse.setFilename(MasterNode.listFilesInServer(userInfo));
-
-        } else {
-            fileResponse.setFilename(SlaveNode.list(userInfo));
-
+            fileResponse.setFilename(masterMetaData.getAllFiles(userInfo.getUsername()).toString());
         }
-
         fileResponseStreamObserver.onNext(fileResponse.build());
         fileResponseStreamObserver.onCompleted();
-        ch1.shutdown();
     }
 
 
@@ -379,15 +367,16 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void downloadFile(FileInfo fileInfo, StreamObserver<FileData> fileDataStreamObserver) {
-
-
         if (isMaster) {
             logger.info("creating channel -download");
             ch1 = slaveIpThread();
             ayncStub = FileServiceGrpc.newStub(ch1);
+            String username = fileInfo.getUsername().getUsername();
+            String filename = fileInfo.getFilename().getFilename();
             logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
             CountDownLatch cdl = new CountDownLatch(1);
             StreamObserver<FileData> fileDataStreamObserver1 = new StreamObserver<FileData>() {
+
                 @Override
                 public void onNext(FileData fileData) {
                     logger.info("received file data with seq num: " + fileData.getSeqnum());
@@ -410,8 +399,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     ch1.shutdown();
                 }
             };
+
+            List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
+            ch1 = MasterNode.createChannel(ips.get(0));
+            ayncStub = FileServiceGrpc.newStub(ch1);
             ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
-            //logger.info("content: "+ new String(result.getContent().toByteArray()));
             try {
                 cdl.await(3, TimeUnit.SECONDS);
             } catch (InterruptedException ie) {

@@ -90,6 +90,7 @@ public class RouteClient {
         if (searchFileInServer(filename)) {
             return "File already present";
         } else {
+            logger.info("file is not present. saving now");
             CountDownLatch cdl = new CountDownLatch(1);
             StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
@@ -181,6 +182,7 @@ public class RouteClient {
 
     public String deleteFileFromServer(String msg) {
         if(searchFileInServer(msg)) {
+            logger.info("file is present. deleting now");
             route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
             route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
             fileInfo.setFilename(fileResponse.build());
@@ -188,7 +190,7 @@ public class RouteClient {
             fileInfo.setUsername(userInfo.build());
 
             Ack ack = blockingStub.deleteFile(fileInfo.build());
-            return "success";
+            return "present";
         } return "File not present";
     }
 
@@ -227,7 +229,7 @@ public class RouteClient {
 
     public String updateFileInServer(String filename) {
         if (searchFileInServer(filename)) {
-
+            logger.info("file is present. updating now");
             CountDownLatch cdl = new CountDownLatch(1);
             StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
@@ -318,6 +320,20 @@ public class RouteClient {
 
     public File getFileFromServer(String filename) {
         File file = new File("output-"+filename);
+        //Create the file
+        try {
+            if (file.createNewFile()) {
+                logger.info("File: " + file + " is created!");
+            } else {
+                logger.info("File: " + file + " already exists.");
+            }} catch (IOException io) {
+            io.printStackTrace();;
+        }
+        if(!checkIfFile(filename)) {
+            logger.info("file not present. returning empty file");
+            return file;
+        }
+
         //Create the file
         try {
             if (file.createNewFile()) {

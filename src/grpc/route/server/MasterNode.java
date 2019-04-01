@@ -127,12 +127,6 @@ public class MasterNode extends RouteServerImpl {
         return ack.getSuccess();
     }
 
-    public static boolean searchFileInServer(FileInfo fileInfo) {
-        logger.info("searching file: " + fileInfo.getFilename().getFilename());
-        Ack ack = blockingStub.searchFile(fileInfo);
-        return ack.getSuccess();
-    }
-
     public static String listFilesInServer(UserInfo userInfo) {
         logger.info("listing files of user : " + userInfo.getUsername());
         FileResponse fileResponse = blockingStub.listFile(userInfo);
