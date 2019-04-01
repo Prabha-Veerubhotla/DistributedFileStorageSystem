@@ -42,7 +42,7 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
-    //Method for round robin IP - Sharding data among 3 Slaves
+    //Method for round robin IP  among 3 Slaves
     public synchronized static String roundRobinIP(){
         currentIP = slaveip.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;

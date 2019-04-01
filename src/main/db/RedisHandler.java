@@ -18,6 +18,7 @@ public class RedisHandler {
     public static JedisPool redisPool;
     public static final int MAX_POOL_SIZE = 100;
     public static final String HOST_NAME = "localhost";
+    private static boolean FIRST_UPDATE_CALL = true;
 
     public synchronized Jedis getPoolConnection() {
         logger.info("Setting Redis Pool");
@@ -166,16 +167,12 @@ public class RedisHandler {
         return true;
     }
 
-    //TODO: Implement update file
-    public boolean update(@NotNull String userName, @NotNull String fileName, String seqID, byte[] content) {
-        Map<String, Map<String, byte[]>> tempMap = getFilesMap(userName);
-        if(tempMap == null || tempMap.isEmpty() || !tempMap.containsKey(fileName)){
-            return false;
+    public void update(@NotNull String userName, @NotNull String fileName, String seqID, byte[] content) {
+        if(FIRST_UPDATE_CALL){
+            remove(userName, fileName);
+            FIRST_UPDATE_CALL = false;
         }
-        Map<String, byte[]> newdata = new HashMap<>();
-        newdata.put(seqID, content);
-        redisConnector.set(serialize(userName), serialize(tempMap));
-        return true;
+        put(userName, fileName, seqID, content);
     }
 
 }

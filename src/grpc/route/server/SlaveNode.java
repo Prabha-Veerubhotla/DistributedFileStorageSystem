@@ -43,7 +43,6 @@ public class SlaveNode extends RouteServerImpl {
         String seqID = Long.toString(r.getSeq());
         String fileName = getFileName(r.getPath());
         logger.info("Put details: "+ userName +" " + " "+ fileName + " "+ seqID);
-        //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName, fileName, seqID, payload);
         return true;
     }
@@ -94,6 +93,18 @@ public class SlaveNode extends RouteServerImpl {
         logger.info("deleting file " + fileName + "from Mongo.");
         mh.remove(userName, fileName);
         return status;
+    }
+
+    /**
+     * update file contents
+     * @param r
+     */
+    public static void update(Route r){
+        String userName = r.getUsername();
+        String fileName = getFileName(r.getPath());
+        String seqID = Long.toString(r.getSeq());
+        byte[] payload = r.getPayload().toByteArray();
+        rh.update(userName, fileName, seqID, payload);
     }
 
     //TODO: Move to client - wrote here for testing purposes
@@ -203,11 +214,11 @@ public class SlaveNode extends RouteServerImpl {
     }
 
 
-//    @SuppressWarnings("unchecked")
-//    public static void main(String[] args) {
+    @SuppressWarnings("unchecked")
+    public static void main(String[] args) {
 //        String filePath = "temp.jpg";
-//        String userName = "N";
-//        long seq = 0l;
+//        String userName = "prabha";
+////        long seq = 0l;
 //        try{
 //            FileInputStream fis = new FileInputStream(filePath);
 //            int i = 0;
@@ -221,7 +232,7 @@ public class SlaveNode extends RouteServerImpl {
 //            } while (i != -1);
 //            byte[] payload = null;
 //            Map<String, byte[]> res = rh.get(userName, filePath);
-//
+
 //            byte[] temp = combineBytes(res);
 //            BufferedOutputStream bw = null;
 //            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.jpg"));
@@ -232,7 +243,7 @@ public class SlaveNode extends RouteServerImpl {
 //            mh.put(userName, new FileEntity(filePath, res));
 //            FileEntity mongoDBres = mh.get(userName, filePath);
 //            Map<String, byte[]> r = (Map<String, byte[]>)mongoDBres.getFileContents();
-//            temp = combineBytes(res);
+//            byte[] temp = combineBytes(r);
 //            bw = null;
 //            bw = new BufferedOutputStream(new FileOutputStream("tempMongo.jpg"));
 //            bw.write(temp);
@@ -241,7 +252,7 @@ public class SlaveNode extends RouteServerImpl {
 //        } catch (Exception e) {
 //            e.printStackTrace();
 //        }
-//    }
+    }
 }
 // v2: 4. maintain a in memory, cache
 
