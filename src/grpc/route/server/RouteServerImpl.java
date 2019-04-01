@@ -359,7 +359,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     ackStreamObserver.onCompleted();
                     ch1.shutdown();
                 } else {
-                    if (SlaveNode.put(username, filepath)) {
+                    if (SlaveNode.updateMongo(username, filepath)) {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());

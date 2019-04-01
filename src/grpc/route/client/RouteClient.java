@@ -190,7 +190,11 @@ public class RouteClient {
             fileInfo.setUsername(userInfo.build());
 
             Ack ack = blockingStub.deleteFile(fileInfo.build());
-            return "present";
+            if(ack.getSuccess()) {
+                return "present";
+            } else {
+                return "unable to delete file";
+            }
         } return "File not present";
     }
 
@@ -315,7 +319,7 @@ public class RouteClient {
                 return "success";
             }
         }
-        return "Unable to save file";
+        return "Unable to update file";
     }
 
     public File getFileFromServer(String filename) {

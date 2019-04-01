@@ -63,7 +63,7 @@ public class SlaveNode extends RouteServerImpl {
     /**
      * retrieve a file. If file is not in Redis fetch from MongoDB
      *
-     * @param r
+     * @param fileInfo
      * @return
      */
     public static FileEntity get(FileInfo fileInfo) {
@@ -82,7 +82,7 @@ public class SlaveNode extends RouteServerImpl {
     /**
      * update file contents
      *
-     * @param r
+     * @param fileData
      */
     public static boolean update(FileData fileData) {
         String userName = fileData.getUsername().getUsername();
@@ -91,6 +91,16 @@ public class SlaveNode extends RouteServerImpl {
         byte[] payload = fileData.getContent().toByteArray();
         rh.update(userName, fileName, seqID, payload);
         return true;
+    }
+
+    public static boolean updateMongo(String username, String filePath) {
+        String fileName = getFileName(filePath);
+        Map<String, byte[]> result = rh.get(username, fileName);
+        FileEntity fileEntity;
+
+            fileEntity = new FileEntity(fileName, result);
+
+        return mh.update(username, fileEntity);
     }
 
     //TODO: Move to client - wrote here for testing purposes

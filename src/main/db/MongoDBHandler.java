@@ -106,12 +106,12 @@ public class MongoDBHandler implements DbHandler {
     }
 
     @Override
-    public FileEntity update(@NotNull String email, @NotNull FileEntity file){
+    public boolean update(@NotNull String email, @NotNull FileEntity file){
         logger.info("Inside UPDATE mongo handler");
         BasicDBObject query = new BasicDBObject("personEmail", email).append("allData.fileName", file.getFileName());
         BasicDBObject update = new BasicDBObject();
         update.put("allData.$.value", file.getFileContents());
         collection.updateOne(query, new BasicDBObject("$set", update));
-        return file;
+        return true;
     }
 }
