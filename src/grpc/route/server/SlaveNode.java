@@ -79,6 +79,18 @@ public class SlaveNode extends RouteServerImpl {
     }
 
 
+    /**
+     * update file contents
+     * @param r
+     */
+    public static void update(FileData fileData){
+        String userName = fileData.getUsername().getUsername();
+        String fileName = getFileName(fileData.getFilename().getFilename());
+        String seqID = Long.toString(fileData.getSeqnum());
+        byte[] payload = fileData.getContent().toByteArray();
+        rh.update(userName, fileName, seqID, payload);
+    }
+
     //TODO: Move to client - wrote here for testing purposes
     @SuppressWarnings("unchecked")
     public static byte[] combineBytes(Map<String, byte[]> res) {
@@ -265,6 +277,47 @@ public class SlaveNode extends RouteServerImpl {
             e.printStackTrace();
         }
     }
+    @SuppressWarnings("unchecked")
+    public static void main(String[] args) {
+//        String filePath = "temp.jpg";
+//        String userName = "prabha";
+////        long seq = 0l;
+//        try{
+//            FileInputStream fis = new FileInputStream(filePath);
+//            int i = 0;
+//            do {
+//                byte[] buf = new byte[1024];
+//                i = fis.read(buf);
+//                if (i != -1 ) {
+//                    rh.put(userName, filePath, Long.toString(seq), buf);
+//                }
+//                seq++;
+//            } while (i != -1);
+//            byte[] payload = null;
+//            Map<String, byte[]> res = rh.get(userName, filePath);
+
+//            byte[] temp = combineBytes(res);
+//            BufferedOutputStream bw = null;
+//            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.jpg"));
+//            bw.write(temp);
+//            bw.flush();
+//            bw.close();
+//            logger.info("Putting into DB");
+//            mh.put(userName, new FileEntity(filePath, res));
+//            FileEntity mongoDBres = mh.get(userName, filePath);
+//            Map<String, byte[]> r = (Map<String, byte[]>)mongoDBres.getFileContents();
+//            byte[] temp = combineBytes(r);
+//            bw = null;
+//            bw = new BufferedOutputStream(new FileOutputStream("tempMongo.jpg"));
+//            bw.write(temp);
+//            bw.flush();
+//            bw.close();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+    }
+}
+// v2: 4. maintain a in memory, cache
 
  v2: 4. maintain a in memory, cache
 
