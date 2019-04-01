@@ -6,11 +6,14 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
 import route.*;
+import sun.reflect.FieldInfo;
 
 
 /**
@@ -178,6 +181,7 @@ public class RouteClient {
     }
 
     public boolean searchFileInServer(String msg) {
+        logger.info("searching file in server");
         route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
         route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
         fileInfo.setFilename(fileResponse.build());
@@ -290,4 +294,55 @@ public class RouteClient {
         return "Unable to save file";
     }
 
+    public File getFileFromServer(String filename) {
+        File file = new File("output-"+filename);
+        //Create the file
+        try {
+            if (file.createNewFile()) {
+                logger.info("File: " + file + " is created!");
+            } else {
+                logger.info("File: " + file + " already exists.");
+            }
+            RandomAccessFile f = new RandomAccessFile(file, "rw");
+
+            CountDownLatch cdl = new CountDownLatch(1);
+            StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+                @Override
+                public void onNext(FileData fileData) {
+                    // write into the file , every chunk received from master
+                    try {
+                        logger.info(new String(fileData.getContent().toByteArray()));
+
+                        logger.info("writing seq num: " + fileData.getSeqnum()+" into file");
+                        f.write(fileData.getContent().toByteArray());
+                    } catch (IOException ie) {
+                        ie.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    logger.info("Exception in the response from server: " + throwable);
+                    cdl.countDown();
+                }
+
+                @Override
+                public void onCompleted() {
+                    try {
+                        f.close();
+                    } catch (IOException ie) {
+                        ie.printStackTrace();
+                    }
+                    cdl.countDown();
+                }
+            };
+            FileInfo.Builder fileInfo = FileInfo.newBuilder();
+            fileInfo.setFilename(FileResponse.newBuilder().setFilename(filename).build());
+            fileInfo.setUsername(UserInfo.newBuilder().setUsername(name).build());
+            asyncStub.downloadFile(fileInfo.build(), fileDataStreamObserver);
+        } catch (IOException io) {
+            io.printStackTrace();
+        }
+        return file;
+    }
 }

@@ -1,5 +1,6 @@
 package grpc.route.server;
 
+import com.google.protobuf.ByteString;
 import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,11 +8,16 @@ import route.FileData;
 import route.FileInfo;
 import route.UserInfo;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.*;
-
 
 public class SlaveNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-slave");
+    private static long seq = 01;
+    static final int blen = 10024;
+    static int currentOffset = 0;
 
     /**
      *
@@ -25,8 +31,8 @@ public class SlaveNode extends RouteServerImpl {
     /**
      * put in Redis
      *
-     * @param r route
-     * @return
+     * @param fileData
+     * @return boolean
      */
     public static boolean put(FileData fileData) {
         UserInfo userName = fileData.getUsername();
@@ -54,7 +60,6 @@ public class SlaveNode extends RouteServerImpl {
         mh.put(userName, new FileEntity(fileName, res));
         return true;
     }
-
     //TODO: Handle cache miss
 
     /**
@@ -63,36 +68,18 @@ public class SlaveNode extends RouteServerImpl {
      * @param r
      * @return
      */
-    /*public static FileEntity get(Route r) {
+    public static FileEntity get(FileInfo fileInfo) {
         logger.info("SlaveNode.GET");
-        String userName = r.getUsername();
-        String fileName = getFileName(r.getPath());
+        String userName = fileInfo.getUsername().getUsername();
+        String fileName = getFileName(fileInfo.getFilename().getFilename());
         logger.info("retrieving information of: " + fileName);
-        String name = r.getUsername();
-        Map<String, byte[]> result = rh.get(name, fileName);
+        Map<String, byte[]> result = rh.get(userName, fileName);
         if (result != null) {
             return new FileEntity(fileName, result);
         }
         return mh.get(userName, fileName);
-    }*/
+    }
 
-    /**
-     * delete a file
-     *
-     * @param r route coming from somewhere
-     * @return /*
-     *//*
-    public static boolean delete(Route r) {
-        boolean status = false;
-        String userName = r.getUsername();
-        String fileName = getFileName(r.getPath());
-        logger.info("deleting file " + fileName + " from Redis.");
-        status = rh.remove(userName, fileName);
-        logger.info("deleting file " + fileName + " from Mongo.");
-        mh.remove(userName, fileName);
-        logger.info("delete status: " + status);
-        return status;
-    }*/
 
     //TODO: Move to client - wrote here for testing purposes
     @SuppressWarnings("unchecked")
@@ -119,8 +106,16 @@ public class SlaveNode extends RouteServerImpl {
         return b;
     }
 
+
+    /**
+     * delete a file
+     *
+     * @param fileInfo coming from somewhere
+     * @return boolean
+     */
+
     public static boolean delete(FileInfo fileInfo) {
-        boolean status = false;
+        boolean status;
         String userName = fileInfo.getUsername().getUsername();
         String fileName = getFileName(fileInfo.getFilename().getFilename());
         logger.info("deleting file " + fileName + " from Redis.");
@@ -134,12 +129,51 @@ public class SlaveNode extends RouteServerImpl {
 
     public static boolean search(FileInfo fileInfo) {
         //TODO: implement search from db here
+        logger.info("Searching for file: " + fileInfo.getFilename().getFilename() + " in DB.");
         return true;
     }
 
     public static String list(UserInfo userInfo) {
         //TODO: implement list of files from db here
+        logger.info("Listing files for user: " + userInfo.getUsername() + " in DB.");
         return "blank";
+    }
+
+    public static FileData getFileFromServer(FileInfo fileInfo) {
+        FileData.Builder fileData = FileData.newBuilder();
+        FileEntity fileEntity = get(fileInfo);
+        File fn = new File(fileEntity.getFileName());
+        FileInputStream fis;
+        try {
+            fis = new FileInputStream(fn);
+
+            byte[] raw = new byte[blen];
+            boolean done = false;
+
+                int n = fis.read(raw, currentOffset, blen);
+                if(n<=0) {
+                    fileData.setContent(ByteString.copyFrom("no data to return".getBytes()));
+                    return fileData.build();
+                } else {
+                    logger.info("n: " + n);
+                    // identifying sequence number
+                    seq++;
+                    fileData.setContent(ByteString.copyFrom(raw));
+                    logger.info("content: " + new String(fileData.getContent().toByteArray()));
+                    currentOffset = blen+1;
+
+                }
+        } catch (IOException fe) {
+            fe.printStackTrace();
+        }
+
+        fileData.setUsername(fileInfo.getUsername());
+        fileData.setFilename(fileInfo.getFilename());
+        fileData.setSeqnum(seq);
+
+        return fileData.build();
+
+
     }
 
 

@@ -1,13 +1,12 @@
 package grpc.route.server;
 
-
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
+
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -15,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2346";
+    static String slave1port = "2345";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
@@ -23,6 +22,8 @@ public class MasterNode extends RouteServerImpl {
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
+    private static boolean ackStatus;
+    private static FileData result;
 
 
     public static void assignSlaveIp(List<String> slaveiplist) {
@@ -52,7 +53,6 @@ public class MasterNode extends RouteServerImpl {
     public static boolean streamFileToServer(FileData fileData, boolean complete) {
         CountDownLatch cdl = new CountDownLatch(1);
         StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
-            boolean ackStatus;
 
             @Override
             public void onNext(Ack ack) {
@@ -119,7 +119,7 @@ public class MasterNode extends RouteServerImpl {
     }
 
     public static boolean searchFileInServer(FileInfo fileInfo) {
-        logger.info("deleting file: " + fileInfo.getFilename().getFilename());
+        logger.info("searching file: " + fileInfo.getFilename().getFilename());
         Ack ack = blockingStub.searchFile(fileInfo);
         return ack.getSuccess();
     }
@@ -128,6 +128,49 @@ public class MasterNode extends RouteServerImpl {
         logger.info("listing files of user : " + userInfo.getUsername());
         FileResponse fileResponse = blockingStub.listFile(userInfo);
         return fileResponse.getFilename();
+    }
+
+    public static FileData getFileFromServer(FileInfo fileInfo) {
+        logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
+        CountDownLatch cdl = new CountDownLatch(1);
+        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+            @Override
+            public void onNext(FileData fileData) {
+                logger.info("received file data with seq num: " + fileData.getSeqnum());
+                result = fileData;
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the response from server: " + throwable);
+                cdl.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("Slave is done sending data");
+                cdl.countDown();
+            }
+        };
+        ayncStub.downloadFile(fileInfo, fileDataStreamObserver);
+
+        try {
+            cdl.await(3, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            logger.info("Exception while waiting for count down latch: " + ie);
+        }
+
+        logger.info("content: "+ new String(result.getContent().toByteArray()));
+
+        while(new String(result.getContent().toByteArray()).equalsIgnoreCase("")) {
+            try {
+                logger.info("waiting");
+                Thread.sleep(1000);
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            }
+        }
+        return result;
     }
 
 

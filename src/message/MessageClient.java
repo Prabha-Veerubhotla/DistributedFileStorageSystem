@@ -37,11 +37,11 @@ public class MessageClient {
             } else if (choice.equalsIgnoreCase("get")) {
                 System.out.print("Enter file name to retrieve: ");
                 String msg = br.readLine();
-                File f = new File("sample.txt"); //= rc.download(msg);
+                File f = rc.getFileFromServer(msg);
                 System.out.println("Retrieved file: " + f);
             } else if (choice.equalsIgnoreCase("list")) {
                 String list = rc.listFilesInServer(clientname);
-                if( list!= null) {
+                if (list != null) {
                     System.out.println(list);
                 } else {
                     System.out.println("No files saved from this user: " + clientname);
@@ -60,19 +60,16 @@ public class MessageClient {
                 String msg = br.readLine();
                 String updateStatus = rc.updateFileInServer(msg);
                 System.out.println(updateStatus);
-            } else if(choice.equalsIgnoreCase("search")) {
+            } else if (choice.equalsIgnoreCase("search")) {
                 System.out.print("Enter file name to update: ");
                 String msg = br.readLine();
                 boolean searchResult = rc.searchFileInServer(msg);
-                if(searchResult) {
-                    System.out.println("File "+ msg+ " is present. Enter put and file name to save it");
+                if (searchResult) {
+                    System.out.println("File " + msg + " is present. Enter get and file name to retrieve it");
                 } else {
-                    System.out.println("File: "+msg+" is not present in the server");
+                    System.out.println("File: " + msg + " is not present in the server. Enter put and file name to save it");
                 }
-
-            }
-            else {
-
+            } else {
                 // if the choice is not one of the above options { get, put, list, delete }
                 // the default is put
                 rc.streamFileToServer(choice);

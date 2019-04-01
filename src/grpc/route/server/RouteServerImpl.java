@@ -321,5 +321,20 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         return fileDataStreamObserver;
     }
 
+    @Override
+    public void downloadFile(FileInfo fileInfo, StreamObserver<FileData> fileDataStreamObserver) {
+        FileData fileData;
+        if(isMaster) {
+            fileData = MasterNode.getFileFromServer(fileInfo);
+        } else {
+            fileData = SlaveNode.getFileFromServer(fileInfo);
+        }
+        logger.info("sending data");
+        fileDataStreamObserver.onNext(fileData);
+        logger.info("calling on completed");
+        fileDataStreamObserver.onCompleted();
+
+    }
+
 
 }
