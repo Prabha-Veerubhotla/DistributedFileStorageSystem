@@ -43,7 +43,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static ManagedChannel ch1;
-    private static MasterMetaData masterMetaData;
+    private static MasterMetaData masterMetaData = new MasterMetaData();
 
 
     public void getSlaveIpList() {
@@ -131,6 +131,13 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     }
 
 
+    public static String getFileName(String filePath) {
+        String[] tokens = filePath.split("/");
+        String fileName = tokens[tokens.length - 1];
+        return fileName;
+    }
+
+
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
         if(isMaster) {
@@ -184,7 +191,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     ackStreamObserver.onCompleted();
 
                     logger.info("putting metadata of file, slave in master");
-                    masterMetaData.putMetaData(username, filepath,slave1);
+                    logger.info("username: "+username);
+                    logger.info("filepath: "+filepath);
+                    logger.info("ip: "+ slave1);
+                    logger.info("file name: "+getFileName(filepath));
+                    masterMetaData.putMetaData(username, getFileName(filepath),slave1);
                     logger.info("channel is shutitng down");
                     ch1.shutdown();
 
