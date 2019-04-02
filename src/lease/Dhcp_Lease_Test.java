@@ -35,6 +35,7 @@ public class Dhcp_Lease_Test {
 
     public void compareAndUpdate() {
         logger.info("Comparing and Updating list of all the current nodes in the network");
+        logger.info("new ip list: "+newIpList.toString());
         Set<String> set = new HashSet<>();
         for (String old : oldIpList) {
             set.add(old);
@@ -105,8 +106,8 @@ public class Dhcp_Lease_Test {
                     //TODO: replace the command with relative path or use root dir
                     Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                     BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
-
-
+                    newIpList.clear();
+                    logger.info("old ip list: "+newIpList.toString());
                     String output = null;
                     while ((output = reader1.readLine()) != null) {
                         newIpList.add(output);

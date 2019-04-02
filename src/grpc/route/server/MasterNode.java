@@ -28,11 +28,15 @@ public class MasterNode extends RouteServerImpl {
     private static boolean done = false;
 
 
-    public static void assignSlaveIp(List<String> slaveiplist) {
+    public static String assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        slave1 = slaveip.get(0);
+        if(slaveiplist.size() != 0) {
+            slave1 = slaveip.get(0);
+        } else {
+            slave1 = "localhost";
+        }
+        return slave1;
         //slave1 = "localhost"; // local testing
-
         //TODO: create channels for all the slaves
 
     }
@@ -44,11 +48,14 @@ public class MasterNode extends RouteServerImpl {
         return currentIP;
     }
 
-    public static void createChannel() {
+    public static ManagedChannel createChannel(String slave1) {
         logger.info("creating channel for slave");
+        logger.info("slave 1 ip is: "+slave1);
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         ayncStub = FileServiceGrpc.newStub(ch);
+        logger.info("creating async stub ");
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
+        return ch;
     }
 
 
@@ -94,6 +101,48 @@ public class MasterNode extends RouteServerImpl {
         return ackStatus;
     }
 
+    public static boolean updateFileToServer(FileData fileData, boolean complete) {
+        CountDownLatch cdl = new CountDownLatch(1);
+        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+            @Override
+            public void onNext(Ack ack) {
+                ackStatus = ack.getSuccess();
+                logger.info("Received ack status from the server: " + ack.getSuccess());
+                logger.info("Received ack  message from the server: " + ack.getMessage());
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the response from server: " + throwable);
+                cdl.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("Server is done sending data");
+                cdl.countDown();
+            }
+        };
+
+        StreamObserver<FileData> fileDataStreamObserver = ayncStub.updateFile(ackStreamObserver);
+
+        if (complete) {
+            fileDataStreamObserver.onNext(fileData);
+            logger.info("sending completed to slave");
+            fileDataStreamObserver.onCompleted();
+        } else {
+            fileDataStreamObserver.onNext(fileData);
+            logger.info("sent data with seq num:  "+fileData.getSeqnum()+" to slave");
+        }
+        try {
+            cdl.await(3, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            logger.info("Exception while waiting for count down latch: " + ie);
+        }
+        return ackStatus;
+    }
+
 
     public static String sendIpToNode(Map<String, List<String>> map, List<String> ipList) {
         //TODO: modify to accommodate client or slave ip
@@ -117,12 +166,6 @@ public class MasterNode extends RouteServerImpl {
     public static boolean deleteFileFromServer(FileInfo fileInfo) {
         logger.info("deleting file: " + fileInfo.getFilename().getFilename());
         Ack ack = blockingStub.deleteFile(fileInfo);
-        return ack.getSuccess();
-    }
-
-    public static boolean searchFileInServer(FileInfo fileInfo) {
-        logger.info("searching file: " + fileInfo.getFilename().getFilename());
-        Ack ack = blockingStub.searchFile(fileInfo);
         return ack.getSuccess();
     }
 

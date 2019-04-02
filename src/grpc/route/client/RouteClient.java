@@ -90,6 +90,7 @@ public class RouteClient {
         if (searchFileInServer(filename)) {
             return "File already present";
         } else {
+            logger.info("file is not present. saving now");
             CountDownLatch cdl = new CountDownLatch(1);
             StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
@@ -181,6 +182,7 @@ public class RouteClient {
 
     public String deleteFileFromServer(String msg) {
         if(searchFileInServer(msg)) {
+            logger.info("file is present. deleting now");
             route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
             route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
             fileInfo.setFilename(fileResponse.build());
@@ -188,7 +190,11 @@ public class RouteClient {
             fileInfo.setUsername(userInfo.build());
 
             Ack ack = blockingStub.deleteFile(fileInfo.build());
-            return "success";
+            if(ack.getSuccess()) {
+                return "present";
+            } else {
+                return "unable to delete file";
+            }
         } return "File not present";
     }
 
@@ -227,7 +233,7 @@ public class RouteClient {
 
     public String updateFileInServer(String filename) {
         if (searchFileInServer(filename)) {
-
+            logger.info("file is present. updating now");
             CountDownLatch cdl = new CountDownLatch(1);
             StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
@@ -313,7 +319,7 @@ public class RouteClient {
                 return "success";
             }
         }
-        return "Unable to save file";
+        return "Unable to update file";
     }
 
     public File getFileFromServer(String filename) {
@@ -325,6 +331,10 @@ public class RouteClient {
             } else {
                 logger.info("File: " + file + " already exists.");
             }
+        if(!checkIfFile(filename)) {
+            logger.info("file not present. returning empty file");
+            return file;
+        }
             RandomAccessFile f = new RandomAccessFile(file, "rw");
 
             CountDownLatch cdl = new CountDownLatch(1);

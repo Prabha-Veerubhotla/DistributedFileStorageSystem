@@ -11,7 +11,7 @@ public interface DbHandler {
 
     void remove(@NotNull String email, @NotNull String fileName);
 
-    FileEntity update(@NotNull String email, @NotNull FileEntity newFile);
+    boolean update(@NotNull String email, @NotNull FileEntity newFile);
 
     Logger logger = Logger.getLogger(DbHandler.class.getName());
 

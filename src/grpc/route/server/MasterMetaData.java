@@ -92,6 +92,9 @@ public class MasterMetaData {
     }
 
     public boolean putMetaData(String userName, String fileName, String IP) {
+        logger.info("username: "+userName);
+        logger.info("filename: "+fileName);
+        logger.info("ip: "+ IP);
         byte[] userNameByte = serialize(userName);
         try {
             if (redisConnector.exists(userNameByte)) {
@@ -207,9 +210,7 @@ public class MasterMetaData {
         }
     }
 
-    public List<String> updateMetaData(String userName, String fileName){
-        return getMetaData(userName, fileName);
-    }
+
 
 //    public static void main(String[] args){
 //        MasterMetaData md = new MasterMetaData();

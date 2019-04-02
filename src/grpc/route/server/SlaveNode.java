@@ -63,7 +63,7 @@ public class SlaveNode extends RouteServerImpl {
     /**
      * retrieve a file. If file is not in Redis fetch from MongoDB
      *
-     * @param r
+     * @param fileInfo
      * @return
      */
     public static FileEntity get(FileInfo fileInfo) {
@@ -72,7 +72,9 @@ public class SlaveNode extends RouteServerImpl {
         String fileName = getFileName(fileInfo.getFilename().getFilename());
         logger.info("retrieving information of: " + fileName);
         Map<String, byte[]> result = rh.get(userName, fileName);
+        logger.info("Result ---> " + result);
         if (result != null) {
+            logger.info("File found in redis!");
             return new FileEntity(fileName, result);
         }
         return mh.get(userName, fileName);
@@ -81,40 +83,27 @@ public class SlaveNode extends RouteServerImpl {
 
     /**
      * update file contents
-     * @param r
+     *
+     * @param fileData
      */
-    public static void update(FileData fileData){
+    public static boolean update(FileData fileData) {
         String userName = fileData.getUsername().getUsername();
         String fileName = getFileName(fileData.getFilename().getFilename());
         String seqID = Long.toString(fileData.getSeqnum());
         byte[] payload = fileData.getContent().toByteArray();
         rh.update(userName, fileName, seqID, payload);
+        return true;
     }
 
-    //TODO: Move to client - wrote here for testing purposes
-    @SuppressWarnings("unchecked")
-    public static byte[] combineBytes(Map<String, byte[]> res) {
-        List<String> sortedKeys = new ArrayList(res.keySet());
-        sortedKeys.sort(Comparator.comparingInt(Integer::parseInt));
-        List<byte[]> allbytes = new ArrayList<>();
-        for (String sortedKey : sortedKeys) {
-            allbytes.add(res.get(sortedKey));
-        }
-        logger.info("Total Size: " + allbytes.size());
-        List<Byte> allData = new ArrayList<>();
-        for (byte[] allbyte : allbytes) {
-            for (byte anAllbyte : allbyte) {
-                allData.add(anAllbyte);
-            }
-        }
-
-        byte[] b = new byte[allData.size()];
-        for (int i = 0; i < allData.size(); i++) {
-            b[i] = allData.get(i);
-        }
-        logger.info("Total BSize: " + b.length);
-        return b;
+    public static boolean updateMongo(String username, String filePath) {
+        logger.info("Inside slave updateMongo");
+        String fileName = getFileName(filePath);
+        Map<String, byte[]> result = rh.get(username, fileName);
+        FileEntity fileEntity;
+        fileEntity = new FileEntity(fileName, result);
+        return mh.update(username, fileEntity);
     }
+
 
 
     /**
@@ -135,149 +124,15 @@ public class SlaveNode extends RouteServerImpl {
         logger.info("delete status: " + status);
         return status;
     }
-
-
-    public static boolean search(FileInfo fileInfo) {
-        //TODO: implement search from db here
-        logger.info("Searching for file: " + fileInfo.getFilename().getFilename() + " in DB.");
-        return false;
-    }
-
-    public static String list(UserInfo userInfo) {
-        //TODO: implement list of files from db here
-        logger.info("Listing files for user: " + userInfo.getUsername() + " in DB.");
-        return "blank";
-    }
-
-
-
-
-
-
-    //return file in chunks to the master
-    /*public static void returnFileInchunks(Route r) {
-        logger.info("returnFileInchunks");
-        ch = ManagedChannelBuilder.forAddress(r.getOrigin(), Integer.parseInt("2345")).usePlaintext(true).build();
-        stub = RouteServiceGrpc.newStub(ch);
-        CountDownLatch latch = new CountDownLatch(1);
-        StreamObserver<Route> requestObserver = stub.request(new StreamObserver<Route>() {
-            //handle response from server here
-            @Override
-            public void onNext(Route route) {
-                logger.info("returnFileInchunks: Received response from master: " + route.getPayload());
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("returnFileInchunks:Exception in the response from master: " + throwable);
-                latch.countDown();
-            }
-
-            @Override
-            public void onCompleted() {
-                logger.info("returnFileInchunks: Server is done sending data");
-                latch.countDown();
-            }
-        });
-        try {
-            latch.await(3, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-            logger.info("Exception while waiting for count down latch: " + ie);
-        }
-        logger.info("Streaming file: " + new String(r.getPayload().toByteArray()));
-        FileEntity fileEntity = get(r);
-        File fn = new File(fileEntity.getFileName());
-        FileInputStream fis = null;
-        try {
-            fis = new FileInputStream(fn);
-            long seq = 0l;
-            final int blen = 10024;
-            byte[] raw = new byte[blen];
-            boolean done = false;
-            while (!done) {
-                int n = fis.read(raw, 0, blen);
-                if (n <= 0)
-                    break;
-                System.out.println("n: " + n);
-                // identifying sequence number
-                seq++;
-
-                route.Route.Builder builder = Route.newBuilder();
-                builder.setPath(r.getPath());
-                builder.setPayload(ByteString.copyFrom(raw, 0, n));
-                builder.setOrigin(r.getDestination());
-                builder.setDestination(r.getOrigin());
-                builder.setSeq(seq);
-                builder.setType(r.getType());
-                logger.info("Sending file data to master with seq num: " + seq);
-                requestObserver.onNext(builder.build());
-            }
-        } catch (IOException e) {
-            ; // ignore? really? ...yes
-            requestObserver.onError(e);
-        } finally {
-            try {
-                fis.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        route.Route.Builder builder = Route.newBuilder();
-        builder.setPath(r.getPath());
-        builder.setPayload(ByteString.copyFrom("complete".getBytes()));
-        builder.setOrigin(r.getDestination());
-        builder.setDestination(r.getOrigin());
-        builder.setSeq(0);
-        builder.setType("get-complete");
-        logger.info("Sending complete message to master");
-        requestObserver.onNext(builder.build());
-
-        requestObserver.onCompleted();
-    }*/
 }
 
 
-/*
-    @SuppressWarnings("unchecked")
-    public static void main(String[] args) {
-        String filePath = "temp.jpg";
-        String userName = "N";
-        long seq = 0l;
-        try{
-            FileInputStream fis = new FileInputStream(filePath);
-            int i = 0;
-            do {
-                byte[] buf = new byte[1024];
-                i = fis.read(buf);
-                if (i != -1 ) {
-                    rh.put(userName, filePath, Long.toString(seq), buf);
-                }
-                seq++;
-            } while (i != -1);
-            byte[] payload = null;
-            Map<String, byte[]> res = rh.get(userName, filePath);
 
-            byte[] temp = combineBytes(res);
-            BufferedOutputStream bw = null;
-            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.jpg"));
-            bw.write(temp);
-            bw.flush();
-            bw.close();
-            logger.info("Putting into DB");
-            mh.put(userName, new FileEntity(filePath, res));
-            FileEntity mongoDBres = mh.get(userName, filePath);
-            Map<String, byte[]> r = (Map<String, byte[]>)mongoDBres.getFileContents();
-            temp = combineBytes(res);
-            bw = null;
-            bw = new BufferedOutputStream(new FileOutputStream("tempMongo.jpg"));
-            bw.write(temp);
-            bw.flush();
-            bw.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+
+
+/*
     }
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     public static void main(String[] args) {
 //        String filePath = "temp.jpg";
 //        String userName = "prabha";

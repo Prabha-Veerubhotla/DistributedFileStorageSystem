@@ -47,6 +47,7 @@ public class MongoDBHandler implements DbHandler {
 
     @Override
     public String put(String userEmail, FileEntity file) {
+        logger.info("Inside PUT mongo handler");
         logger.info("userEmail: " + userEmail);
         try {
             BasicDBObject findQuery = new BasicDBObject("personEmail", userEmail);
@@ -73,6 +74,7 @@ public class MongoDBHandler implements DbHandler {
 
     @Override
     public FileEntity get(@NotNull String email, @NotNull String fileName){
+        logger.info("Inside GET mongo handler");
         try {
             BasicDBObject elementQuery = new BasicDBObject("fileName", fileName);
             BasicDBObject query = new BasicDBObject("allData", new BasicDBObject("$elemMatch", elementQuery));
@@ -97,17 +99,19 @@ public class MongoDBHandler implements DbHandler {
 
     @Override
     public void remove(@NotNull String email, @NotNull String fileName){
+        logger.info("Inside REMOVE mongo handler");
         BasicDBObject query = new BasicDBObject("personEmail", email);
         BasicDBObject update = new BasicDBObject("allData", new BasicDBObject("fileName", fileName));
         collection.updateOne(query, new BasicDBObject("$pull", update));
     }
 
     @Override
-    public FileEntity update(@NotNull String email, @NotNull FileEntity file){
+    public boolean update(@NotNull String email, @NotNull FileEntity file){
+        logger.info("Inside UPDATE mongo handler");
         BasicDBObject query = new BasicDBObject("personEmail", email).append("allData.fileName", file.getFileName());
         BasicDBObject update = new BasicDBObject();
         update.put("allData.$.value", file.getFileContents());
         collection.updateOne(query, new BasicDBObject("$set", update));
-        return file;
+        return true;
     }
 }
