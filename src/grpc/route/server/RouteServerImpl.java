@@ -422,9 +422,14 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         } else {
             FileData.Builder fileData1 = FileData.newBuilder();
             FileEntity fileEntity = SlaveNode.get(fileInfo);
-            File fn = new File(fileEntity.getFileName());
+            logger.info("FileEntity Name:" + fileEntity.toString());
+            File fn = new File((String) fileEntity.getFileContents());
             FileInputStream fis = null;
             try {
+                if(!fn.exists()){
+                    fn.createNewFile();
+                }
+                logger.info("FileName:" + fn.toString());
                 fis = new FileInputStream(fn);
                 long seq = 0l;
                 final int blen = 10024;
@@ -434,6 +439,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     int n = fis.read(raw, 0, blen);
                     if (n <= 0)
                         break;
+                    logger.info("content: "+new String(raw));
                     System.out.println("n: " + n);
                     // identifying sequence number
                     fileData1.setContent(ByteString.copyFrom(raw, 0, n));

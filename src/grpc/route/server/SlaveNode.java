@@ -132,7 +132,7 @@ public class SlaveNode extends RouteServerImpl {
 
 /*
     }
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     public static void main(String[] args) {
 //        String filePath = "temp.jpg";
 //        String userName = "prabha";

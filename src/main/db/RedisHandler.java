@@ -211,15 +211,15 @@ public class RedisHandler {
         return b;
     }
 
-//    @SuppressWarnings("unchecked")
-//    public static void main(String[] args) {
-//        RedisHandler rh = new RedisHandler();
-//        String filePath = "/Users/nrupa/Desktop/cat.png";
-//        String filePath1 = "/Users/nrupa/Desktop/test.txt";
-//        String fileName = "test.png";
-//        String userName = "N";
-//        long seq = 0l;
-//        try {
+    @SuppressWarnings("unchecked")
+    public static void main(String[] args) {
+        RedisHandler rh = new RedisHandler();
+        String filePath = "/Users/nrupa/Desktop/cat.png";
+        String filePath1 = "/Users/nrupa/Desktop/test.txt";
+        String fileName = "example.txt";
+        String userName = "prabha";
+        long seq = 0l;
+        try {
 //            FileInputStream fis = new FileInputStream(filePath1);
 //            int i = 0;
 //            do {
@@ -231,13 +231,13 @@ public class RedisHandler {
 //                seq++;
 //            } while (i != -1);
 //            byte[] payload = null;
-//            Map<String, byte[]> res = rh.get(userName, fileName);
-//            byte[] temp = combineBytes(res);
-//            BufferedOutputStream bw = null;
-//            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.txt"));
-//            bw.write(temp);
-//            bw.flush();
-//            bw.close();
+            Map<String, byte[]> res = rh.get(userName, fileName);
+            byte[] temp = combineBytes(res);
+            BufferedOutputStream bw = null;
+            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.txt"));
+            bw.write(temp);
+            bw.flush();
+            bw.close();
 //            logger.info("Putting into DB");
 //            mh.put(userName, new FileEntity(filePath, res));
 //            FileEntity mongoDBres = mh.get(userName, filePath);
@@ -249,8 +249,8 @@ public class RedisHandler {
 //            bw.flush();
 //            bw.close();
 
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
