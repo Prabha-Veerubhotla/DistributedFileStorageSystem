@@ -5,8 +5,7 @@ option optimize_for = SPEED;
 package heartbeat;
 
 service HeartBeatService{
-    rpc requestNodeInfo(stream NodeInfo) returns (stream NodeInfo);
-    rpc requestStats(stream stats) returns (stream stats);
+    rpc isAlive(stream NodeInfo) returns (stream stats);
 }
 
 message NodeInfo {

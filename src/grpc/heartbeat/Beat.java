@@ -35,24 +35,23 @@ public class Beat extends HeartBeatServiceImplBase{
     private static HeartBeatServiceGrpc.HeartBeatServiceStub stub;
     private static ManagedChannel ch;
     // Consensus response;
-    Heartbeat heartbeat;
+    // Heartbeat heartbeat;
 
     OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
 
-    public void start(String myIp){
+    public void start(String myIp, boolean isMaster){
 
-        // NodeInfo.Builder ni = NodeInfo.newBuilder();
-        // ni.setIp(myIp);
-        // ni.setPort("2345");
+        NodeInfo.Builder ni = NodeInfo.newBuilder();
+        ni.setIp(myIp);
+        ni.setPort("2345");
 
         ch = ManagedChannelBuilder.forAddress("127.0.0.1", Integer.parseInt("2345")).usePlaintext(true).build();
         //TODO: make it async stub
         stub = HeartBeatServiceGrpc.newStub(ch);
         
-        stats.Builder sb = stats.newBuilder();
         CountDownLatch latch = new CountDownLatch(1);
         System.out.println("test");
-        StreamObserver<stats> observer = stub.requestStats(new StreamObserver<stats>() {
+        StreamObserver<NodeInfo> observer = stub.isAlive(new StreamObserver<stats>() {
             @Override
             public void onNext(stats st){
                 logger.info(st.getCpuUsage());
@@ -72,15 +71,36 @@ public class Beat extends HeartBeatServiceImplBase{
             }
         });
 
-        TimerTask beat = new Beat_Worker(){
-            protected void beat(){
+        if(!isMaster){
+            TimerTask beat = new Beat_Worker(){
+                protected void beat(){
+                    System.out.println(123);
+                    observer.onNext(ni.build());
+                }
+            };
+            Timer timer = new  Timer();
+            timer.schedule(beat, new Date(), 5000);
+        }
+    }
+
+    @Override
+    public StreamObserver<NodeInfo> isAlive(StreamObserver<stats> resobserver) {
+        StreamObserver<NodeInfo> reqobserver = new StreamObserver<NodeInfo>() {
+            stats.Builder sb = stats.newBuilder();
+            @Override
+            public void onNext(NodeInfo ni) {
                 sb.setCpuUsage(Double.toString(mxBean.getSystemCpuLoad()*100));
                 sb.setMemUsage(Double.toString(mxBean.getFreePhysicalMemorySize()));
-                observer.onNext(sb.build());
+                resobserver.onNext(sb.build());
             }
+
+            @Override
+            public void onError(Throwable throwable){}
+
+            @Override
+            public void onCompleted(){}
         };
-        Timer timer = new  Timer();
-        timer.schedule(beat, new Date(), 5000);
+        return reqobserver;
     }
 
 }

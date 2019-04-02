@@ -191,8 +191,14 @@ public class RouteServerImpl extends RouteServiceImplBase {
     private void startHeartbeat(){
         Thread thread = new Thread(){
             public void run(){
-                logger.info("Starting Heartbeat...");
-                heartbeat.start(myIp);
+                if(isMaster){
+                    logger.info("Reading Heartbeat...");
+                    heartbeat.start(myIp, true);
+                }
+                else{
+                    logger.info("Starting Heartbeat...");
+                    heartbeat.start(myIp, false);
+                }
             }
         };
         thread.start();
@@ -216,9 +222,8 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.start();
         if (isMaster) {
             invokeDhcpMonitorThread();
-        }else{
-            startHeartbeat();
         }
+        startHeartbeat();
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
