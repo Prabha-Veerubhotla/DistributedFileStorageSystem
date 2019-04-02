@@ -19,6 +19,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import route.RouteServiceGrpc.RouteServiceImplBase;
+import grpc.heartbeat.*;
 
 
 public class RouteServerImpl extends RouteServiceImplBase {
@@ -29,6 +30,7 @@ public class RouteServerImpl extends RouteServiceImplBase {
     private static String myIp = "server";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
+    private static Beat heartbeat = new Beat();
     private List<String> msgTypes = FetchConfig.getMsgTypes();
     static MongoDBHandler mh = new MongoDBHandler();
     static RedisHandler rh = new RedisHandler();
@@ -186,6 +188,16 @@ public class RouteServerImpl extends RouteServiceImplBase {
         impl.blockUntilShutdown();
     }
 
+    private void startHeartbeat(){
+        Thread thread = new Thread(){
+            public void run(){
+                logger.info("Starting Heartbeat...");
+                heartbeat.start(myIp);
+            }
+        };
+        thread.start();
+    }
+
     private void invokeDhcpMonitorThread() {
         Thread thread = new Thread() {
             public void run() {
@@ -204,6 +216,8 @@ public class RouteServerImpl extends RouteServiceImplBase {
         svr.start();
         if (isMaster) {
             invokeDhcpMonitorThread();
+        }else{
+            startHeartbeat();
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {

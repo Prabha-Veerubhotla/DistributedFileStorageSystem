@@ -1,0 +1,48 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option optimize_for = SPEED;
+
+package heartbeat;
+
+service HeartBeatService{
+    rpc requestNodeInfo(stream NodeInfo) returns (stream NodeInfo);
+    rpc requestStats(stream stats) returns (stream stats);
+}
+
+message NodeInfo {
+string ip = 1;
+string port = 2;
+}
+
+message stats {
+string cpuUsage = 1;
+string memUsage = 2;
+}
+
+
+// service ConsensusService{
+//     rpc request(stream Consensus) returns (stream Consensus);
+// }
+
+// message Consensus{
+
+//     LeaderQuery action = 1;
+//     LeaderState state = 2;
+//     string leader = 3;
+//     int32 leader_id = 4;
+//     int32 election_id = 5;
+//     int32 voted_for = 6;
+//     bool vote_granted = 7;
+
+//     enum LeaderState{
+//         UNKNOWN = 0;
+//         ALIVE = 1;
+//         DEAD = 2;
+//     }
+//     enum LeaderQuery{
+//         GETLEADER = 0;
+//         LEADER = 1;
+//         VOTEREQUEST = 2;
+//         VOTERESPONSE = 3;
+//     }
+// }
