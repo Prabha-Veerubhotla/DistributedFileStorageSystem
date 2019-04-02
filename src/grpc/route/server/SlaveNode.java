@@ -72,7 +72,9 @@ public class SlaveNode extends RouteServerImpl {
         String fileName = getFileName(fileInfo.getFilename().getFilename());
         logger.info("retrieving information of: " + fileName);
         Map<String, byte[]> result = rh.get(userName, fileName);
+        logger.info("Result ---> " + result);
         if (result != null) {
+            logger.info("File found in redis!");
             return new FileEntity(fileName, result);
         }
         return mh.get(userName, fileName);
@@ -102,30 +104,6 @@ public class SlaveNode extends RouteServerImpl {
         return mh.update(username, fileEntity);
     }
 
-    //TODO: Move to client - wrote here for testing purposes
-    @SuppressWarnings("unchecked")
-    public static byte[] combineBytes(Map<String, byte[]> res) {
-        List<String> sortedKeys = new ArrayList(res.keySet());
-        sortedKeys.sort(Comparator.comparingInt(Integer::parseInt));
-        List<byte[]> allbytes = new ArrayList<>();
-        for (String sortedKey : sortedKeys) {
-            allbytes.add(res.get(sortedKey));
-        }
-        logger.info("Total Size: " + allbytes.size());
-        List<Byte> allData = new ArrayList<>();
-        for (byte[] allbyte : allbytes) {
-            for (byte anAllbyte : allbyte) {
-                allData.add(anAllbyte);
-            }
-        }
-
-        byte[] b = new byte[allData.size()];
-        for (int i = 0; i < allData.size(); i++) {
-            b[i] = allData.get(i);
-        }
-        logger.info("Total BSize: " + b.length);
-        return b;
-    }
 
 
     /**
@@ -153,44 +131,6 @@ public class SlaveNode extends RouteServerImpl {
 
 
 /*
-    @SuppressWarnings("unchecked")
-    public static void main(String[] args) {
-        String filePath = "temp.jpg";
-        String userName = "N";
-        long seq = 0l;
-        try{
-            FileInputStream fis = new FileInputStream(filePath);
-            int i = 0;
-            do {
-                byte[] buf = new byte[1024];
-                i = fis.read(buf);
-                if (i != -1 ) {
-                    rh.put(userName, filePath, Long.toString(seq), buf);
-                }
-                seq++;
-            } while (i != -1);
-            byte[] payload = null;
-            Map<String, byte[]> res = rh.get(userName, filePath);
-
-            byte[] temp = combineBytes(res);
-            BufferedOutputStream bw = null;
-            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.jpg"));
-            bw.write(temp);
-            bw.flush();
-            bw.close();
-            logger.info("Putting into DB");
-            mh.put(userName, new FileEntity(filePath, res));
-            FileEntity mongoDBres = mh.get(userName, filePath);
-            Map<String, byte[]> r = (Map<String, byte[]>)mongoDBres.getFileContents();
-            temp = combineBytes(res);
-            bw = null;
-            bw = new BufferedOutputStream(new FileOutputStream("tempMongo.jpg"));
-            bw.write(temp);
-            bw.flush();
-            bw.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
     @SuppressWarnings("unchecked")
     public static void main(String[] args) {

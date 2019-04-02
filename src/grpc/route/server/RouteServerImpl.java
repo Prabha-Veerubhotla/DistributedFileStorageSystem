@@ -333,7 +333,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackMessage = "Unable to update file";
                     }
                 } else {
-                    logger.info("received data from master");
+                    logger.info("Updating in redis" + new String(fileData.getContent().toByteArray()));
                     ackStatus = SlaveNode.update(fileData);
                     if (ackStatus) {
                         ackMessage = "success";
@@ -367,7 +367,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
-                    ch1.shutdown();
+//                    ch1.shutdown();
                 }
             }
         };
