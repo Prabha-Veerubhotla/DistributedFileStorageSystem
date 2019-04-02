@@ -174,6 +174,7 @@ public class RedisHandler {
     public void update(@NotNull String userName, @NotNull String fileName, String seqID, byte[] content) {
         logger.info("Inside UPDATE redis handler");
         if(FIRST_UPDATE_CALL){
+            logger.info("First update!");
             remove(userName, fileName);
             FIRST_UPDATE_CALL = false;
         }

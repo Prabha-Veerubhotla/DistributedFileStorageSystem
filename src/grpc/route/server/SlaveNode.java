@@ -94,6 +94,7 @@ public class SlaveNode extends RouteServerImpl {
     }
 
     public static boolean updateMongo(String username, String filePath) {
+        logger.info("Inside slave updateMongo");
         String fileName = getFileName(filePath);
         Map<String, byte[]> result = rh.get(username, fileName);
         FileEntity fileEntity;

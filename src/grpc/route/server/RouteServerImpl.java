@@ -360,6 +360,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     ackStreamObserver.onCompleted();
                     ch1.shutdown();
                 } else {
+                    logger.info("Calling Update Mongo");
                     if (SlaveNode.updateMongo(username, filepath)) {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
