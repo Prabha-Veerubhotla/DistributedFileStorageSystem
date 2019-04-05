@@ -44,6 +44,7 @@ public class SlaveNode extends RouteServerImpl {
      * @return boolean
      */
     public static boolean put(FileData fileData) {
+        logger.info("All Data" + new String(fileData.getContent().toByteArray()));
         UserInfo userName = fileData.getUsername();
         byte[] payload = fileData.getContent().toByteArray();
         String seqID = Long.toString(fileData.getSeqnum());

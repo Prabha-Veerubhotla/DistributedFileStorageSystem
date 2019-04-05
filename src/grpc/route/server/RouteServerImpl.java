@@ -1,8 +1,6 @@
 package grpc.route.server;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.util.*;
@@ -52,8 +50,30 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
 
     }
+    
+    @SuppressWarnings("unchecked")
+    public static byte[] combineBytes(Map<String, byte[]> res) {
+        List<String> sortedKeys = new ArrayList(res.keySet());
+        sortedKeys.sort(Comparator.comparingInt(Integer::parseInt));
+        List<byte[]> allbytes = new ArrayList<>();
+        for (String sortedKey : sortedKeys) {
+            allbytes.add(res.get(sortedKey));
+        }
+        System.out.println("Total Size: " + allbytes.size());
+        List<Byte> allData = new ArrayList<>();
+        for (byte[] allbyte : allbytes) {
+            for (byte anAllbyte : allbyte) {
+                allData.add(anAllbyte);
+            }
+        }
 
-
+        byte[] b = new byte[allData.size()];
+        for (int i = 0; i < allData.size(); i++) {
+            b[i] = allData.get(i);
+        }
+        System.out.println("Total BSize: " + b.length);
+        return b;
+    }
 
 
     public static void main(String[] args) throws Exception {
@@ -452,27 +472,39 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         } else {
             FileData.Builder fileData1 = FileData.newBuilder();
             FileEntity fileEntity = SlaveNode.get(fileInfo);
-            String fileName = fileEntity.getFileName();
-            File fn = new File(fileName);
-            logger.info("FileEntity Name:" + fileEntity.toString());
-
-
-            FileInputStream fis;
+            Map<String, byte[]> res = (Map<String, byte[]>)fileEntity.getFileContents();
+            byte[] temp = combineBytes(res);
+            BufferedOutputStream bw = null;
             try {
-                if (!fn.exists()) {
-                    fn.createNewFile();
-                }
-                logger.info("FileName:" + fn.toString());
+                bw = new BufferedOutputStream(new FileOutputStream(fileEntity.getFileName()));
+                bw.write(temp);
+                bw.flush();
+                bw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            File fn = new File(fileEntity.getFileName());
+            logger.info("FileEntity Name:" + fileEntity.toString());
+            FileInputStream fis = null;
+            try {
+//                if (!fn.exists()) {
+//                    fn.createNewFile();
+//                }
+//                logger.info("FileName:" + fn.toString());
                 fis = new FileInputStream(fn);
+                logger.info("fis: " + fis.toString());
                 long seq = 0l;
                 final int blen = 10024;
                 byte[] raw = new byte[blen];
                 boolean done = false;
                 while (!done) {
                     int n = fis.read(raw, 0, blen);
+                    logger.info("n: " + n);
+                    logger.info("raw before break: " + new String(raw));
                     if (n <= 0)
                         break;
-                    logger.info("content: " + new String(raw));
+                    logger.info("raw after break: " + new String(raw));
                     System.out.println("n: " + n);
                     // identifying sequence number
                     fileData1.setContent(ByteString.copyFrom(raw, 0, n));
