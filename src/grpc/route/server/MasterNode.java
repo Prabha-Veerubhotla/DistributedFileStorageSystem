@@ -26,9 +26,12 @@ public class MasterNode extends RouteServerImpl {
     private static int NOOFSHARDS = 1;
     private static boolean ackStatus;
     private static boolean done = false;
-     static boolean isRoundRobinCalled = false;
+    static boolean isRoundRobinCalled = false;
 
 
+    public static void setIsRoundRobinCalled(boolean isRoundRobinCalled) {
+        MasterNode.isRoundRobinCalled = isRoundRobinCalled;
+    }
 
     public static String assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
@@ -47,7 +50,7 @@ public class MasterNode extends RouteServerImpl {
 
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
-        isRoundRobinCalled = true;
+        //isRoundRobinCalled = true;
         NOOFSHARDS = slaveip.size();
         logger.info("number of shards: "+NOOFSHARDS);
         currentIP = slaveip.get(currentIPIxd);
