@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import com.google.protobuf.ByteString;
 import com.sun.management.UnixOperatingSystemMXBean;
 import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
@@ -21,6 +22,9 @@ import route.*;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+
+import static grpc.route.server.MasterNode.roundRobinIP;
+import static grpc.route.server.MasterNode.slave1port;
 
 
 public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
@@ -169,9 +173,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
-        if(isMaster) {
-            ch1 = slaveIpThread();
-        }
         logger.info("calling upload file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
@@ -226,8 +227,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     logger.info("ip: " + slave1);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), slave1);
-                    logger.info("channel is shutitng down");
-                    ch1.shutdown();
 
                 } else {
                     if (SlaveNode.put(username, filepath)) {

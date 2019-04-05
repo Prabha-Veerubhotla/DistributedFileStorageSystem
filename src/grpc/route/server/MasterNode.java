@@ -23,7 +23,7 @@ public class MasterNode extends RouteServerImpl {
     private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
     private static String currentIP;
     private static int currentIPIxd = 0;
-    private static int NOOFSHARDS = 3;
+    private static int NOOFSHARDS = 1;
     private static boolean ackStatus;
     private static boolean done = false;
 
@@ -41,10 +41,15 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
+
+
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
+        NOOFSHARDS = slaveip.size();
+        logger.info("number of shards: "+NOOFSHARDS);
         currentIP = slaveip.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
+        logger.info("returning ip: "+currentIP);
         return currentIP;
     }
 
@@ -87,6 +92,7 @@ public class MasterNode extends RouteServerImpl {
             }
         };
 
+        ayncStub = FileServiceGrpc.newStub(ManagedChannelBuilder.forAddress(roundRobinIP(), Integer.parseInt(slave1port.trim())).usePlaintext(true).build());
         StreamObserver<FileData> fileDataStreamObserver = ayncStub.uploadFile(ackStreamObserver);
 
         if (complete) {
