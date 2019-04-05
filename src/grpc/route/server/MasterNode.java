@@ -15,7 +15,7 @@ public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
     static String slave1port = "2345";
-    static String slave1 = null;
+    static String slave1 = "localhost";
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static FileServiceGrpc.FileServiceBlockingStub blockingStub;

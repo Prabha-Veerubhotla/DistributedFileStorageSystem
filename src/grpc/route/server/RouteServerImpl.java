@@ -71,8 +71,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             logger.info("Running as Slave node");
         }
         impl.start();
-       // ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(myPort.trim())).usePlaintext(true).build();
-        //ayncStub = FileServiceGrpc.newStub(ch);
         impl.blockUntilShutdown();
     }
 
@@ -410,7 +408,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             };
 
             List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
-            ch1 = MasterNode.createChannel(ips.get(0));
+            if(ips.size() >0) {
+                ch1 = MasterNode.createChannel(ips.get(0));
+            } else {
+                ch1 = MasterNode.createChannel("localhost");
+            }
             ayncStub = FileServiceGrpc.newStub(ch1);
             ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
             try {
@@ -422,9 +424,13 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         } else {
             FileData.Builder fileData1 = FileData.newBuilder();
             FileEntity fileEntity = SlaveNode.get(fileInfo);
+            String fileName = fileEntity.getFileName();
+            File fn = new File(fileName);
             logger.info("FileEntity Name:" + fileEntity.toString());
-            File fn = new File((String) fileEntity.getFileContents());
-            FileInputStream fis = null;
+
+
+
+            FileInputStream fis;
             try {
                 if(!fn.exists()){
                     fn.createNewFile();
