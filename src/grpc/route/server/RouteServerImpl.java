@@ -203,31 +203,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         }
     }
 
-    public StreamObserver<FileData> setReplicaStub() {
-        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
-
-            @Override
-            public void onNext(Ack ack) {
-                logger.info("Received ack status from the server: " + ack.getSuccess());
-                logger.info("Received ack  message from the server: " + ack.getMessage());
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                logger.info("Exception in the response from server: " + throwable);
-                cdl.countDown();
-            }
-
-            @Override
-            public void onCompleted() {
-                logger.info("Server is done sending data");
-                cdl.countDown();
-                replicaChannel.shutdown();
-            }
-        };
-        return replicaStub.replicateFile(ackStreamObserver);
-
-    }
 
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
@@ -254,7 +229,29 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         replicaIp = roundRobinIP();
                         replicaChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
                         replicaStub = FileServiceGrpc.newStub(replicaChannel);
-                        fdsm = setReplicaStub();
+                        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+                            @Override
+                            public void onNext(Ack ack) {
+                                logger.info("Received ack status from the server: " + ack.getSuccess());
+                                logger.info("Received ack  message from the server: " + ack.getMessage());
+                            }
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                logger.info("Exception in the response from server: " + throwable);
+                                cdl.countDown();
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                                logger.info("Server is done sending data");
+                                cdl.countDown();
+                               // replicaChannel.shutdown();
+                            }
+                        };
+
+                        fdsm = replicaStub.replicateFile(ackStreamObserver);
                         originalChannel = ManagedChannelBuilder.forAddress(originalIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
                         ayncStub = FileServiceGrpc.newStub(originalChannel);
                         setIsRoundRobinCalled(true);
