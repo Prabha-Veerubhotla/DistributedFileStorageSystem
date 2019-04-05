@@ -9,6 +9,7 @@ import route.NodeName;
 import utility.FetchConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -35,7 +36,7 @@ public class Dhcp_Lease_Test {
 
     public void compareAndUpdate() {
         logger.info("Comparing and Updating list of all the current nodes in the network");
-        logger.info("new ip list: "+newIpList.toString());
+        logger.info("new ip list: " + newIpList.toString());
         Set<String> set = new HashSet<>();
         for (String old : oldIpList) {
             set.add(old);
@@ -84,8 +85,6 @@ public class Dhcp_Lease_Test {
 
             // update all the nodes with current ips in the network ( if new node | one node is removed)
             logger.info("Sending current ip updates in the network to all nodes");
-
-
             NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
             nodeInfo.setIp(sb.toString());
             nodeInfo.setPort("2345");
@@ -107,7 +106,7 @@ public class Dhcp_Lease_Test {
                     Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                     BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
                     newIpList.clear();
-                    logger.info("old ip list: "+newIpList.toString());
+                    logger.info("old ip list: " + newIpList.toString());
                     String output = null;
                     while ((output = reader1.readLine()) != null) {
                         newIpList.add(output);

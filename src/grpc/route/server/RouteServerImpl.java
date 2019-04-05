@@ -10,6 +10,7 @@ import java.util.Properties;
 import java.lang.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
@@ -48,7 +49,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             slaveips = map.get("slave");
         }
         //slave1 = slaveips.get(0); -- local testing
-        slave1 =  MasterNode.assignSlaveIp(slaveips);
+        slave1 = MasterNode.assignSlaveIp(slaveips);
 
 
     }
@@ -134,10 +135,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
-        if(isMaster) { ch1 = slaveIpThread();
+        if (isMaster) {
+            ch1 = slaveIpThread();
 
         }
-        logger.info("calling upload file");
+
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -147,6 +149,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
             @Override
             public void onNext(FileData fileData) {
+                logger.info("Received seq num:  " + fileData.getSeqnum() + " for file: " + fileData.getFilename().getFilename());
                 fd = fileData;
                 username = fileData.getUsername().getUsername();
                 filepath = fileData.getFilename().getFilename();
@@ -185,11 +188,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     ackStreamObserver.onCompleted();
 
                     logger.info("putting metadata of file, slave in master");
-                    logger.info("username: "+username);
-                    logger.info("filepath: "+filepath);
-                    logger.info("ip: "+ slave1);
-                    logger.info("file name: "+getFileName(filepath));
-                    masterMetaData.putMetaData(username, getFileName(filepath),slave1);
+                    logger.info("username: " + username);
+                    logger.info("filepath: " + filepath);
+                    logger.info("ip: " + slave1);
+                    logger.info("file name: " + getFileName(filepath));
+                    masterMetaData.putMetaData(username, getFileName(filepath), slave1);
                     logger.info("channel is shutitng down");
                     ch1.shutdown();
 
@@ -208,6 +211,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void deleteFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
+        logger.info("Calling delete file for: " + fileInfo.getFilename().getFilename());
         Ack.Builder ack = Ack.newBuilder();
         boolean ackStatus;
         String ackMessage = "Unable to save file";
@@ -218,8 +222,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             if (ackStatus) {
                 ackMessage = "success";
             }
-            logger.info("ack status: "+ackStatus);
-            logger.info("Ack message: "+ ackMessage);
+            logger.info("ack status: " + ackStatus);
+            logger.info("Ack message: " + ackMessage);
 
             ack.setMessage(ackMessage);
             ack.setSuccess(ackStatus);
@@ -227,9 +231,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             ackStreamObserver.onCompleted();
 
             logger.info("putting metadata of file, slave in master");
-            logger.info("username: "+ fileInfo.getUsername().getUsername());
-            logger.info("filepath: "+fileInfo.getFilename().getFilename());
-            logger.info("file name: "+getFileName(fileInfo.getFilename().getFilename()));
+            logger.info("username: " + fileInfo.getUsername().getUsername());
+            logger.info("filepath: " + fileInfo.getFilename().getFilename());
+            logger.info("file name: " + getFileName(fileInfo.getFilename().getFilename()));
             masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
             ch1.shutdown();
 
@@ -270,6 +274,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void requestNodeIp(NodeName nodeName, StreamObserver<NodeInfo> nodeInfoStreamObserver) {
+        logger.info("Requesting node ip for node: " + nodeName);
         NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
         if (isMaster) {
             nodeInfo.setIp(MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList()));
@@ -308,7 +313,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
-        logger.info("calling update file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
@@ -318,6 +322,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
             @Override
             public void onNext(FileData fileData) {
+                logger.info("Received seq num:  " + fileData.getSeqnum() + " for file: " + fileData.getFilename().getFilename());
                 fd = fileData;
                 username = fileData.getUsername().getUsername();
                 filepath = fileData.getFilename().getFilename();
@@ -365,7 +370,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
-//                    ch1.shutdown();
                 }
             }
         };
@@ -408,7 +412,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             };
 
             List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
-            if(ips.size() >0) {
+            if (ips.size() > 0) {
                 ch1 = MasterNode.createChannel(ips.get(0));
             } else {
                 ch1 = MasterNode.createChannel("localhost");
@@ -429,10 +433,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             logger.info("FileEntity Name:" + fileEntity.toString());
 
 
-
             FileInputStream fis;
             try {
-                if(!fn.exists()){
+                if (!fn.exists()) {
                     fn.createNewFile();
                 }
                 logger.info("FileName:" + fn.toString());
@@ -445,7 +448,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     int n = fis.read(raw, 0, blen);
                     if (n <= 0)
                         break;
-                    logger.info("content: "+new String(raw));
+                    logger.info("content: " + new String(raw));
                     System.out.println("n: " + n);
                     // identifying sequence number
                     fileData1.setContent(ByteString.copyFrom(raw, 0, n));
@@ -454,7 +457,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     fileData1.setFilename(fileInfo.getFilename());
                     seq++;
                     fileDataStreamObserver.onNext(fileData1.build());
-                    logger.info("sending data with seq num: "+fileData1.getSeqnum());
+                    logger.info("sending data with seq num: " + fileData1.getSeqnum());
                 }
             } catch (IOException io) {
                 io.printStackTrace();
@@ -465,6 +468,82 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
         }
 
+    }
+
+    @Override
+    public StreamObserver<FileData> replicateFile(StreamObserver<Ack> ackStreamObserver) {
+        //TODO: call from upload file or some where in this file
+        if (isMaster) {
+            ch1 = slaveIpThread();
+
+        }
+        logger.info("Calling replicate file");
+        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+            boolean ackStatus;
+            String ackMessage;
+            String username;
+            String filepath;
+            FileData fd;
+
+            @Override
+            public void onNext(FileData fileData) {
+                fd = fileData;
+                username = fileData.getUsername().getUsername();
+                filepath = fileData.getFilename().getFilename();
+                if (isMaster) {
+                    ackStatus = MasterNode.streamFileToServer(fileData, false);
+                    if (ackStatus) {
+                        ackMessage = "success";
+                    } else {
+                        ackMessage = "Unable to save file";
+                    }
+                } else {
+                    logger.info("received data from master");
+                    ackStatus = SlaveNode.put(fileData);
+                    if (ackStatus) {
+                        ackMessage = "success";
+                    } else {
+                        ackMessage = "Unable to save file";
+                    }
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the request from node: " + throwable);
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("Node is done sending messages");
+                if (isMaster) {
+                    if (MasterNode.streamFileToServer(fd, true)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
+                    }
+                    ackStreamObserver.onCompleted();
+
+                    logger.info("putting metadata of file, slave in master");
+                    logger.info("username: " + username);
+                    logger.info("filepath: " + filepath);
+                    logger.info("ip: " + slave1);
+                    logger.info("file name: " + getFileName(filepath));
+                    masterMetaData.putMetaData(username, getFileName(filepath), slave1);
+                    logger.info("channel is shutitng down");
+                    ch1.shutdown();
+
+                } else {
+                    if (SlaveNode.put(username, filepath)) {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                    } else {
+                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
+                    }
+                    ackStreamObserver.onCompleted();
+                }
+            }
+        };
+        return fileDataStreamObserver;
     }
 
 
