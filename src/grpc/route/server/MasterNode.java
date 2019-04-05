@@ -26,6 +26,8 @@ public class MasterNode extends RouteServerImpl {
     private static int NOOFSHARDS = 1;
     private static boolean ackStatus;
     private static boolean done = false;
+     static boolean isRoundRobinCalled = false;
+
 
 
     public static String assignSlaveIp(List<String> slaveiplist) {
@@ -45,6 +47,7 @@ public class MasterNode extends RouteServerImpl {
 
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
+        isRoundRobinCalled = true;
         NOOFSHARDS = slaveip.size();
         logger.info("number of shards: "+NOOFSHARDS);
         currentIP = slaveip.get(currentIPIxd);
@@ -68,7 +71,7 @@ public class MasterNode extends RouteServerImpl {
     }
 
 
-    public static boolean streamFileToServer(FileData fileData, boolean complete) {
+    public static boolean streamFileToServer(FileData fileData, boolean complete, ManagedChannel channel) {
         CountDownLatch cdl = new CountDownLatch(1);
         StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
@@ -91,8 +94,7 @@ public class MasterNode extends RouteServerImpl {
                 cdl.countDown();
             }
         };
-
-        ayncStub = FileServiceGrpc.newStub(ManagedChannelBuilder.forAddress(roundRobinIP(), Integer.parseInt(slave1port.trim())).usePlaintext(true).build());
+        ayncStub = FileServiceGrpc.newStub(channel);
         StreamObserver<FileData> fileDataStreamObserver = ayncStub.uploadFile(ackStreamObserver);
 
         if (complete) {
@@ -165,6 +167,8 @@ public class MasterNode extends RouteServerImpl {
         for (String s : slaveList) {
             myset.add(s);
         }
+
+
         for (String s : ipList) {
             myset.add(s);
         }

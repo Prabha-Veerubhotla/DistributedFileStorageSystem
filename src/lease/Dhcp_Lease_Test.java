@@ -135,7 +135,7 @@ public class Dhcp_Lease_Test {
     }
 
     public List<String> getCurrentIpList() {
-        return newIpList;
+        return oldIpList;
     }
 
     public boolean updateCurrentNodeMapping(NodeInfo nodeInfo, NodeName nodeName) {
