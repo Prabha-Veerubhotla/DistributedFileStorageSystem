@@ -19,7 +19,7 @@ public class MasterNode extends RouteServerImpl {
     static Map<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
     static Map<String,Stats> nodeStatsMap=new HashMap<>();
     static String slave1port = "2345";
-    static String slave1 = null;
+    static String slave1 = "localhost";
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
