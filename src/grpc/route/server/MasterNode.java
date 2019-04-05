@@ -50,7 +50,7 @@ public class MasterNode extends RouteServerImpl {
 
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
-        //isRoundRobinCalled = true;
+       logger.info("current ip list: "+slaveip);
         NOOFSHARDS = slaveip.size();
         logger.info("number of shards: "+NOOFSHARDS);
         currentIP = slaveip.get(currentIPIxd);

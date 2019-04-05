@@ -180,7 +180,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         return fileName;
     }
 
-    public void replicate(FileData fileData, boolean complete, StreamObserver<FileData> fileDataStreamObserver, CountDownLatch cdl) {
+    public void replicate(FileData fileData, boolean complete, StreamObserver<FileData> fileDataStreamObserver) {
         logger.info("replicating file: "+fileData.getFilename().getFilename());
         route.FileData.Builder fileData1 = FileData.newBuilder();
         fileData1.setFilename(fileData.getFilename());
@@ -204,7 +204,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     }
 
     public StreamObserver<FileData> setReplicaStub() {
-        CountDownLatch cdl = new CountDownLatch(1);
         StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
             @Override
@@ -223,10 +222,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             public void onCompleted() {
                 logger.info("Server is done sending data");
                 cdl.countDown();
+                replicaChannel.shutdown();
             }
         };
-        StreamObserver<FileData> fileDataStreamObserver =  replicaStub.replicateFile(ackStreamObserver);
-        return fileDataStreamObserver;
+        return replicaStub.replicateFile(ackStreamObserver);
+
     }
 
     @Override
@@ -245,12 +245,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 fd = fileData;
                 username = fileData.getUsername().getUsername();
                 filepath = fileData.getFilename().getFilename();
-                List<String> slaveip = new ArrayList<>();
+
 
                 if (isMaster) {
                     if(!MasterNode.isRoundRobinCalled){
                        MasterNode.assignSlaveIp(dhcp_lease_test.getCurrentIpList());
-                        logger.info("current ip list: " + slaveip);
                         originalIp = roundRobinIP();
                         replicaIp = roundRobinIP();
                         replicaChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
@@ -262,7 +261,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     } else {
                         logger.info("round robin not called");
                     }
-                    replicate(fileData, false, fdsm, cdl);
+                    replicate(fileData, false, fdsm);
                     ackStatus = MasterNode.streamFileToServer(fileData, false, originalChannel);
                     if (ackStatus) {
                         ackMessage = "success";
@@ -294,7 +293,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     } else {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
                     }
-                    replicate( fd, true ,fdsm, cdl);
+                    replicate( fd, true ,fdsm);
                     ackStreamObserver.onCompleted();
                     originalChannel.shutdown();
                     logger.info("putting metadata of file, slave in master");
