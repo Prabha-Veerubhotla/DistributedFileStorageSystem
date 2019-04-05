@@ -361,6 +361,15 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
+
+                    masterMetaData.deleteFileFormMetaData(username, getFileName(filepath));
+                    logger.info("putting metadata of file, slave in master");
+                    logger.info("username: " + username);
+                    logger.info("filepath: " + filepath);
+                    logger.info("ip: " + slave1);
+                    logger.info("file name: " + getFileName(filepath));
+                    masterMetaData.putMetaData(username, getFileName(filepath), slave1);
+                    logger.info("channel is shutitng down");
                     ch1.shutdown();
                 } else {
                     logger.info("Calling Update Mongo");
