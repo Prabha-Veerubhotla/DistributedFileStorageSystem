@@ -325,28 +325,30 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         Ack.Builder ack = Ack.newBuilder();
         boolean ackStatus;
         String ackMessage = "Unable to save file";
+
         if (isMaster) {
             List<String> ips = masterMetaData.getMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
-            ch1 = MasterNode.createChannel(ips.get(0));
-            ackStatus = MasterNode.deleteFileFromServer(fileInfo);
-            if (ackStatus) {
-                ackMessage = "success";
-            }
-            logger.info("ack status: " + ackStatus);
-            logger.info("Ack message: " + ackMessage);
+            for(String ip: ips) {
+                ch1 = MasterNode.createChannel(ip);
+                ackStatus = MasterNode.deleteFileFromServer(fileInfo);
+                if (ackStatus) {
+                    ackMessage = "success";
+                }
+                logger.info("ack status: " + ackStatus);
+                logger.info("Ack message: " + ackMessage);
 
-            ack.setMessage(ackMessage);
-            ack.setSuccess(ackStatus);
-            ackStreamObserver.onNext(ack.build());
-            ackStreamObserver.onCompleted();
+                ack.setMessage(ackMessage);
+                ack.setSuccess(ackStatus);
+                ackStreamObserver.onNext(ack.build());
+                ackStreamObserver.onCompleted();
+                ch1.shutdown();
+            }
 
             logger.info("putting metadata of file, slave in master");
             logger.info("username: " + fileInfo.getUsername().getUsername());
             logger.info("filepath: " + fileInfo.getFilename().getFilename());
             logger.info("file name: " + getFileName(fileInfo.getFilename().getFilename()));
             masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
-            ch1.shutdown();
-
         } else {
             ackStatus = SlaveNode.delete(fileInfo);
             if (ackStatus) {
@@ -613,14 +615,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 fd = fileData;
                 username = fileData.getUsername().getUsername();
                 filepath = fileData.getFilename().getFilename();
-                /*if (isMaster) {
-                    ackStatus = MasterNode.streamFileToServer(fileData, false);
-                    if (ackStatus) {
-                        ackMessage = "success";
-                    } else {
-                        ackMessage = "Unable to save file";
-                    }
-                }*/ //else {
                     logger.info("received data from master");
                     ackStatus = SlaveNode.put(fileData);
                     if (ackStatus) {
@@ -628,7 +622,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     } else {
                         ackMessage = "Unable to save file";
                     }
-                //}
             }
 
             @Override
@@ -639,24 +632,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             @Override
             public void onCompleted() {
                 logger.info("Node is done sending messages");
-              /*  if (isMaster) {
-                    if (MasterNode.streamFileToServer(fd, true)) {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
-                    } else {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
-                    }
-                    ackStreamObserver.onCompleted();
-
-                    logger.info("putting metadata of file, slave in master");
-                    logger.info("username: " + username);
-                    logger.info("filepath: " + filepath);
-                    logger.info("ip: " + slave1);
-                    logger.info("file name: " + getFileName(filepath));
-                    masterMetaData.putMetaData(username, getFileName(filepath), slave1);
-                    logger.info("channel is shutitng down");
-                    ch1.shutdown();
-
-                }*/ //else {
                     if (SlaveNode.put(username, filepath)) {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
@@ -664,7 +639,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     }
                     ackStreamObserver.onCompleted();
                 }
-           // }
         };
         return fileDataStreamObserver;
     }
