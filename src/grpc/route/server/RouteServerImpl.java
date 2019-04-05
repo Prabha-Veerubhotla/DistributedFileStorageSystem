@@ -31,7 +31,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
-    private static String myPort = "2346";
+    private static String myPort = "2345";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     static MongoDBHandler mh = new MongoDBHandler();

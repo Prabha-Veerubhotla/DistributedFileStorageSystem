@@ -201,7 +201,7 @@ public class MasterNode extends RouteServerImpl {
             blockingStub=FileServiceGrpc.newBlockingStub(channel);
             NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
             nodeInfo.setIp("localhost");
-            nodeInfo.setPort("2346");
+            nodeInfo.setPort("2345");
             Stats stats=blockingStub.isAlive(nodeInfo.build());
             logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
         }
@@ -253,7 +253,7 @@ public class MasterNode extends RouteServerImpl {
             blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
             NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
             nodeInfo.setIp(node_ip_channel.getIpAddress());
-            nodeInfo.setPort("2346");
+            nodeInfo.setPort("2345");
             Stats stats=blockingStub.isAlive(nodeInfo.build());
             logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
         return stats;
