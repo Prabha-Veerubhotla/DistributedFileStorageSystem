@@ -72,9 +72,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         svr.start();
 
         if (isMaster) {
-//            invokeDhcpMonitorThread();
-//            slaveIpThread();
-            getSlavesHeartBeat();
+            invokeDhcpMonitorThread();
+            slaveIpThread();
+            if(dhcp_lease_test.getCurrentIpList().size() > 0) {
+                getSlavesHeartBeat();
+            }
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {

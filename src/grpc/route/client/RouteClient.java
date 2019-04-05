@@ -72,7 +72,7 @@ public class RouteClient {
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
         logger.info("Client running...");
         logger.info("Requesting ip from dhcp server");
-//        requestIp();
+        requestIp();
     }
 
 

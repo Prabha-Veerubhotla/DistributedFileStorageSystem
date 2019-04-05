@@ -16,11 +16,9 @@ import java.util.concurrent.TimeUnit;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-//    static List<Node_ip_channel> nodeIpChannelList=new ArrayList<>();
     static Map<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
     static Map<String,Stats> nodeStatsMap=new HashMap<>();
-    static Map<String,Stats> tempNewNodeStatsMap=new HashMap<>();
-    static String slave1port = "2346";
+    static String slave1port = "2345";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
