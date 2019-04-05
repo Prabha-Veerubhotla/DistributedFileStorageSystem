@@ -72,7 +72,7 @@ public class RouteClient {
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
         logger.info("Client running...");
         logger.info("Requesting ip from dhcp server");
-        requestIp();
+//        requestIp();
     }
 
 
@@ -116,12 +116,15 @@ public class RouteClient {
             };
 
             route.FileData.Builder fileData = FileData.newBuilder();
+
             route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
             fileData.setFilename(fileResponse.build());
+
             route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
             fileData.setUsername(userInfo.build());
 
             StreamObserver<FileData> fileDataStreamObserver = asyncStub.uploadFile(ackStreamObserver);
+
             if (checkIfFile(filename)) {
                 logger.info(filename + " is a file");
                 File fn = new File(filename);

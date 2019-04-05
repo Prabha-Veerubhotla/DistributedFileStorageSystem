@@ -131,6 +131,11 @@ public class Dhcp_Lease_Test {
         return nodesInNetwork;
     }
 
+    public void removeDeadnodes(List<String> deadNodes){
+        newIpList.removeAll(deadNodes);
+        copyList();
+    }
+
     public List<String> getCurrentIpList() {
         return newIpList;
     }

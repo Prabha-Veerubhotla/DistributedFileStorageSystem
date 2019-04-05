@@ -3,10 +3,12 @@ package grpc.route.server;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import lease.Dhcp_Lease_Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -14,7 +16,11 @@ import java.util.concurrent.TimeUnit;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2345";
+//    static List<Node_ip_channel> nodeIpChannelList=new ArrayList<>();
+    static Map<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
+    static Map<String,Stats> nodeStatsMap=new HashMap<>();
+    static Map<String,Stats> tempNewNodeStatsMap=new HashMap<>();
+    static String slave1port = "2346";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
@@ -55,6 +61,10 @@ public class MasterNode extends RouteServerImpl {
         ayncStub = FileServiceGrpc.newStub(ch);
         logger.info("creating async stub ");
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
+        Node_ip_channel node_ip_channel=new Node_ip_channel();
+        node_ip_channel.setIpAddress(slave1);
+        node_ip_channel.setChannel(ch);
+        nodeIpChannelMap.put(slave1,ch);
         return ch;
     }
 
@@ -181,6 +191,74 @@ public class MasterNode extends RouteServerImpl {
             return false;
         }
         return true;
+    }
+
+    // gets the hearbeat of all slaves and updates the nodeStatsMap.
+    public static void getHeartBeatofAllSlaves(){
+
+        Map<String,Stats> tempStats=new HashMap<>();
+        //local testing.
+        if(nodeIpChannelMap.isEmpty()){
+            ManagedChannel channel=nodeIpChannelMap.get("localhost");
+            blockingStub=FileServiceGrpc.newBlockingStub(channel);
+            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            nodeInfo.setIp("localhost");
+            nodeInfo.setPort("2346");
+            Stats stats=blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+        }
+
+        nodeIpChannelMap.forEach((ip,channel1)->{
+            blockingStub=FileServiceGrpc.newBlockingStub(channel1);
+
+            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            nodeInfo.setIp(ip);
+            nodeInfo.setPort("2345");
+            Stats stats=blockingStub.isAlive(nodeInfo.build());
+            tempStats.put(ip,stats);
+            logger.info("Got CPU stats from slave:"+ip+" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+        });
+        updateNodeStats(tempStats);
+
+    }
+    // TODO: Confused on how to detect the Slave node that went off.
+    public static void updateNodeStats(Map<String,Stats> newStats){
+        Set<String> nodeSet=new HashSet<>();
+        List<String> deadNodes=new ArrayList<>();
+
+        newStats.forEach((ip,Stats)->{
+            nodeSet.add(ip);
+        });
+        int numNewNodes=nodeSet.size();
+        nodeStatsMap.forEach((ip,Stats)->{
+            nodeSet.add(ip);
+        });
+        int numofNodeWentOff=nodeSet.size()-numNewNodes;
+        String[] nodeArray= (String[]) nodeSet.toArray();
+
+        if(numofNodeWentOff>0){
+            for(int i=1;i<=numofNodeWentOff;i++) {
+                deadNodes.add(nodeArray[nodeArray.length-i]);
+            }
+        }
+        removeDeadSlavesFromDHCPList(deadNodes);
+
+
+
+    }
+    public static void removeDeadSlavesFromDHCPList(List<String> deadNodes){
+        new Dhcp_Lease_Test().removeDeadnodes(deadNodes);
+    }
+    // get the heartbeat and stats of individual node.
+    public static Stats getHeartBeatofASlave(Node_ip_channel node_ip_channel){
+
+            blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
+            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            nodeInfo.setIp(node_ip_channel.getIpAddress());
+            nodeInfo.setPort("2346");
+            Stats stats=blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+        return stats;
     }
 
 
