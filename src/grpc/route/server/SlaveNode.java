@@ -18,7 +18,7 @@ import java.util.*;
 
 //For HeartBeat
 import route.FileResponse;
-import route.HeartBeatGrpc;
+
 import route.NodeInfo;
 import route.Stats;
 
@@ -137,22 +137,7 @@ public class SlaveNode extends RouteServerImpl {
     }
 
 
-    class HeartbeatFinder extends HeartBeatGrpc.HeartBeatImplBase {
-        @Override
-        public void isAlive(NodeInfo request, StreamObserver<Stats> responseObserver) {
-            sendStatstoMaster(responseObserver);
-        }
 
-        public void sendStatstoMaster(StreamObserver<Stats> responseObserver){
-            OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
-            Stats.Builder stats = Stats.newBuilder();
-            stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
-            stats.setDiskSpace(Double.toString(((UnixOperatingSystemMXBean) mxBean).getFreePhysicalMemorySize()));
-
-            responseObserver.onNext(stats.build());
-            responseObserver.onCompleted();
-        }
-    }
 
 }
 

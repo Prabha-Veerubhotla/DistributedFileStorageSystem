@@ -16,13 +16,14 @@ public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
 //    static List<Node_ip_channel> nodeIpChannelList=new ArrayList<>();
-    static HashMap<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
+    static Map<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
+    static Map<String,Stats> nodeStatsMap=new HashMap<>();
+    static Map<String,Stats> tempNewNodeStatsMap=new HashMap<>();
     static String slave1port = "2346";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
-    private static HeartBeatGrpc.HeartBeatBlockingStub heartBeatStub;
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
@@ -191,19 +192,51 @@ public class MasterNode extends RouteServerImpl {
         return true;
     }
 
-    public static Stats getSlaveHeartBeat(String slaveIP){
-        ManagedChannel channel=null;
-        if(slaveIP.equalsIgnoreCase("localhost"))
-            channel=ManagedChannelBuilder.forAddress("localhost", 2346).usePlaintext(true).build();
-        else
-            channel=nodeIpChannelMap.get(slaveIP);
+    // gets the hearbeat of all slaves and updates the nodeStatsMap.
+    public static void getHeartBeatofAllSlaves(){
+        //local testing.
+        if(nodeIpChannelMap.isEmpty()){
+            ManagedChannel channel=nodeIpChannelMap.get("localhost");
+            blockingStub=FileServiceGrpc.newBlockingStub(channel);
+            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            nodeInfo.setIp("localhost");
+            nodeInfo.setPort("2346");
+            Stats stats=blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+        }
 
-        heartBeatStub=HeartBeatGrpc.newBlockingStub(channel);
+        nodeIpChannelMap.forEach((ip,channel1)->{
+            blockingStub=FileServiceGrpc.newBlockingStub(channel1);
 
-        NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            nodeInfo.setIp(ip);
+            nodeInfo.setPort("2345");
+            Stats stats=blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from slave:"+ip+" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+            updateNodeStats(ip, stats);
 
-        Stats stats=heartBeatStub.isAlive(nodeInfo.build());
-        logger.info("Got CPU stats from slave:\ncpuUsage: "+stats.getCpuUsage()+"\nmemoryUsed: "+stats.getUsedMem()+"\nFreeSpace: "+stats.getDiskSpace());
+        });
+
+    }
+    // TODO: Confused on how to detect the Slave node that went off.
+    public static void updateNodeStats(String ip,Stats newStats){
+
+        if(nodeStatsMap.containsKey(ip))
+            nodeStatsMap.remove(ip);
+        tempNewNodeStatsMap.put(ip,newStats);
+
+
+
+    }
+    // get the heartbeat and stats of individual node.
+    public static Stats getHeartBeatofASlave(Node_ip_channel node_ip_channel){
+
+            blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
+            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            nodeInfo.setIp(node_ip_channel.getIpAddress());
+            nodeInfo.setPort("2346");
+            Stats stats=blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
         return stats;
     }
 

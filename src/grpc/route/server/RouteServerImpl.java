@@ -3,14 +3,14 @@ package grpc.route.server;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
+import java.util.*;
 import java.lang.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import com.google.protobuf.ByteString;
+import com.sun.management.UnixOperatingSystemMXBean;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
@@ -74,8 +74,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         if (isMaster) {
 //            invokeDhcpMonitorThread();
 //            slaveIpThread();
-            MasterNode.getSlaveHeartBeat("localhost");
-
+            getSlavesHeartBeat();
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -107,6 +106,18 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         };
         thread.start();
         return ch1;
+    }
+
+    //gets and updates the nodeStatsMap<String ip, Stats stats> in MasterNode every 5 seconds
+    private void getSlavesHeartBeat(){
+        TimerTask timerTask=new TimerTask(){
+            @Override
+            public void run() {
+                MasterNode.getHeartBeatofAllSlaves();
+            }
+        };
+        Timer timer=new Timer();
+        timer.scheduleAtFixedRate(timerTask,0,5000);
     }
 
     public void getSlaveIpList() {
@@ -282,7 +293,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         nodeInfoStreamObserver.onNext(nodeInfo.build());
         nodeInfoStreamObserver.onCompleted();
     }
-
     @Override
     public void assignNodeIp(NodeInfo nodeInfo, StreamObserver<NodeName> nodeNameStreamObserver) {
         NodeName.Builder nodeName = NodeName.newBuilder();
@@ -458,6 +468,27 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
 
         }
+
+    }
+
+    //This is slave's service.
+    @Override
+    public void isAlive(NodeInfo request, StreamObserver<Stats> responseObserver) {
+
+        sendStatstoMaster(responseObserver);
+
+    }
+
+    public void sendStatstoMaster(StreamObserver<Stats> responseObserver){
+
+        OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
+
+        Stats.Builder stats = Stats.newBuilder();
+        stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
+        stats.setDiskSpace(Double.toString(((UnixOperatingSystemMXBean) mxBean).getFreePhysicalMemorySize()));
+
+        responseObserver.onNext(stats.build());
+        responseObserver.onCompleted();
 
     }
 
