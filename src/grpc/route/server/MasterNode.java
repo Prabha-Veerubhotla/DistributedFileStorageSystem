@@ -3,6 +3,7 @@ package grpc.route.server;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import lease.Dhcp_Lease_Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
@@ -194,6 +195,8 @@ public class MasterNode extends RouteServerImpl {
 
     // gets the hearbeat of all slaves and updates the nodeStatsMap.
     public static void getHeartBeatofAllSlaves(){
+
+        Map<String,Stats> tempStats=new HashMap<>();
         //local testing.
         if(nodeIpChannelMap.isEmpty()){
             ManagedChannel channel=nodeIpChannelMap.get("localhost");
@@ -212,21 +215,39 @@ public class MasterNode extends RouteServerImpl {
             nodeInfo.setIp(ip);
             nodeInfo.setPort("2345");
             Stats stats=blockingStub.isAlive(nodeInfo.build());
+            tempStats.put(ip,stats);
             logger.info("Got CPU stats from slave:"+ip+" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-            updateNodeStats(ip, stats);
-
         });
+        updateNodeStats(tempStats);
 
     }
     // TODO: Confused on how to detect the Slave node that went off.
-    public static void updateNodeStats(String ip,Stats newStats){
+    public static void updateNodeStats(Map<String,Stats> newStats){
+        Set<String> nodeSet=new HashSet<>();
+        List<String> deadNodes=new ArrayList<>();
 
-        if(nodeStatsMap.containsKey(ip))
-            nodeStatsMap.remove(ip);
-        tempNewNodeStatsMap.put(ip,newStats);
+        newStats.forEach((ip,Stats)->{
+            nodeSet.add(ip);
+        });
+        int numNewNodes=nodeSet.size();
+        nodeStatsMap.forEach((ip,Stats)->{
+            nodeSet.add(ip);
+        });
+        int numofNodeWentOff=nodeSet.size()-numNewNodes;
+        String[] nodeArray= (String[]) nodeSet.toArray();
+
+        if(numofNodeWentOff>0){
+            for(int i=1;i<=numofNodeWentOff;i++) {
+                deadNodes.add(nodeArray[nodeArray.length-i]);
+            }
+        }
+        removeDeadSlavesFromDHCPList(deadNodes);
 
 
 
+    }
+    public static void removeDeadSlavesFromDHCPList(List<String> deadNodes){
+        new Dhcp_Lease_Test().removeDeadnodes(deadNodes);
     }
     // get the heartbeat and stats of individual node.
     public static Stats getHeartBeatofASlave(Node_ip_channel node_ip_channel){
