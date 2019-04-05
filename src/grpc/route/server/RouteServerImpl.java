@@ -25,6 +25,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 
+
 public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     protected static Logger logger = LoggerFactory.getLogger("server");
     private Server svr;
@@ -40,19 +41,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static ManagedChannel ch1;
     private static MasterMetaData masterMetaData = new MasterMetaData();
-
-
-    public void getSlaveIpList() {
-        Map<String, List<String>> map = dhcp_lease_test.getCurrentNodeMapping();
-        if (map.containsKey("slave")) {
-            slaveips = map.get("slave");
-        }
-        //slave1 = slaveips.get(0); -- local testing
-        slave1 =  MasterNode.assignSlaveIp(slaveips);
-
-
-    }
-
 
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
@@ -76,6 +64,28 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         impl.blockUntilShutdown();
     }
 
+    private void start() throws Exception {
+        svr = ServerBuilder.forPort(RouteServer.getInstance().getServerPort()).addService(new RouteServerImpl())
+                .build();
+
+        logger.info("Starting server..");
+        svr.start();
+
+        if (isMaster) {
+//            invokeDhcpMonitorThread();
+//            slaveIpThread();
+            MasterNode.getSlaveHeartBeat("localhost");
+
+        }
+
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                RouteServerImpl.this.stop();
+            }
+        });
+    }
+
     private void invokeDhcpMonitorThread() {
         Thread thread = new Thread() {
             public void run() {
@@ -92,30 +102,22 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 logger.info("Fetching Ip List of Nodes...");
                 getSlaveIpList();
                 ch1 = MasterNode.createChannel(slave1);
+
             }
         };
         thread.start();
         return ch1;
     }
 
-    private void start() throws Exception {
-        svr = ServerBuilder.forPort(RouteServer.getInstance().getServerPort()).addService(new RouteServerImpl())
-                .build();
-
-        logger.info("Starting server..");
-        svr.start();
-        if (isMaster) {
-            invokeDhcpMonitorThread();
-            slaveIpThread();
+    public void getSlaveIpList() {
+        Map<String, List<String>> map = dhcp_lease_test.getCurrentNodeMapping();
+        if (map.containsKey("slave")) {
+            slaveips = map.get("slave");
         }
+        //slave1 = slaveips.get(0); -- local testing
+        slave1 =  MasterNode.assignSlaveIp(slaveips);
 
 
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            @Override
-            public void run() {
-                RouteServerImpl.this.stop();
-            }
-        });
     }
 
     protected void stop() {
@@ -126,18 +128,16 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         svr.awaitTermination();
     }
 
-
     public static String getFileName(String filePath) {
         String[] tokens = filePath.split("/");
         String fileName = tokens[tokens.length - 1];
         return fileName;
     }
 
-
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
-        if(isMaster) { ch1 = slaveIpThread();
-
+        if(isMaster) {
+            ch1 = slaveIpThread();
         }
         logger.info("calling upload file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {

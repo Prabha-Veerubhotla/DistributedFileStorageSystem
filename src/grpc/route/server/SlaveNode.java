@@ -1,17 +1,28 @@
 package grpc.route.server;
 
 import com.google.protobuf.ByteString;
+import com.sun.management.UnixOperatingSystemMXBean;
+import io.grpc.stub.StreamObserver;
 import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.FileData;
-import route.FileInfo;
-import route.UserInfo;
+import route.*;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
 import java.util.*;
+
+
+//For HeartBeat
+import route.FileResponse;
+import route.HeartBeatGrpc;
+import route.NodeInfo;
+import route.Stats;
+
+
 
 public class SlaveNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-slave");
@@ -124,8 +135,26 @@ public class SlaveNode extends RouteServerImpl {
         logger.info("delete status: " + status);
         return status;
     }
-}
 
+
+    class HeartbeatFinder extends HeartBeatGrpc.HeartBeatImplBase {
+        @Override
+        public void isAlive(NodeInfo request, StreamObserver<Stats> responseObserver) {
+            sendStatstoMaster(responseObserver);
+        }
+
+        public void sendStatstoMaster(StreamObserver<Stats> responseObserver){
+            OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
+            Stats.Builder stats = Stats.newBuilder();
+            stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
+            stats.setDiskSpace(Double.toString(((UnixOperatingSystemMXBean) mxBean).getFreePhysicalMemorySize()));
+
+            responseObserver.onNext(stats.build());
+            responseObserver.onCompleted();
+        }
+    }
+
+}
 
 
 

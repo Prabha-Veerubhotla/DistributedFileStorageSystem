@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -14,11 +15,14 @@ import java.util.concurrent.TimeUnit;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-    static String slave1port = "2345";
+//    static List<Node_ip_channel> nodeIpChannelList=new ArrayList<>();
+    static HashMap<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
+    static String slave1port = "2346";
     static String slave1 = null;
     private static ManagedChannel ch;
     private static FileServiceGrpc.FileServiceStub ayncStub;
     private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
+    private static HeartBeatGrpc.HeartBeatBlockingStub heartBeatStub;
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
@@ -55,6 +59,10 @@ public class MasterNode extends RouteServerImpl {
         ayncStub = FileServiceGrpc.newStub(ch);
         logger.info("creating async stub ");
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
+        Node_ip_channel node_ip_channel=new Node_ip_channel();
+        node_ip_channel.setIpAddress(slave1);
+        node_ip_channel.setChannel(ch);
+        nodeIpChannelMap.put(slave1,ch);
         return ch;
     }
 
@@ -181,6 +189,22 @@ public class MasterNode extends RouteServerImpl {
             return false;
         }
         return true;
+    }
+
+    public static Stats getSlaveHeartBeat(String slaveIP){
+        ManagedChannel channel=null;
+        if(slaveIP.equalsIgnoreCase("localhost"))
+            channel=ManagedChannelBuilder.forAddress("localhost", 2346).usePlaintext(true).build();
+        else
+            channel=nodeIpChannelMap.get(slaveIP);
+
+        heartBeatStub=HeartBeatGrpc.newBlockingStub(channel);
+
+        NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+
+        Stats stats=heartBeatStub.isAlive(nodeInfo.build());
+        logger.info("Got CPU stats from slave:\ncpuUsage: "+stats.getCpuUsage()+"\nmemoryUsed: "+stats.getUsedMem()+"\nFreeSpace: "+stats.getDiskSpace());
+        return stats;
     }
 
 

@@ -4,7 +4,7 @@ option optimize_for = SPEED;
 package route;
 
 // The heartbeat service definition.
-service HearBeat {
+service HeartBeat {
     // Sends status
     rpc isAlive (NodeInfo) returns (Stats) {
     }
