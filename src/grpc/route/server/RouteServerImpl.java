@@ -47,10 +47,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         }
         //slave1 = slaveips.get(0); -- local testing
         slave1 = MasterNode.assignSlaveIp(slaveips);
-
-
     }
-    
+
     @SuppressWarnings("unchecked")
     public static byte[] combineBytes(Map<String, byte[]> res) {
         List<String> sortedKeys = new ArrayList(res.keySet());
@@ -488,10 +486,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             logger.info("FileEntity Name:" + fileEntity.toString());
             FileInputStream fis = null;
             try {
-//                if (!fn.exists()) {
-//                    fn.createNewFile();
-//                }
-//                logger.info("FileName:" + fn.toString());
+              logger.info("FileName:" + fn.toString());
                 fis = new FileInputStream(fn);
                 logger.info("fis: " + fis.toString());
                 long seq = 0l;

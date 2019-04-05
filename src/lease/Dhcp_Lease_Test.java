@@ -82,7 +82,6 @@ public class Dhcp_Lease_Test {
                 }
                 logger.info("reply: " + nodeName + ", from: " + newip);
             }
-
             // update all the nodes with current ips in the network ( if new node | one node is removed)
             logger.info("Sending current ip updates in the network to all nodes");
             NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();

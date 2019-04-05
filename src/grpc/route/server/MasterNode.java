@@ -7,8 +7,6 @@ import lease.Dhcp_Lease_Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
-
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -27,8 +25,6 @@ public class MasterNode extends RouteServerImpl {
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 3;
     private static boolean ackStatus;
-    private static FileData result;
-    private static boolean next = false;
     private static boolean done = false;
 
 
