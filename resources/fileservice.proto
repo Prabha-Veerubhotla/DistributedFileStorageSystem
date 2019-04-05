@@ -24,6 +24,9 @@ service FileService {
     //  only client
     rpc requestNodeIp (NodeName) returns (NodeInfo) {
     }
+    // heartbeat
+    rpc isAlive (NodeInfo) returns (Stats) {
+    }
 }
 
 message FileData {
@@ -61,5 +64,12 @@ message NodeInfo {
 
 message NodeName {
     string name = 1;
+}
+
+// The response message containing the status of the server
+message Stats {
+    string cpu_usage = 1;
+    string disk_space = 2;
+    string used_mem = 3;
 }
 
