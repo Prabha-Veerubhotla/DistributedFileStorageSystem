@@ -42,10 +42,7 @@ public class MasterNode extends RouteServerImpl {
         }
         return slave1;
         //slave1 = "localhost"; // local testing
-        //TODO: create channels for all the slaves
-
     }
-
 
 
     //Method for round robin IP - Sharding data among 3 Slaves
@@ -158,54 +155,19 @@ public class MasterNode extends RouteServerImpl {
         return ackStatus;
     }
 
-
-    public static String sendIpToNode(Map<String, List<String>> map, List<String> ipList) {
-        //TODO: modify to accommodate client or slave ip
-        String clientIp;
-        List<String> slaveList = new ArrayList<>();
-        if (map.containsKey("slave")) {
-            slaveList = map.get("slave");
-        }
-        Set<String> myset = new HashSet<>();
-        for (String s : slaveList) {
-            myset.add(s);
-        }
-
-
-        for (String s : ipList) {
-            myset.add(s);
-        }
-        Object[] array1 = myset.toArray();
-        clientIp = (String) array1[array1.length - 1];
-        return clientIp;
-    }
-
     public static boolean deleteFileFromServer(FileInfo fileInfo) {
         logger.info("deleting file: " + fileInfo.getFilename().getFilename());
         Ack ack = blockingStub.deleteFile(fileInfo);
         return ack.getSuccess();
     }
 
-    public static String listFilesInServer(UserInfo userInfo) {
-        logger.info("listing files of user : " + userInfo.getUsername());
-        FileResponse fileResponse = blockingStub.listFile(userInfo);
-        return fileResponse.getFilename();
-    }
-
-
-    public static boolean checkDoneStatus() {
-        while(!done){
-            return false;
-        }
-        return true;
-    }
 
     // gets the hearbeat of all slaves and updates the nodeStatsMap.
     public static void getHeartBeatofAllSlaves(){
-
+        logger.info("Fetching cpu and mem stats of slaves");
         Map<String,Stats> tempStats=new HashMap<>();
         //local testing.
-        if(nodeIpChannelMap.isEmpty()){
+       /* if(nodeIpChannelMap.isEmpty()){
             ManagedChannel channel=nodeIpChannelMap.get("localhost");
             blockingStub=FileServiceGrpc.newBlockingStub(channel);
             NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
@@ -213,7 +175,7 @@ public class MasterNode extends RouteServerImpl {
             nodeInfo.setPort("2345");
             Stats stats=blockingStub.isAlive(nodeInfo.build());
             logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-        }
+       }*/
 
         nodeIpChannelMap.forEach((ip,channel1)->{
             blockingStub=FileServiceGrpc.newBlockingStub(channel1);
@@ -226,10 +188,9 @@ public class MasterNode extends RouteServerImpl {
             logger.info("Got CPU stats from slave:"+ip+" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
         });
         updateNodeStats(tempStats);
-
     }
-    // TODO: Confused on how to detect the Slave node that went off.
-    public static void updateNodeStats(Map<String,Stats> newStats){
+
+    public synchronized static void updateNodeStats(Map<String,Stats> newStats){
         Set<String> nodeSet=new HashSet<>();
         List<String> deadNodes=new ArrayList<>();
 
@@ -241,24 +202,33 @@ public class MasterNode extends RouteServerImpl {
             nodeSet.add(ip);
         });
         int numofNodeWentOff=nodeSet.size()-numNewNodes;
-        String[] nodeArray= (String[]) nodeSet.toArray();
-
+        String[] nodeArray=  nodeSet.toArray(new String[nodeSet.size()]);
         if(numofNodeWentOff>0){
             for(int i=1;i<=numofNodeWentOff;i++) {
                 deadNodes.add(nodeArray[nodeArray.length-i]);
             }
         }
         removeDeadSlavesFromDHCPList(deadNodes);
-
-
-
     }
+
+    public synchronized static Map<String,Stats> getNodeStats() {
+        return nodeStatsMap;
+    }
+
+    public synchronized static void removeDeadNodeStats(List<String> deadNodeIp) {
+        for(String ip: deadNodeIp) {
+            if (nodeStatsMap.containsKey(ip)) {
+                nodeStatsMap.remove(ip);
+            }
+        }
+    }
+
+
     public static void removeDeadSlavesFromDHCPList(List<String> deadNodes){
         new Dhcp_Lease_Test().removeDeadnodes(deadNodes);
     }
     // get the heartbeat and stats of individual node.
     public static Stats getHeartBeatofASlave(Node_ip_channel node_ip_channel){
-
             blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
             NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
             nodeInfo.setIp(node_ip_channel.getIpAddress());
@@ -271,17 +241,17 @@ public class MasterNode extends RouteServerImpl {
 
 }
 
-// 1. save meta data of files (which partition on which slave)
+// 1. save meta data of files (which partition on which slave)-- done
 
-// 2. send heartbeat to slaves
+// 2. send heartbeat to slaves -TODO
 
-// 3. hashing the data ( given file (parts) onto the 3 nodes)
+// 3. hashing the data --done
 
-// 4. replication of each part twice
+// 4. replication of each part twice -- done
 
-// 5. update meta-data when a slave goes down or come up
+// 5. update meta-data when a slave goes down or come up  - TODO
 
-// 6. take care of load balancing(data replication) when node goes up or down
+// 6. take care of load balancing(data replication) when node goes up or down - TODO
 
 // 7. talk with both client and other slaves -- done
 

@@ -71,7 +71,6 @@ public class RouteClient {
         asyncStub = FileServiceGrpc.newStub(ch);
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
         logger.info("Client running...");
-        logger.info("Requesting ip from dhcp server");
     }
 
 

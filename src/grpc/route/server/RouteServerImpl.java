@@ -117,9 +117,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         if (isMaster) {
             invokeDhcpMonitorThread();
             slaveIpThread();
-            if(dhcp_lease_test.getCurrentIpList().size() > 0) {
-                getSlavesHeartBeat();
-            }
+            getSlavesHeartBeat();
+
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -155,16 +154,28 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     //gets and updates the nodeStatsMap<String ip, Stats stats> in MasterNode every 5 seconds
     private void getSlavesHeartBeat(){
+        logger.info("Started monitoring heart beat of slaves..");
         TimerTask timerTask=new TimerTask(){
             @Override
             public void run() {
-                MasterNode.getHeartBeatofAllSlaves();
+                if(dhcp_lease_test.getCurrentIpList().size() > 0) {
+                    MasterNode.getHeartBeatofAllSlaves();
+                }
             }
         };
         Timer timer=new Timer();
         timer.scheduleAtFixedRate(timerTask,0,5000);
     }
 
+    public void calculateSlaveStatsScore() {
+        Map<String, Stats> nodeStats = MasterNode.getNodeStats();
+        double cpuWeight = 0.4;
+        double memWeight = 0.6;
+        for(Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
+            double cpu = Double.parseDouble(m.getValue().getCpuUsage());
+            double mem = Double.parseDouble(m.getValue().getCpuUsage());
+        }
+    }
 
     protected void stop() {
         svr.shutdown();
@@ -172,6 +183,28 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     private void blockUntilShutdown() throws Exception {
         svr.awaitTermination();
+    }
+
+    @Override
+    public void assignNodeIp(NodeInfo nodeInfo, StreamObserver<NodeName> nodeNameStreamObserver) {
+        NodeName.Builder nodeName = NodeName.newBuilder();
+        if (!isMaster) {
+            myIp = nodeInfo.getIp();
+            myPort = nodeInfo.getPort();
+        }
+        logger.info("Assigned ip: " + myIp + "  by DHCP server");
+        nodeName.setName("slave");
+        nodeNameStreamObserver.onNext(nodeName.build());
+        nodeNameStreamObserver.onCompleted();
+    }
+
+    @Override
+    public void nodeUpdate(UpdateMessage updateMessage, StreamObserver<UpdateMessage> updateMessageStreamObserver) {
+        UpdateMessage.Builder um = UpdateMessage.newBuilder();
+        um.setMessage("Update received");
+        logger.info("Current Node update received from master: "+updateMessage.getMessage());
+        updateMessageStreamObserver.onNext(um.build());
+        updateMessageStreamObserver.onCompleted();
     }
 
     public static String getFileName(String filePath) {
@@ -224,41 +257,46 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
                 if (isMaster) {
                     if(!MasterNode.isRoundRobinCalled){
-                       MasterNode.assignSlaveIp(dhcp_lease_test.getCurrentIpList());
+                        List<String> slaveIpList = dhcp_lease_test.getCurrentIpList();
+                       MasterNode.assignSlaveIp(slaveIpList);
                         originalIp = roundRobinIP();
-                        replicaIp = roundRobinIP();
-                        replicaChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
-                        replicaStub = FileServiceGrpc.newStub(replicaChannel);
-                        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+                        if(slaveIpList.size() > 1) {
+                            replicaIp = roundRobinIP();
+                            replicaChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+                            replicaStub = FileServiceGrpc.newStub(replicaChannel);
+                            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
-                            @Override
-                            public void onNext(Ack ack) {
-                                logger.info("Received ack status from the server: " + ack.getSuccess());
-                                logger.info("Received ack  message from the server: " + ack.getMessage());
-                            }
+                                @Override
+                                public void onNext(Ack ack) {
+                                    logger.info("Received ack status from the server: " + ack.getSuccess());
+                                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                                }
 
-                            @Override
-                            public void onError(Throwable throwable) {
-                                logger.info("Exception in the response from server: " + throwable);
-                                cdl.countDown();
-                            }
+                                @Override
+                                public void onError(Throwable throwable) {
+                                    logger.info("Exception in the response from server: " + throwable);
+                                    cdl.countDown();
+                                }
 
-                            @Override
-                            public void onCompleted() {
-                                logger.info("Server is done sending data");
-                                cdl.countDown();
-                               // replicaChannel.shutdown();
-                            }
-                        };
+                                @Override
+                                public void onCompleted() {
+                                    logger.info("Server is done sending data");
+                                    cdl.countDown();
+                                    // replicaChannel.shutdown();
+                                }
+                            };
 
-                        fdsm = replicaStub.replicateFile(ackStreamObserver);
+                            fdsm = replicaStub.replicateFile(ackStreamObserver);
+                        }
                         originalChannel = ManagedChannelBuilder.forAddress(originalIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
                         ayncStub = FileServiceGrpc.newStub(originalChannel);
                         setIsRoundRobinCalled(true);
                     } else {
                         logger.info("round robin not called");
                     }
-                    replicate(fileData, false, fdsm);
+                    if(managedChannelList.size() > 1) {
+                        replicate(fileData, false, fdsm);
+                    }
                     ackStatus = MasterNode.streamFileToServer(fileData, false, originalChannel);
                     if (ackStatus) {
                         ackMessage = "success";
@@ -290,21 +328,25 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     } else {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
                     }
-                    replicate( fd, true ,fdsm);
+                    if(managedChannelList.size() > 1) {
+                        replicate(fd, true, fdsm);
+                    }
                     ackStreamObserver.onCompleted();
                     originalChannel.shutdown();
                     logger.info("putting metadata of file, slave in master");
                     logger.info("username: " + username);
                     logger.info("filepath: " + filepath);
-                    logger.info("ip: " + originalIp);
+                    logger.info("original ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
-                    logger.info("putting metadata of file, slave in master");
-                    logger.info("username: " + username);
-                    logger.info("filepath: " + filepath);
-                    logger.info("ip: " + replicaIp);
-                    logger.info("file name: " + getFileName(filepath));
-                    masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
+                    if(managedChannelList.size() > 1) {
+                        logger.info("putting metadata of replicated file, slave in master");
+                        logger.info("username: " + username);
+                        logger.info("filepath: " + filepath);
+                        logger.info("replica ip: " + replicaIp);
+                        logger.info("file name: " + getFileName(filepath));
+                        masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
+                    }
                     MasterNode.isRoundRobinCalled = false;
                 } else {
                     if (SlaveNode.put(username, filepath)) {

@@ -21,8 +21,8 @@ service FileService {
     // to all nodes
     rpc assignNodeIp (NodeInfo) returns (NodeName) {
     }
-    //  only client
-    rpc requestNodeIp (NodeName) returns (NodeInfo) {
+    // to all nodes
+    rpc nodeUpdate(UpdateMessage) returns (UpdateMessage) {
     }
     // heartbeat
     rpc isAlive (NodeInfo) returns (Stats) {
@@ -72,4 +72,10 @@ message Stats {
     string disk_space = 2;
     string used_mem = 3;
 }
+
+message UpdateMessage {
+    string message = 1;
+}
+
+
 

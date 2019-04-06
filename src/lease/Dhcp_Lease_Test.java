@@ -1,13 +1,14 @@
 package lease;
 
 
-import io.grpc.Grpc;
+import grpc.route.server.MasterNode;
 import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.FileServiceGrpc;
 import route.NodeInfo;
 import route.NodeName;
+import route.UpdateMessage;
 import utility.FetchConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -66,7 +67,6 @@ public class Dhcp_Lease_Test {
             if (!set.contains(newip)) {
                 logger.info("Sending hello to new node!");
                 logger.info("New node ip is: " + newip);
-
                 NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
                 nodeInfo.setIp(newip);
                 nodeInfo.setPort(server_port);
@@ -84,15 +84,13 @@ public class Dhcp_Lease_Test {
                 }
                 logger.info("reply: " + nodeName + ", from: " + newip);
             }
-            // update all the nodes with current ips in the network ( if new node | one node is removed)
             logger.info("Sending current ip updates in the network to all nodes");
-            NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
-            nodeInfo.setIp(sb.toString());
-            nodeInfo.setPort("2345");
+            UpdateMessage.Builder updateMessage = UpdateMessage.newBuilder();
+            updateMessage.setMessage(sb.toString());
 
-            String nodeName = blockingStub.assignNodeIp(nodeInfo.build()).getName();
+            UpdateMessage reply = blockingStub.nodeUpdate(updateMessage.build());
 
-            logger.info("reply: " + nodeName + ", from: " + newip);
+            logger.info("reply: " + reply.getMessage() + ", from: " + newip);
         }
     }
 
@@ -134,6 +132,8 @@ public class Dhcp_Lease_Test {
     public void removeDeadnodes(List<String> deadNodes){
         newIpList.removeAll(deadNodes);
         copyList();
+        MasterNode.removeDeadNodeStats(deadNodes);
+
     }
 
     public List<String> getCurrentIpList() {
