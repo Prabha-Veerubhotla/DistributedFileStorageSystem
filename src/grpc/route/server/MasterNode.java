@@ -167,15 +167,15 @@ public class MasterNode extends RouteServerImpl {
         logger.info("Fetching cpu and mem stats of slaves");
         Map<String,Stats> tempStats=new HashMap<>();
         //local testing.
-        if(nodeIpChannelMap.isEmpty()){
-            ManagedChannel channel=nodeIpChannelMap.get("localhost");
-            blockingStub=FileServiceGrpc.newBlockingStub(channel);
-            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
-            nodeInfo.setIp("localhost");
-            nodeInfo.setPort("2345");
-            Stats stats=blockingStub.isAlive(nodeInfo.build());
-            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-        }
+//        if(nodeIpChannelMap.isEmpty()){
+//            ManagedChannel channel=nodeIpChannelMap.get("localhost");
+//            blockingStub=FileServiceGrpc.newBlockingStub(channel);
+//            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+//            nodeInfo.setIp("localhost");
+//            nodeInfo.setPort("2345");
+//            Stats stats=blockingStub.isAlive(nodeInfo.build());
+//            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+//        }
 
         nodeIpChannelMap.forEach((ip,channel1)->{
             blockingStub=FileServiceGrpc.newBlockingStub(channel1);
@@ -202,8 +202,8 @@ public class MasterNode extends RouteServerImpl {
             nodeSet.add(ip);
         });
         int numofNodeWentOff=nodeSet.size()-numNewNodes;
-        String[] nodeArray= (String[]) nodeSet.toArray();
-
+//        String[] nodeArray= (String[]) nodeSet.toArray();
+        String[] nodeArray=  nodeSet.toArray(new String[nodeSet.size()]);
         if(numofNodeWentOff>0){
             for(int i=1;i<=numofNodeWentOff;i++) {
                 deadNodes.add(nodeArray[nodeArray.length-i]);
