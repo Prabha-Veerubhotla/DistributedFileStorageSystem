@@ -23,7 +23,6 @@ service FileService {
     }
     // to all nodes
     rpc nodeUpdate(UpdateMessage) returns (UpdateMessage) {
-
     }
     // heartbeat
     rpc isAlive (NodeInfo) returns (Stats) {
