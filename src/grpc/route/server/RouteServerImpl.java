@@ -117,9 +117,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         if (isMaster) {
             invokeDhcpMonitorThread();
             slaveIpThread();
-            if(dhcp_lease_test.getCurrentIpList().size() > 0) {
-                getSlavesHeartBeat();
-            }
+            getSlavesHeartBeat();
+
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -155,16 +154,28 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     //gets and updates the nodeStatsMap<String ip, Stats stats> in MasterNode every 5 seconds
     private void getSlavesHeartBeat(){
+        logger.info("Started monitoring heart beat of slaves..");
         TimerTask timerTask=new TimerTask(){
             @Override
             public void run() {
-                MasterNode.getHeartBeatofAllSlaves();
+                if(dhcp_lease_test.getCurrentIpList().size() > 0) {
+                    MasterNode.getHeartBeatofAllSlaves();
+                }
             }
         };
         Timer timer=new Timer();
         timer.scheduleAtFixedRate(timerTask,0,5000);
     }
 
+    public void calculateSlaveStatsScore() {
+        Map<String, Stats> nodeStats = MasterNode.getNodeStats();
+        double cpuWeight = 0.4;
+        double memWeight = 0.6;
+        for(Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
+            double cpu = Double.parseDouble(m.getValue().getCpuUsage());
+            double mem = Double.parseDouble(m.getValue().getCpuUsage());
+        }
+    }
 
     protected void stop() {
         svr.shutdown();

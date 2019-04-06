@@ -1,7 +1,7 @@
 package lease;
 
 
-import io.grpc.Grpc;
+import grpc.route.server.MasterNode;
 import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -132,6 +132,8 @@ public class Dhcp_Lease_Test {
     public void removeDeadnodes(List<String> deadNodes){
         newIpList.removeAll(deadNodes);
         copyList();
+        MasterNode.removeDeadNodeStats(deadNodes);
+
     }
 
     public List<String> getCurrentIpList() {
