@@ -440,7 +440,34 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 filepath = fileData.getFilename().getFilename();
                 if (isMaster) {
                     List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
-                    ch1 = MasterNode.createChannel(ips.get(0));
+                    for(String ip: ips) {
+                        replicaChannel = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+                        replicaStub = FileServiceGrpc.newStub(replicaChannel);
+                    }
+                        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+                            @Override
+                            public void onNext(Ack ack) {
+                                logger.info("Received ack status from the server: " + ack.getSuccess());
+                                logger.info("Received ack  message from the server: " + ack.getMessage());
+                            }
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                logger.info("Exception in the response from server: " + throwable);
+                                cdl.countDown();
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                                logger.info("Server is done sending data");
+                                cdl.countDown();
+                                // replicaChannel.shutdown();
+                            }
+                        };
+
+                        fdsm = replicaStub.replicateFile(ackStreamObserver);
+                    }
                     ackStatus = MasterNode.updateFileToServer(fileData, false);
                     if (ackStatus) {
                         ackMessage = "success";
