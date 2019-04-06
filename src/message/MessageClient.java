@@ -56,7 +56,7 @@ public class MessageClient {
                 String updateStatus = rc.updateFileInServer(msg);
                 System.out.println(updateStatus);
             } else if (choice.equalsIgnoreCase("search")) {
-                System.out.print("Enter file name to update: ");
+                System.out.print("Enter file name to search: ");
                 String msg = br.readLine();
                 boolean searchResult = rc.searchFileInServer(msg);
                 if (searchResult) {
