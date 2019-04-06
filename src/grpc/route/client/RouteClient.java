@@ -194,7 +194,7 @@ public class RouteClient {
 
             Ack ack = blockingStub.deleteFile(fileInfo.build());
             if(ack.getSuccess()) {
-                return "present";
+                return "deleted successfully";
             } else {
                 return "unable to delete file";
             }

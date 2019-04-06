@@ -328,8 +328,15 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
         if (isMaster) {
             List<String> ips = masterMetaData.getMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+
+            logger.info("deleting metadata of file, slave in master");
+            logger.info("username: " + fileInfo.getUsername().getUsername());
+            logger.info("filepath: " + fileInfo.getFilename().getFilename());
+            logger.info("file name: " + getFileName(fileInfo.getFilename().getFilename()));
+            masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+
             for(String ip: ips) {
-                ch1 = MasterNode.createChannel(ip);
+                managedChannelList.add(MasterNode.createChannel(ip));
                 ackStatus = MasterNode.deleteFileFromServer(fileInfo);
                 if (ackStatus) {
                     ackMessage = "success";
@@ -341,14 +348,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 ack.setSuccess(ackStatus);
                 ackStreamObserver.onNext(ack.build());
                 ackStreamObserver.onCompleted();
-                ch1.shutdown();
             }
 
-            logger.info("putting metadata of file, slave in master");
-            logger.info("username: " + fileInfo.getUsername().getUsername());
-            logger.info("filepath: " + fileInfo.getFilename().getFilename());
-            logger.info("file name: " + getFileName(fileInfo.getFilename().getFilename()));
-            masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+            for(ManagedChannel managedChannel: managedChannelList) {
+                managedChannel.shutdown();
+            }
         } else {
             ackStatus = SlaveNode.delete(fileInfo);
             if (ackStatus) {
