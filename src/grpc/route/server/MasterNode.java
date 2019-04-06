@@ -44,6 +44,29 @@ public class MasterNode extends RouteServerImpl {
         //slave1 = "localhost"; // local testing
     }
 
+    public static Map<String, Double> calculateSlaveStatsScore() {
+        Map<String, Stats> nodeStats = MasterNode.getNodeStats();
+        double cpuWeight = 0.4;
+        double diskWeight = 0.5;
+        double memWeight = 0.1;
+        double mem = 0.0;
+        Map<String, Double> scoreMap = new HashMap<>();
+        for(Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
+
+            double cpu = Double.parseDouble(m.getValue().getCpuUsage());
+            if (m.getValue().getUsedMem() != null) {
+                mem = Double.parseDouble(m.getValue().getUsedMem());
+            }
+
+            double disk = Double.parseDouble(m.getValue().getDiskSpace());
+
+            double score = cpuWeight*cpu + diskWeight*disk + memWeight*mem;
+            logger.info("stats score: "+score+" for ip: "+m.getKey());
+            scoreMap.put(m.getKey(), score);
+        }
+        return scoreMap;
+    }
+
 
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
@@ -52,7 +75,14 @@ public class MasterNode extends RouteServerImpl {
         logger.info("number of shards: "+NOOFSHARDS);
         currentIP = slaveip.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
-        logger.info("returning ip: "+currentIP);
+        Map<String, Double> map = calculateSlaveStatsScore();
+        if(map.containsKey(currentIP)) {
+            logger.info("stats score: "+ map.get(currentIP)+" for current ip: "+currentIP);
+            if(map.get(currentIP) > 0.8) {
+                return roundRobinIP();
+            }
+        }
+        logger.info("Returning ip: "+currentIP);
         return currentIP;
     }
 

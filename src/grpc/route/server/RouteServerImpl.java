@@ -167,15 +167,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         timer.scheduleAtFixedRate(timerTask,0,2000);
     }
 
-    public void calculateSlaveStatsScore() {
-        Map<String, Stats> nodeStats = MasterNode.getNodeStats();
-        double cpuWeight = 0.4;
-        double memWeight = 0.6;
-        for(Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
-            double cpu = Double.parseDouble(m.getValue().getCpuUsage());
-            double mem = Double.parseDouble(m.getValue().getCpuUsage());
-        }
-    }
+
 
     protected void stop() {
         svr.shutdown();
@@ -239,7 +231,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
-        logger.info("calling upload file");
+        logger.info("Calling Upload file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;

@@ -106,7 +106,7 @@ public class Dhcp_Lease_Test {
                     Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                     BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
                     newIpList.clear();
-                    logger.info("old ip list: " + newIpList.toString());
+                    logger.info("new ip list: " + newIpList.toString());
                     String output;
                     while ((output = reader1.readLine()) != null) {
                         newIpList.add(output);
@@ -139,7 +139,7 @@ public class Dhcp_Lease_Test {
     }
 
     public List<String> getCurrentIpList() {
-        logger.info("old IP list size: "+ oldIpList);
+        logger.info("old IP list content: "+ oldIpList);
         return oldIpList;
     }
 
