@@ -45,7 +45,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     private static MasterMetaData masterMetaData = new MasterMetaData();
     ManagedChannel originalChannel = null;
     ManagedChannel replicaChannel = null;
-    private CountDownLatch cdl;
+    private CountDownLatch cdl = new CountDownLatch(1);
     StreamObserver<FileData> fdsm;
 
     String originalIp;
