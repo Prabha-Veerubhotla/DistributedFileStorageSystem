@@ -22,9 +22,8 @@ import route.*;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-import static grpc.route.server.MasterNode.roundRobinIP;
-import static grpc.route.server.MasterNode.setIsRoundRobinCalled;
-import static grpc.route.server.MasterNode.slave1port;
+
+import static grpc.route.server.MasterNode.*;
 
 
 public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
@@ -47,9 +46,10 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     ManagedChannel replicaChannel = null;
     private CountDownLatch cdl = new CountDownLatch(1);
     StreamObserver<FileData> fdsm;
-
+    List<ManagedChannel> managedChannelList = new ArrayList<>();
     String originalIp;
     String replicaIp;
+    boolean isChannelCreated = false;
 
 
 
@@ -328,8 +328,15 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
         if (isMaster) {
             List<String> ips = masterMetaData.getMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+
+            logger.info("deleting metadata of file, slave in master");
+            logger.info("username: " + fileInfo.getUsername().getUsername());
+            logger.info("filepath: " + fileInfo.getFilename().getFilename());
+            logger.info("file name: " + getFileName(fileInfo.getFilename().getFilename()));
+            masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+
             for(String ip: ips) {
-                ch1 = MasterNode.createChannel(ip);
+                managedChannelList.add(MasterNode.createChannel(ip));
                 ackStatus = MasterNode.deleteFileFromServer(fileInfo);
                 if (ackStatus) {
                     ackMessage = "success";
@@ -341,14 +348,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 ack.setSuccess(ackStatus);
                 ackStreamObserver.onNext(ack.build());
                 ackStreamObserver.onCompleted();
-                ch1.shutdown();
             }
 
-            logger.info("putting metadata of file, slave in master");
-            logger.info("username: " + fileInfo.getUsername().getUsername());
-            logger.info("filepath: " + fileInfo.getFilename().getFilename());
-            logger.info("file name: " + getFileName(fileInfo.getFilename().getFilename()));
-            masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+            for(ManagedChannel managedChannel: managedChannelList) {
+                managedChannel.shutdown();
+            }
         } else {
             ackStatus = SlaveNode.delete(fileInfo);
             if (ackStatus) {
@@ -425,12 +429,14 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     @Override
     public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
         logger.info("calling update file");
+
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
             String ackMessage;
             String username;
             String filepath;
             FileData fd;
+
 
             @Override
             public void onNext(FileData fileData) {
@@ -439,9 +445,49 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 username = fileData.getUsername().getUsername();
                 filepath = fileData.getFilename().getFilename();
                 if (isMaster) {
-                    List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
-                    ch1 = MasterNode.createChannel(ips.get(0));
+                    if(!isChannelCreated) {
+                        List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
+                        ManagedChannel managedChannel;
+                        for (int i = 0; i < ips.size(); i++) {
+                            if (i == 0) {
+                                managedChannel = createChannel(ips.get(i));
+                                originalIp = ips.get(i);
+                            } else {
+                                replicaIp = ips.get(i);
+                                managedChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+                            }
+                            managedChannelList.add(managedChannel);
+                        }
+                        isChannelCreated = true;
+                    }
+                        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+                            @Override
+                            public void onNext(Ack ack) {
+                                logger.info("Received ack status from the server: " + ack.getSuccess());
+                                logger.info("Received ack  message from the server: " + ack.getMessage());
+                            }
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                logger.info("Exception in the response from server: " + throwable);
+                                cdl.countDown();
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                                logger.info("Server is done sending data");
+                                cdl.countDown();
+                                // replicaChannel.shutdown();
+                            }
+                        };
+
                     ackStatus = MasterNode.updateFileToServer(fileData, false);
+                        if(managedChannelList.size() > 1) {
+                            replicaStub = FileServiceGrpc.newStub(managedChannelList.get(1));
+                            fdsm = replicaStub.replicateFile(ackStreamObserver);
+                            replicate(fileData, false, fdsm);
+                        }
                     if (ackStatus) {
                         ackMessage = "success";
                     } else {
@@ -473,16 +519,26 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
-
                     masterMetaData.deleteFileFormMetaData(username, getFileName(filepath));
+                    if(managedChannelList.size() > 1) {
+                        replicate(fd, true, fdsm);
+                        logger.info("putting metadata of file, slave in master");
+                        logger.info("username: " + username);
+                        logger.info("filepath: " + filepath);
+                        logger.info("ip: " + replicaIp);
+                        logger.info("file name: " + getFileName(filepath));
+                        masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
+                    }
                     logger.info("putting metadata of file, slave in master");
                     logger.info("username: " + username);
                     logger.info("filepath: " + filepath);
-                    logger.info("ip: " + slave1);
+                    logger.info("ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
-                    masterMetaData.putMetaData(username, getFileName(filepath), slave1);
+                    masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
                     logger.info("channel is shutitng down");
-                    ch1.shutdown();
+                    for(ManagedChannel channel: managedChannelList) {
+                        channel.shutdown();
+                    }
                 } else {
                     logger.info("Calling Update Mongo");
                     if (SlaveNode.updateMongo(username, filepath)) {
