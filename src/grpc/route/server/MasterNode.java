@@ -167,15 +167,15 @@ public class MasterNode extends RouteServerImpl {
         logger.info("Fetching cpu and mem stats of slaves");
         Map<String,Stats> tempStats=new HashMap<>();
         //local testing.
-//        if(nodeIpChannelMap.isEmpty()){
-//            ManagedChannel channel=nodeIpChannelMap.get("localhost");
-//            blockingStub=FileServiceGrpc.newBlockingStub(channel);
-//            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
-//            nodeInfo.setIp("localhost");
-//            nodeInfo.setPort("2345");
-//            Stats stats=blockingStub.isAlive(nodeInfo.build());
-//            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-//        }
+       /* if(nodeIpChannelMap.isEmpty()){
+            ManagedChannel channel=nodeIpChannelMap.get("localhost");
+            blockingStub=FileServiceGrpc.newBlockingStub(channel);
+            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+            nodeInfo.setIp("localhost");
+            nodeInfo.setPort("2345");
+            Stats stats=blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+       }*/
 
         nodeIpChannelMap.forEach((ip,channel1)->{
             blockingStub=FileServiceGrpc.newBlockingStub(channel1);
@@ -202,7 +202,6 @@ public class MasterNode extends RouteServerImpl {
             nodeSet.add(ip);
         });
         int numofNodeWentOff=nodeSet.size()-numNewNodes;
-//        String[] nodeArray= (String[]) nodeSet.toArray();
         String[] nodeArray=  nodeSet.toArray(new String[nodeSet.size()]);
         if(numofNodeWentOff>0){
             for(int i=1;i<=numofNodeWentOff;i++) {
@@ -242,17 +241,17 @@ public class MasterNode extends RouteServerImpl {
 
 }
 
-// 1. save meta data of files (which partition on which slave)
+// 1. save meta data of files (which partition on which slave)-- done
 
-// 2. send heartbeat to slaves
+// 2. send heartbeat to slaves -TODO
 
-// 3. hashing the data ( given file (parts) onto the 3 nodes)
+// 3. hashing the data --done
 
-// 4. replication of each part twice
+// 4. replication of each part twice -- done
 
-// 5. update meta-data when a slave goes down or come up
+// 5. update meta-data when a slave goes down or come up  - TODO
 
-// 6. take care of load balancing(data replication) when node goes up or down
+// 6. take care of load balancing(data replication) when node goes up or down - TODO
 
 // 7. talk with both client and other slaves -- done
 
