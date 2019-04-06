@@ -72,7 +72,6 @@ public class RouteClient {
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
         logger.info("Client running...");
         logger.info("Requesting ip from dhcp server");
-        requestIp();
     }
 
 
@@ -132,7 +131,7 @@ public class RouteClient {
                 try {
                     fis = new FileInputStream(fn);
                     long seq = 0l;
-                    final int blen = 10024;
+                    final int blen = (int) Math.pow(10, 6)*4;
                     byte[] raw = new byte[blen];
                     boolean done = false;
                     while (!done) {
@@ -218,14 +217,6 @@ public class RouteClient {
         ch.shutdown();
     }
 
-    //blocking
-    public void requestIp() {
-        NodeName.Builder nodeName = NodeName.newBuilder();
-        nodeName.setName("client");
-        NodeInfo nodeInfo = blockingStub.requestNodeIp(nodeName.build());
-        myIp = new String(nodeInfo.getIp());
-        logger.info("my ip is: " + myIp);
-    }
 
     public String listFilesInServer(String userName) {
         UserInfo.Builder userInfo = UserInfo.newBuilder();

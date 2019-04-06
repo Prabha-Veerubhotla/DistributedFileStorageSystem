@@ -49,7 +49,7 @@
            <arg value="conf/server.conf" />
            <jvmarg value = '-server' />
            <jvmarg value = '-Xms500m' />
-           <jvmarg value = '-Xmx4g' />
+           <jvmarg value = '-Xmx10g' />
        </java>
    </target>
 
@@ -61,7 +61,7 @@
             <arg value="conf/slave.conf" />
             <jvmarg value = '-server' />
             <jvmarg value = '-Xms500m' />
-            <jvmarg value = '-Xmx4g' />
+            <jvmarg value = '-Xmx10g' />
         </java>
     </target>
 

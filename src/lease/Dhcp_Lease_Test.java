@@ -1,6 +1,8 @@
 package lease;
 
 
+import io.grpc.Grpc;
+import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.FileServiceGrpc;
@@ -34,7 +36,7 @@ public class Dhcp_Lease_Test {
         oldIpList = new ArrayList<>(newIpList);
     }
 
-    public void compareAndUpdate() {
+    public void compareAndUpdate() throws StatusRuntimeException {
         logger.info("Comparing and Updating list of all the current nodes in the network");
         logger.info("new ip list: " + newIpList.toString());
         Set<String> set = new HashSet<>();
@@ -106,7 +108,7 @@ public class Dhcp_Lease_Test {
                     BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
                     newIpList.clear();
                     logger.info("old ip list: " + newIpList.toString());
-                    String output = null;
+                    String output;
                     while ((output = reader1.readLine()) != null) {
                         newIpList.add(output);
                     }
@@ -114,7 +116,7 @@ public class Dhcp_Lease_Test {
                     compareAndUpdate();
                     copyList();
 
-                } catch (IOException io) {
+                } catch (IOException | StatusRuntimeException io) {
                     logger.info("Exception while handling changes of lease file: " + io);
                 }
 
