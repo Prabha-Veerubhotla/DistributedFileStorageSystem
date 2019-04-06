@@ -1,5 +1,8 @@
-# 275-project1-demo1
+# Project Fluffy
 
+### Description
+Project Fluffy is a distributed system that acts a data-storage platform where network of server nodes are connected with switches and LAN cables.  
+Various distributed systems concepts are used to make Project Fluffy fault tolerant and highly scalable.
 ### Software requirements:
 1. Java 1.8
 2. Apache Ant

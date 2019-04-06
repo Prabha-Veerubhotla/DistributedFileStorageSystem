@@ -127,6 +127,7 @@ public class RouteClient {
             if (checkIfFile(filename)) {
                 logger.info(filename + " is a file");
                 File fn = new File(filename);
+                logger.info("file length is: "+fn.length());
                 FileInputStream fis = null;
                 try {
                     fis = new FileInputStream(fn);
@@ -136,6 +137,7 @@ public class RouteClient {
                     boolean done = false;
                     while (!done) {
                         int n = fis.read(raw, 0, blen);
+                        logger.info("n: "+n);
                         if (n <= 0)
                             break;
                         // identifying sequence number
