@@ -118,7 +118,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             invokeDhcpMonitorThread();
             slaveIpThread();
             getSlavesHeartBeat();
-
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -158,13 +157,14 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         TimerTask timerTask=new TimerTask(){
             @Override
             public void run() {
+                logger.info("running heart beat monitoring service...");
                 if(dhcp_lease_test.getCurrentIpList().size() > 0) {
                     MasterNode.getHeartBeatofAllSlaves();
                 }
             }
         };
         Timer timer=new Timer();
-        timer.scheduleAtFixedRate(timerTask,0,5000);
+        timer.scheduleAtFixedRate(timerTask,0,2000);
     }
 
     public void calculateSlaveStatsScore() {
