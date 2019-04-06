@@ -45,7 +45,6 @@ public class MasterNode extends RouteServerImpl {
     }
 
     public static Map<String, Double> calculateSlaveStatsScore() {
-        Map<String, Stats> nodeStats = MasterNode.getNodeStats();
         double cpuWeight = 0.4;
         double diskWeight = 0.5;
         double memWeight = 0.1;
@@ -76,6 +75,8 @@ public class MasterNode extends RouteServerImpl {
         logger.info("number of shards: "+NOOFSHARDS);
         currentIP = slaveip.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
+
+        /* using heartbeat stats also
         Map<String, Double> map = calculateSlaveStatsScore();
         logger.info("Calculating slave stats list size: "+map.size());
         if(map.containsKey(currentIP)) {
@@ -83,7 +84,7 @@ public class MasterNode extends RouteServerImpl {
             if(map.get(currentIP) > 0.8) {
                 return roundRobinIP();
             }
-        }
+        }*/
         logger.info("Returning ip: "+currentIP);
         return currentIP;
     }
