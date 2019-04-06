@@ -389,32 +389,6 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     }
 
     @Override
-    public void requestNodeIp(NodeName nodeName, StreamObserver<NodeInfo> nodeInfoStreamObserver) {
-        logger.info("Requesting node ip for node: " + nodeName);
-        NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
-        if (isMaster) {
-            nodeInfo.setIp(MasterNode.sendIpToNode(dhcp_lease_test.getCurrentNodeMapping(), dhcp_lease_test.getCurrentIpList()));
-            nodeInfo.setPort("2345");
-            dhcp_lease_test.updateCurrentNodeMapping(nodeInfo.build(), nodeName);
-        }
-        logger.info("Requesting to assign ip, for: " + nodeName.getName());
-        nodeInfoStreamObserver.onNext(nodeInfo.build());
-        nodeInfoStreamObserver.onCompleted();
-    }
-    @Override
-    public void assignNodeIp(NodeInfo nodeInfo, StreamObserver<NodeName> nodeNameStreamObserver) {
-        NodeName.Builder nodeName = NodeName.newBuilder();
-        if (!isMaster) {
-            myIp = nodeInfo.getIp();
-            myPort = nodeInfo.getPort();
-        }
-        logger.info("Assigned ip: " + myIp + "  by DHCP server");
-        nodeName.setName("slave");
-        nodeNameStreamObserver.onNext(nodeName.build());
-        nodeNameStreamObserver.onCompleted();
-    }
-
-    @Override
     public void listFile(UserInfo userInfo, StreamObserver<FileResponse> fileResponseStreamObserver) {
         logger.info("Listing files for user: " + userInfo.getUsername());
         FileResponse.Builder fileResponse = FileResponse.newBuilder();
@@ -625,17 +599,14 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 fis = new FileInputStream(fn);
                 logger.info("fis: " + fis.toString());
                 long seq = 0l;
-                final int blen = 10024;
+                final int blen = (int) Math.pow(10, 6)*4;
                 byte[] raw = new byte[blen];
                 boolean done = false;
                 while (!done) {
                     int n = fis.read(raw, 0, blen);
                     logger.info("n: " + n);
-                    logger.info("raw before break: " + new String(raw));
                     if (n <= 0)
                         break;
-                    logger.info("raw after break: " + new String(raw));
-                    System.out.println("n: " + n);
                     // identifying sequence number
                     fileData1.setContent(ByteString.copyFrom(raw, 0, n));
                     fileData1.setSeqnum(seq);

@@ -44,14 +44,11 @@ public class SlaveNode extends RouteServerImpl {
      * @return boolean
      */
     public static boolean put(FileData fileData) {
-        logger.info("All Data" + new String(fileData.getContent().toByteArray()));
         UserInfo userName = fileData.getUsername();
         byte[] payload = fileData.getContent().toByteArray();
         String seqID = Long.toString(fileData.getSeqnum());
         String fileName = getFileName(fileData.getFilename().getFilename());
         logger.info("Put details: " + userName + " seq num: " + seqID);
-        //logger.info("content: " + new String(payload));
-        //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName.getUsername(), fileName, seqID, payload);
         return true;
     }
