@@ -174,6 +174,28 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         svr.awaitTermination();
     }
 
+    @Override
+    public void assignNodeIp(NodeInfo nodeInfo, StreamObserver<NodeName> nodeNameStreamObserver) {
+        NodeName.Builder nodeName = NodeName.newBuilder();
+        if (!isMaster) {
+            myIp = nodeInfo.getIp();
+            myPort = nodeInfo.getPort();
+        }
+        logger.info("Assigned ip: " + myIp + "  by DHCP server");
+        nodeName.setName("slave");
+        nodeNameStreamObserver.onNext(nodeName.build());
+        nodeNameStreamObserver.onCompleted();
+    }
+
+    @Override
+    public void nodeUpdate(UpdateMessage updateMessage, StreamObserver<UpdateMessage> updateMessageStreamObserver) {
+        UpdateMessage.Builder um = UpdateMessage.newBuilder();
+        um.setMessage("Update received");
+        logger.info("Current Node update received from master: "+updateMessage.getMessage());
+        updateMessageStreamObserver.onNext(um.build());
+        updateMessageStreamObserver.onCompleted();
+    }
+
     public static String getFileName(String filePath) {
         String[] tokens = filePath.split("/");
         String fileName = tokens[tokens.length - 1];
