@@ -102,6 +102,7 @@ public class Dhcp_Lease_Test {
                 // here we code the action on a change
                 try {
                     //TODO: replace the command with relative path or use root dir
+                    logger.info("Calling onchange dhcpd.lease file");
                     Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                     BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
                     newIpList.clear();
@@ -130,6 +131,7 @@ public class Dhcp_Lease_Test {
     }
 
     public void removeDeadnodes(List<String> deadNodes){
+        logger.info("Removing dead nodes");
         newIpList.removeAll(deadNodes);
         copyList();
         MasterNode.removeDeadNodeStats(deadNodes);
@@ -137,6 +139,7 @@ public class Dhcp_Lease_Test {
     }
 
     public List<String> getCurrentIpList() {
+        logger.info("old IP list size: "+ oldIpList);
         return oldIpList;
     }
 

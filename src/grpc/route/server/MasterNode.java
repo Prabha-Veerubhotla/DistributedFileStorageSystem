@@ -213,7 +213,8 @@ public class MasterNode extends RouteServerImpl {
                 deadNodes.add(nodeArray[nodeArray.length-i]);
             }
         }
-        removeDeadSlavesFromDHCPList(deadNodes);
+        if(deadNodes.size()!=0)
+            removeDeadSlavesFromDHCPList(deadNodes);
     }
 
     public synchronized static Map<String,Stats> getNodeStats() {

@@ -727,6 +727,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         Stats.Builder stats = Stats.newBuilder();
         stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
         stats.setDiskSpace(Double.toString(((UnixOperatingSystemMXBean) mxBean).getFreePhysicalMemorySize()));
+//        stats.setUsedMem(Double.toString(mxBean.))
 
         responseObserver.onNext(stats.build());
         responseObserver.onCompleted();
