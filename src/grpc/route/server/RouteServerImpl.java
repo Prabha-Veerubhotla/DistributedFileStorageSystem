@@ -331,6 +331,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     logger.info("original ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
+                    masterMetaData.putMetaDataForIP(username,getFileName(filepath),originalIp);
                     if(managedChannelList.size() > 1) {
                         logger.info("putting metadata of replicated file, slave in master");
                         logger.info("username: " + username);
@@ -338,6 +339,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         logger.info("replica ip: " + replicaIp);
                         logger.info("file name: " + getFileName(filepath));
                         masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
+                        masterMetaData.putMetaDataForIP(username,getFileName(filepath),replicaIp);
                     }
                     MasterNode.isRoundRobinCalled = false;
                 } else {
@@ -539,6 +541,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         logger.info("replica ip: " + replicaIp);
                         logger.info("file name: " + getFileName(filepath));
                         masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
+                        masterMetaData.putMetaDataForIP(username, getFileName(filepath), replicaIp);
                     }
                     logger.info("putting metadata of  replica file, slave in master");
                     logger.info("username: " + username);
@@ -546,6 +549,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     logger.info("original ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
+                    masterMetaData.putMetaDataForIP(username, getFileName(filepath), originalIp);
                     logger.info("channel is shutitng down");
                     for(ManagedChannel channel: managedChannelList) {
                         channel.shutdown();

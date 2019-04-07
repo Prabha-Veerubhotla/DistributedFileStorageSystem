@@ -1,5 +1,6 @@
 package grpc.route.server;
 
+import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
@@ -7,9 +8,14 @@ import lease.Dhcp_Lease_Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
@@ -27,7 +33,7 @@ public class MasterNode extends RouteServerImpl {
     private static boolean ackStatus;
     private static boolean done = false;
     static boolean isRoundRobinCalled = false;
-
+    static MasterMetaData masterMetaData=new MasterMetaData();
 
     public static void setIsRoundRobinCalled(boolean isRoundRobinCalled) {
         MasterNode.isRoundRobinCalled = isRoundRobinCalled;
@@ -70,10 +76,11 @@ public class MasterNode extends RouteServerImpl {
 
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
-       logger.info("current ip list: "+slaveip);
-        NOOFSHARDS = slaveip.size();
+       logger.info("current ip list: "+new Dhcp_Lease_Test().getCurrentIpList());
+        List<String> currentList = new Dhcp_Lease_Test().getCurrentIpList();
+        NOOFSHARDS =currentList.size();
         logger.info("number of shards: "+NOOFSHARDS);
-        currentIP = slaveip.get(currentIPIxd);
+        currentIP = currentList.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
 
         /* using heartbeat stats also
@@ -271,6 +278,138 @@ public class MasterNode extends RouteServerImpl {
     public static void removeDeadSlavesFromDHCPList(List<String> deadNodes){
         new Dhcp_Lease_Test().removeDeadnodes(deadNodes);
     }
+
+    public static void migrateDataFromANode(String nodeIP){
+        Map<String,List<String>> userFile=masterMetaData.getMetaDataForIP(nodeIP);
+
+        AtomicReference<List<String>> nodesNottobeReplicated=null;
+
+        userFile.forEach((username,fileList)->{
+            for(int i=0;i<fileList.size();i++) {
+                nodesNottobeReplicated.set(masterMetaData.getMetaData(username, fileList.get(i)));
+                nodesNottobeReplicated.get().remove(nodeIP);
+                //getting file data from the node that already has the file.
+                FileInfo.Builder fileInfo=FileInfo.newBuilder();
+                fileInfo.setFilename(fileList.get(i));
+
+//                SlaveNode.get(fileInfo);
+//                String IPtoReplicateTo=null;
+//                while(true){
+//                    IPtoReplicateTo=roundRobinIP();
+//                    if(!nodesNottobeReplicated.get().contains(IPtoReplicateTo))
+//                        break;
+//                }
+//                ManagedChannel ch=ManagedChannelBuilder.forAddress(IPtoReplicateTo,Integer.parseInt(slave1port)).usePlaintext().build();
+//                ayncStub = FileServiceGrpc.newStub(ch);
+
+
+
+
+
+                /*CountDownLatch cdl = new CountDownLatch(1);
+                StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+
+                    @Override
+                    public void onNext(Ack ack) {
+                        ackStatus = ack.getSuccess();
+                        logger.info("Received ack status from the replicated server when a node is dead: " + ack.getSuccess());
+                        logger.info("Received ack  message from the replicated server when a node is dead: " + ack.getMessage());
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        logger.info("Exception in the response from server that replicating data when a node is dead: " + throwable);
+                        cdl.countDown();
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        logger.info("Server is done sending data");
+//                        putCompleted = true;
+                        cdl.countDown();
+                    }
+                };
+
+                route.FileData.Builder fileData = FileData.newBuilder();
+
+                route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(fileList.get(i));
+                fileData.setFilename(fileResponse.build());
+
+                route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(username);
+                fileData.setUsername(userInfo.build());
+
+                StreamObserver<FileData> fileDataStreamObserver = ayncStub.uploadFile(ackStreamObserver);
+
+                if (checkIfFile(filename)) {
+                    logger.info(filename + " is a file");
+                    File fn = new File(filename);
+                    logger.info("file length is: "+fn.length());
+                    FileInputStream fis = null;
+                    try {
+                        fis = new FileInputStream(fn);
+                        long seq = 0l;
+                        final int blen = 4194000;
+                        byte[] raw = new byte[blen];
+                        boolean done = false;
+                        while (!done) {
+                            int n = fis.read(raw, 0, blen);
+                            logger.info("n: "+n);
+                            if (n <= 0)
+                                break;
+                            // identifying sequence number
+                            seq++;
+                            logger.info("Streaming seq num: " + seq);
+                            fileData.setContent(ByteString.copyFrom(raw, 0, n));
+                            logger.info("seq num is: " + seq);
+                            fileData.setSeqnum(seq);
+                            logger.info("Sending file data to server with seq num: " + seq);
+                            fileDataStreamObserver.onNext(fileData.build());
+                        }
+                    } catch (IOException e) {
+                        ; // ignore? really?
+                        fileDataStreamObserver.onError(e);
+                    } finally {
+                        try {
+                            fis.close();
+                        } catch (IOException e) {
+                            ; // ignore
+                        }
+                    }
+                }
+                fileDataStreamObserver.onCompleted();
+
+                try {
+                    cdl.await(3, TimeUnit.SECONDS);
+                } catch (InterruptedException ie) {
+                    logger.info("Exception while waiting for count down latch: " + ie);
+                }
+            }
+
+            while(!putCompleted) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    ie.printStackTrace();
+                }
+            }
+
+            if (ackStatus) {
+                return "success";
+            }
+            return "Unable to save file";
+
+
+
+
+            }
+
+        });
+*/
+
+    }
+
+
+
     /* get the heartbeat and stats of individual node.
     public static Stats getHeartBeatofSelectedSlaves(List<String> nodes){
             blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
