@@ -9,9 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import route.*;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -20,8 +17,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
-    static Map<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
-    static Map<String,Stats> nodeStatsMap=new HashMap<>();
+    static Map<String, ManagedChannel> nodeIpChannelMap = new HashMap<>();
+    static Map<String, Stats> nodeStatsMap = new HashMap<>();
     static String slave1port = "2345";
     static String slave1 = "localhost";
     private static ManagedChannel ch;
@@ -31,9 +28,9 @@ public class MasterNode extends RouteServerImpl {
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 1;
     private static boolean ackStatus;
-    private static boolean done = false;
     static boolean isRoundRobinCalled = false;
-    static MasterMetaData masterMetaData=new MasterMetaData();
+    static MasterMetaData masterMetaData = new MasterMetaData();
+    static StreamObserver<FileData> fileDataStreamObserver1 = null;
 
     public static void setIsRoundRobinCalled(boolean isRoundRobinCalled) {
         MasterNode.isRoundRobinCalled = isRoundRobinCalled;
@@ -41,7 +38,7 @@ public class MasterNode extends RouteServerImpl {
 
     public static String assignSlaveIp(List<String> slaveiplist) {
         slaveip = slaveiplist;
-        if(slaveiplist.size() != 0) {
+        if (slaveiplist.size() != 0) {
             slave1 = slaveip.get(0);
         } else {
             slave1 = "localhost";
@@ -56,8 +53,8 @@ public class MasterNode extends RouteServerImpl {
         double memWeight = 0.1;
         double mem = 0.0;
         Map<String, Double> scoreMap = new HashMap<>();
-        logger.info("In claculateSlaveStatsScore: nodeStatsMapSize: "+nodeStatsMap.size());
-        for(Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
+        logger.info("In claculateSlaveStatsScore: nodeStatsMapSize: " + nodeStatsMap.size());
+        for (Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
 
             double cpu = Double.parseDouble(m.getValue().getCpuUsage());
             if (m.getValue().getUsedMem() != "") {
@@ -66,8 +63,8 @@ public class MasterNode extends RouteServerImpl {
 
             double disk = Double.parseDouble(m.getValue().getDiskSpace());
 
-            double score = cpuWeight*cpu + diskWeight*disk + memWeight*mem;
-            logger.info("stats score: "+score+" for ip: "+m.getKey());
+            double score = cpuWeight * cpu + diskWeight * disk + memWeight * mem;
+            logger.info("stats score: " + score + " for ip: " + m.getKey());
             scoreMap.put(m.getKey(), score);
         }
         return scoreMap;
@@ -76,29 +73,19 @@ public class MasterNode extends RouteServerImpl {
 
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
-       logger.info("current ip list: "+new Dhcp_Lease_Test().getCurrentIpList());
+        logger.info("current ip list: " + new Dhcp_Lease_Test().getCurrentIpList());
         List<String> currentList = new Dhcp_Lease_Test().getCurrentIpList();
-        NOOFSHARDS =currentList.size();
-        logger.info("number of shards: "+NOOFSHARDS);
+        NOOFSHARDS = currentList.size();
+        logger.info("number of shards: " + NOOFSHARDS);
         currentIP = currentList.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
-
-        /* using heartbeat stats also
-        Map<String, Double> map = calculateSlaveStatsScore();
-        logger.info("Calculating slave stats list size: "+map.size());
-        if(map.containsKey(currentIP)) {
-            logger.info("stats score: "+ map.get(currentIP)+" for current ip: "+currentIP);
-            if(map.get(currentIP) > 0.8) {
-                return roundRobinIP();
-            }
-        }*/
-        logger.info("Returning ip: "+currentIP);
+        logger.info("Returning ip: " + currentIP);
         return currentIP;
     }
 
     public static ManagedChannel createChannel(String slave1) {
         logger.info("creating channel for slave");
-        logger.info("slave 1 ip is: "+slave1);
+        logger.info("slave 1 ip is: " + slave1);
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
         ayncStub = FileServiceGrpc.newStub(ch);
         logger.info("creating async stub ");
@@ -139,7 +126,7 @@ public class MasterNode extends RouteServerImpl {
             fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData);
-            logger.info("sent data with seq num:  "+fileData.getSeqnum()+" to slave");
+            logger.info("sent data with seq num:  " + fileData.getSeqnum() + " to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -181,7 +168,7 @@ public class MasterNode extends RouteServerImpl {
             fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData);
-            logger.info("sent data with seq num:  "+fileData.getSeqnum()+" to slave");
+            logger.info("sent data with seq num:  " + fileData.getSeqnum() + " to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -199,10 +186,10 @@ public class MasterNode extends RouteServerImpl {
 
 
     // gets the hearbeat of all slaves and updates the nodeStatsMap.
-    public static void getHeartBeatofAllSlaves(){
+    public static void getHeartBeatofAllSlaves() {
         logger.info("getting current ip list from dhcp lease file");
         List<String> currentIpList = new Dhcp_Lease_Test().getCurrentIpList();
-        for(String ip: currentIpList) {
+        for (String ip : currentIpList) {
             Node_ip_channel node_ip_channel = new Node_ip_channel();
             node_ip_channel.setIpAddress(ip);
             ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
@@ -210,51 +197,51 @@ public class MasterNode extends RouteServerImpl {
             nodeIpChannelMap.put(ip, ch);
         }
         logger.info("Fetching cpu and mem stats of slaves");
-        Map<String,Stats> tempStats=new HashMap<>();
+        Map<String, Stats> tempStats = new HashMap<>();
         //local testing.
-        if(nodeIpChannelMap.isEmpty()){
-            ManagedChannel channel=nodeIpChannelMap.get("localhost");
-            blockingStub=FileServiceGrpc.newBlockingStub(channel);
-            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+        if (nodeIpChannelMap.isEmpty()) {
+            ManagedChannel channel = nodeIpChannelMap.get("localhost");
+            blockingStub = FileServiceGrpc.newBlockingStub(channel);
+            NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
             nodeInfo.setIp("localhost");
             nodeInfo.setPort("2345");
-            Stats stats=blockingStub.isAlive(nodeInfo.build());
-            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-       }
+            Stats stats = blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: " + stats.getCpuUsage() + "\n\tmemoryUsed: " + stats.getUsedMem() + "\n\tFreeSpace: " + stats.getDiskSpace());
+        }
 
-        nodeIpChannelMap.forEach((ip,channel1)->{
-        blockingStub=FileServiceGrpc.newBlockingStub(channel1);
+        nodeIpChannelMap.forEach((ip, channel1) -> {
+            blockingStub = FileServiceGrpc.newBlockingStub(channel1);
 
-        NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
-        nodeInfo.setIp(ip);
-        nodeInfo.setPort("2345");
-        Stats stats=blockingStub.isAlive(nodeInfo.build());
-        tempStats.put(ip,stats);
-        logger.info("Got CPU stats from slave:"+ip+" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-    });
-    updateNodeStats(tempStats);
-}
+            NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
+            nodeInfo.setIp(ip);
+            nodeInfo.setPort("2345");
+            Stats stats = blockingStub.isAlive(nodeInfo.build());
+            tempStats.put(ip, stats);
+            logger.info("Got CPU stats from slave:" + ip + " \n\tcpuUsage: " + stats.getCpuUsage() + "\n\tmemoryUsed: " + stats.getUsedMem() + "\n\tFreeSpace: " + stats.getDiskSpace());
+        });
+        updateNodeStats(tempStats);
+    }
 
-    public synchronized static void updateNodeStats(Map<String,Stats> newStats){
+    public synchronized static void updateNodeStats(Map<String, Stats> newStats) {
         logger.info("In node stats");
-        Set<String> nodeSet=new HashSet<>();
-        List<String> deadNodes=new ArrayList<>();
+        Set<String> nodeSet = new HashSet<>();
+        List<String> deadNodes = new ArrayList<>();
 
-        newStats.forEach((ip,Stats)->{
+        newStats.forEach((ip, Stats) -> {
             nodeSet.add(ip);
         });
-        int numNewNodes=nodeSet.size();
-        nodeStatsMap.forEach((ip,Stats)->{
+        int numNewNodes = nodeSet.size();
+        nodeStatsMap.forEach((ip, Stats) -> {
             nodeSet.add(ip);
         });
-        int numofNodeWentOff=nodeSet.size()-numNewNodes;
-        String[] nodeArray=  nodeSet.toArray(new String[nodeSet.size()]);
-        if(numofNodeWentOff>0){
-            for(int i=1;i<=numofNodeWentOff;i++) {
-                deadNodes.add(nodeArray[nodeArray.length-i]);
+        int numofNodeWentOff = nodeSet.size() - numNewNodes;
+        String[] nodeArray = nodeSet.toArray(new String[nodeSet.size()]);
+        if (numofNodeWentOff > 0) {
+            for (int i = 1; i <= numofNodeWentOff; i++) {
+                deadNodes.add(nodeArray[nodeArray.length - i]);
             }
         }
-        if(deadNodes.size()!=0) {
+        if (deadNodes.size() != 0) {
             removeDeadSlavesFromDHCPList(deadNodes);
 
         }
@@ -262,12 +249,12 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
-    public synchronized static Map<String,Stats> getNodeStats() {
+    public synchronized static Map<String, Stats> getNodeStats() {
         return nodeStatsMap;
     }
 
     public synchronized static void removeDeadNodeStats(List<String> deadNodeIp) {
-        for(String ip: deadNodeIp) {
+        for (String ip : deadNodeIp) {
             if (nodeStatsMap.containsKey(ip)) {
                 nodeStatsMap.remove(ip);
             }
@@ -275,22 +262,97 @@ public class MasterNode extends RouteServerImpl {
     }
 
 
-    public static void removeDeadSlavesFromDHCPList(List<String> deadNodes){
+    public static void removeDeadSlavesFromDHCPList(List<String> deadNodes) {
         new Dhcp_Lease_Test().removeDeadnodes(deadNodes);
     }
 
-    public static void migrateDataFromANode(String nodeIP){
-        Map<String,List<String>> userFile=masterMetaData.getMetaDataForIP(nodeIP);
+    public static void migrateDataFromANode(String nodeIP) {
+        Map<String, List<String>> userFile = masterMetaData.getMetaDataForIP(nodeIP);
 
-        AtomicReference<List<String>> nodesNottobeReplicated=null;
+        AtomicReference<List<String>> nodesNottobeReplicated = null;
 
-        userFile.forEach((username,fileList)->{
-            for(int i=0;i<fileList.size();i++) {
+        userFile.forEach((username, fileList) -> {
+            for (int i = 0; i < fileList.size(); i++) {
                 nodesNottobeReplicated.set(masterMetaData.getMetaData(username, fileList.get(i)));
                 nodesNottobeReplicated.get().remove(nodeIP);
-                //getting file data from the node that already has the file.
-                FileInfo.Builder fileInfo=FileInfo.newBuilder();
-                fileInfo.setFilename(fileList.get(i));
+                FileInfo.Builder fileInfo = FileInfo.newBuilder();
+                fileInfo.setUsername(UserInfo.newBuilder().setUsername(username).build());
+                fileInfo.setFilename(FileResponse.newBuilder().setFilename(fileList.get(i)));
+                List<String> replicaips = nodesNottobeReplicated.get();
+                if (replicaips.size() > 0) {
+                    ManagedChannel ch = ManagedChannelBuilder.forAddress(replicaips.get(0), Integer.parseInt("2345")).usePlaintext(true).build();
+                    FileServiceGrpc.FileServiceStub asyncstub = FileServiceGrpc.newStub(ch);
+                    FileServiceGrpc.FileServiceStub uploadStub;
+                    String roundrobinip = null;
+                    if (new Dhcp_Lease_Test().getCurrentIpList().size() > 1) {
+                        roundrobinip = roundRobinIP();
+                        while (roundrobinip == replicaips.get(0)) {
+                            roundrobinip = roundRobinIP();
+                        }
+                    }
+                    ManagedChannel ch1 = null;
+                    if (roundrobinip != null) {
+                        ch1 = ManagedChannelBuilder.forAddress(roundrobinip, Integer.parseInt("2345")).usePlaintext(true).build();
+                    }
+                    if (ch1 != null) {
+                        uploadStub = FileServiceGrpc.newStub(ch1);
+                        if (roundrobinip != null) {
+                            CountDownLatch cdl1 = new CountDownLatch(1);
+                            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+                                @Override
+                                public void onNext(Ack ack) {
+                                    ackStatus = ack.getSuccess();
+                                    logger.info("Received ack status from the server: " + ack.getSuccess());
+                                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                                }
+
+                                @Override
+                                public void onError(Throwable throwable) {
+                                    logger.info("Exception in the response from server: " + throwable);
+                                    cdl1.countDown();
+                                }
+
+                                @Override
+                                public void onCompleted() {
+                                    logger.info("Server is done sending data");
+                                    cdl1.countDown();
+                                }
+                            };
+                            fileDataStreamObserver1 = uploadStub.uploadFile(ackStreamObserver);
+                        }
+                    }
+
+                    if (new Dhcp_Lease_Test().getCurrentIpList().size() > 1) {
+                        CountDownLatch cdl = new CountDownLatch(1);
+                        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+                            @Override
+                            public void onNext(FileData fileData) {
+                                fileDataStreamObserver1.onNext(fileData);
+                            }
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                logger.info("Exception in the response from server: " + throwable);
+                                cdl.countDown();
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                                cdl.countDown();
+                                fileDataStreamObserver1.onCompleted();
+                            }
+                        };
+                        asyncstub.downloadFile(fileInfo.build(), fileDataStreamObserver);
+                    }
+                }
+            }
+        });
+    }
+}
+
+
+//getting file data from the node that already has the file.
+
 
 //                SlaveNode.get(fileInfo);
 //                String IPtoReplicateTo=null;
@@ -406,7 +468,7 @@ public class MasterNode extends RouteServerImpl {
         });
 */
 
-    }
+
 
 
 
@@ -422,8 +484,6 @@ public class MasterNode extends RouteServerImpl {
     }*/
 
 
-}
-
 // 1. save meta data of files (which partition on which slave)-- done
 
 // 2. send heartbeat to slaves -TODO
@@ -438,3 +498,12 @@ public class MasterNode extends RouteServerImpl {
 
 // 7. talk with both client and other slaves -- done
 
+ /* using heartbeat stats also
+        Map<String, Double> map = calculateSlaveStatsScore();
+        logger.info("Calculating slave stats list size: "+map.size());
+        if(map.containsKey(currentIP)) {
+            logger.info("stats score: "+ map.get(currentIP)+" for current ip: "+currentIP);
+            if(map.get(currentIP) > 0.8) {
+                return roundRobinIP();
+            }
+        }*/

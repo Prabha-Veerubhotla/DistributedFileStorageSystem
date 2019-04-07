@@ -604,13 +604,16 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             };
 
             List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
-            if (ips.size() > 0) {
-                ch1 = MasterNode.createChannel(ips.get(0));
-            } else {
-                ch1 = MasterNode.createChannel("localhost");
+            for(int i = 0 ; i< ips.size();i++) {
+                if (!new Dhcp_Lease_Test().getCurrentIpList().contains(ips.get(i))) {
+                    continue;
+                }
+                ch1 = MasterNode.createChannel(ips.get(i));
             }
-            ayncStub = FileServiceGrpc.newStub(ch1);
-            ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
+            if(ch1 != null) {
+                ayncStub = FileServiceGrpc.newStub(ch1);
+                ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
+            }
             try {
                 cdl.await(3, TimeUnit.SECONDS);
             } catch (InterruptedException ie) {

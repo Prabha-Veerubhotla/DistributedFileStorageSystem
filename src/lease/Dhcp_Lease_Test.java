@@ -137,8 +137,9 @@ public class Dhcp_Lease_Test {
         MasterNode.removeDeadNodeStats(deadNodes);
 
         //TODO replicate the data in the dead node to another live node.
-        for(int i=0;i<deadNodes.size();i++)
+        for(int i=0;i<deadNodes.size();i++) {
             MasterNode.migrateDataFromANode(deadNodes.get(i));
+        }
     }
 
     public List<String> getCurrentIpList() {
