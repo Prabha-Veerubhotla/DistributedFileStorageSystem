@@ -44,6 +44,29 @@ public class MasterNode extends RouteServerImpl {
         //slave1 = "localhost"; // local testing
     }
 
+    public static Map<String, Double> calculateSlaveStatsScore() {
+        double cpuWeight = 0.4;
+        double diskWeight = 0.5;
+        double memWeight = 0.1;
+        double mem = 0.0;
+        Map<String, Double> scoreMap = new HashMap<>();
+        logger.info("In claculateSlaveStatsScore: nodeStatsMapSize: "+nodeStatsMap.size());
+        for(Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
+
+            double cpu = Double.parseDouble(m.getValue().getCpuUsage());
+            if (m.getValue().getUsedMem() != "") {
+                mem = Double.parseDouble(m.getValue().getUsedMem());
+            }
+
+            double disk = Double.parseDouble(m.getValue().getDiskSpace());
+
+            double score = cpuWeight*cpu + diskWeight*disk + memWeight*mem;
+            logger.info("stats score: "+score+" for ip: "+m.getKey());
+            scoreMap.put(m.getKey(), score);
+        }
+        return scoreMap;
+    }
+
 
     //Method for round robin IP - Sharding data among 3 Slaves
     public synchronized static String roundRobinIP() {
@@ -52,7 +75,17 @@ public class MasterNode extends RouteServerImpl {
         logger.info("number of shards: "+NOOFSHARDS);
         currentIP = slaveip.get(currentIPIxd);
         currentIPIxd = (currentIPIxd + 1) % NOOFSHARDS;
-        logger.info("returning ip: "+currentIP);
+
+        /* using heartbeat stats also
+        Map<String, Double> map = calculateSlaveStatsScore();
+        logger.info("Calculating slave stats list size: "+map.size());
+        if(map.containsKey(currentIP)) {
+            logger.info("stats score: "+ map.get(currentIP)+" for current ip: "+currentIP);
+            if(map.get(currentIP) > 0.8) {
+                return roundRobinIP();
+            }
+        }*/
+        logger.info("Returning ip: "+currentIP);
         return currentIP;
     }
 
@@ -63,10 +96,6 @@ public class MasterNode extends RouteServerImpl {
         ayncStub = FileServiceGrpc.newStub(ch);
         logger.info("creating async stub ");
         blockingStub = FileServiceGrpc.newBlockingStub(ch);
-        Node_ip_channel node_ip_channel=new Node_ip_channel();
-        node_ip_channel.setIpAddress(slave1);
-        node_ip_channel.setChannel(ch);
-        nodeIpChannelMap.put(slave1,ch);
         return ch;
     }
 
@@ -164,10 +193,19 @@ public class MasterNode extends RouteServerImpl {
 
     // gets the hearbeat of all slaves and updates the nodeStatsMap.
     public static void getHeartBeatofAllSlaves(){
+        logger.info("getting current ip list from dhcp lease file");
+        List<String> currentIpList = new Dhcp_Lease_Test().getCurrentIpList();
+        for(String ip: currentIpList) {
+            Node_ip_channel node_ip_channel = new Node_ip_channel();
+            node_ip_channel.setIpAddress(ip);
+            ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+            node_ip_channel.setChannel(ch);
+            nodeIpChannelMap.put(ip, ch);
+        }
         logger.info("Fetching cpu and mem stats of slaves");
         Map<String,Stats> tempStats=new HashMap<>();
         //local testing.
-       /* if(nodeIpChannelMap.isEmpty()){
+        if(nodeIpChannelMap.isEmpty()){
             ManagedChannel channel=nodeIpChannelMap.get("localhost");
             blockingStub=FileServiceGrpc.newBlockingStub(channel);
             NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
@@ -175,22 +213,23 @@ public class MasterNode extends RouteServerImpl {
             nodeInfo.setPort("2345");
             Stats stats=blockingStub.isAlive(nodeInfo.build());
             logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-       }*/
+       }
 
         nodeIpChannelMap.forEach((ip,channel1)->{
-            blockingStub=FileServiceGrpc.newBlockingStub(channel1);
+        blockingStub=FileServiceGrpc.newBlockingStub(channel1);
 
-            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
-            nodeInfo.setIp(ip);
-            nodeInfo.setPort("2345");
-            Stats stats=blockingStub.isAlive(nodeInfo.build());
-            tempStats.put(ip,stats);
-            logger.info("Got CPU stats from slave:"+ip+" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-        });
-        updateNodeStats(tempStats);
-    }
+        NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+        nodeInfo.setIp(ip);
+        nodeInfo.setPort("2345");
+        Stats stats=blockingStub.isAlive(nodeInfo.build());
+        tempStats.put(ip,stats);
+        logger.info("Got CPU stats from slave:"+ip+" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+    });
+    updateNodeStats(tempStats);
+}
 
     public synchronized static void updateNodeStats(Map<String,Stats> newStats){
+        logger.info("In node stats");
         Set<String> nodeSet=new HashSet<>();
         List<String> deadNodes=new ArrayList<>();
 
@@ -208,7 +247,11 @@ public class MasterNode extends RouteServerImpl {
                 deadNodes.add(nodeArray[nodeArray.length-i]);
             }
         }
-        removeDeadSlavesFromDHCPList(deadNodes);
+        if(deadNodes.size()!=0) {
+            removeDeadSlavesFromDHCPList(deadNodes);
+        }
+        nodeStatsMap.putAll(newStats);
+
     }
 
     public synchronized static Map<String,Stats> getNodeStats() {
@@ -228,15 +271,15 @@ public class MasterNode extends RouteServerImpl {
         new Dhcp_Lease_Test().removeDeadnodes(deadNodes);
     }
     // get the heartbeat and stats of individual node.
-    public static Stats getHeartBeatofASlave(Node_ip_channel node_ip_channel){
-            blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
-            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
-            nodeInfo.setIp(node_ip_channel.getIpAddress());
-            nodeInfo.setPort("2345");
-            Stats stats=blockingStub.isAlive(nodeInfo.build());
-            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
-        return stats;
-    }
+//    public static Stats getHeartBeatofSelectedSlaves(List<String> nodes){
+//            blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
+//            NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
+//            nodeInfo.setIp(node_ip_channel.getIpAddress());
+//            nodeInfo.setPort("2345");
+//            Stats stats=blockingStub.isAlive(nodeInfo.build());
+//            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: "+stats.getCpuUsage()+"\n\tmemoryUsed: "+stats.getUsedMem()+"\n\tFreeSpace: "+stats.getDiskSpace());
+//        return stats;
+//    }
 
 
 }
