@@ -211,6 +211,70 @@ public class MasterMetaData {
         }
     }
 
+    public boolean putMetaDataForIP(String userName, String fileName, String IP) {
+        logger.info("putMetaDataWithIP:\nIn username: "+userName);
+        logger.info("\nfilename: "+fileName);
+        logger.info("\nip: "+ IP);
+        byte[] ipByte = serialize(IP);
+
+        try {
+            if (redisConnector.exists(ipByte)) {
+                byte[] val = redisConnector.get(ipByte);
+                Map<String, List<String>> ipFilesMap = (Map<String, List<String>>)deserialize(val);
+                if (ipFilesMap.containsKey(userName)) {
+                    List<String> fileList = ipFilesMap.get(userName);
+                    fileList.add(fileName);
+                } else {
+                    List<String> t = new ArrayList();
+                    t.add(fileName);
+                    ipFilesMap.put(userName, t);
+                }
+                logger.info("IPFilesMap ----> " + ipFilesMap);
+                String res = redisConnector.set(ipByte, serialize(ipFilesMap));
+                if(res == null){
+                    logger.info("Error storing in Redis for first time " + IP);
+                    return false;
+                }
+            } else {
+                Map<String, List<String>> innerMap = new HashMap<>();
+                List<String> fileList = new ArrayList<>();
+                fileList.add(fileName);
+                innerMap.put(userName, fileList);
+                logger.info("newMap: user file map ----> " + innerMap);
+                String res = redisConnector.set(ipByte, serialize(innerMap));
+                if (res == null) {
+                    logger.info("Error storing in Redis for first time " + IP);
+                    return false;
+                }
+            }
+        }
+        catch (Exception ex){
+            ex.printStackTrace();
+        }
+        logger.info("Success " + IP);
+        return true;
+    }
+
+    public Map<String,List<String>> getMetaDataForIP(String IP) {
+        byte[] ipByte = serialize(IP);
+        try{
+            if(redisConnector.exists(ipByte)){
+                byte[] val = redisConnector.get(ipByte);
+                Map<String, List<String>> ipFilesMap = (Map<String, List<String>>)deserialize(val);
+
+                return ipFilesMap;
+
+            }
+            else {
+                logger.info("Node with the provided IP not present");
+                return null;
+            }
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
+        return null;
+    }
+
 
 
 //    public static void main(String[] args){
