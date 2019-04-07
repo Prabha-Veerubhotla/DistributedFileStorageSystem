@@ -164,7 +164,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             }
         };
         Timer timer=new Timer();
-        timer.scheduleAtFixedRate(timerTask,0,2000);
+        timer.scheduleAtFixedRate(timerTask,0,60000);
     }
 
 
@@ -455,6 +455,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 if (isMaster) {
                     if(!isChannelCreated) {
                         List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
+                        logger.info("meta data: "+ ips+"  for file: "+filepath);
                         ManagedChannel managedChannel;
                         for (int i = 0; i < ips.size(); i++) {
                             if (i == 0) {
@@ -468,6 +469,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         }
                         isChannelCreated = true;
                     }
+                    logger.info("managed channel list size: "+managedChannelList.size());
                         StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
 
                             @Override
@@ -491,7 +493,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         };
 
                     ackStatus = MasterNode.updateFileToServer(fileData, false);
-                        if(managedChannelList.size() > 1) {
+                        if(managedChannelList.size() > 1 && replicaIp != null) {
+                            logger.info("entering replica part");
                             replicaStub = FileServiceGrpc.newStub(managedChannelList.get(1));
                             fdsm = replicaStub.replicateFile(ackStreamObserver);
                             replicate(fileData, false, fdsm);
@@ -502,7 +505,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         ackMessage = "Unable to update file";
                     }
                 } else {
-                    logger.info("Updating in redis" + new String(fileData.getContent().toByteArray()));
+                    //logger.info("Updating in redis" + new String(fileData.getContent().toByteArray()));
                     ackStatus = SlaveNode.update(fileData);
                     if (ackStatus) {
                         ackMessage = "success";
@@ -528,19 +531,19 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     }
                     ackStreamObserver.onCompleted();
                     masterMetaData.deleteFileFormMetaData(username, getFileName(filepath));
-                    if(managedChannelList.size() > 1) {
+                    if(managedChannelList.size() > 1 && replicaIp != null) {
                         replicate(fd, true, fdsm);
                         logger.info("putting metadata of file, slave in master");
                         logger.info("username: " + username);
                         logger.info("filepath: " + filepath);
-                        logger.info("ip: " + replicaIp);
+                        logger.info("replica ip: " + replicaIp);
                         logger.info("file name: " + getFileName(filepath));
                         masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
                     }
-                    logger.info("putting metadata of file, slave in master");
+                    logger.info("putting metadata of  replica file, slave in master");
                     logger.info("username: " + username);
                     logger.info("filepath: " + filepath);
-                    logger.info("ip: " + originalIp);
+                    logger.info("original ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
                     logger.info("channel is shutitng down");
