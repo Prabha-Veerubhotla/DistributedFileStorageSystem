@@ -351,18 +351,18 @@ public class MasterNode extends RouteServerImpl {
 }
 
 
-//getting file data from the node that already has the file.
+/*getting file data from the node that already has the file.
 
 
-//                SlaveNode.get(fileInfo);
-//                String IPtoReplicateTo=null;
-//                while(true){
-//                    IPtoReplicateTo=roundRobinIP();
-//                    if(!nodesNottobeReplicated.get().contains(IPtoReplicateTo))
-//                        break;
-//                }
-//                ManagedChannel ch=ManagedChannelBuilder.forAddress(IPtoReplicateTo,Integer.parseInt(slave1port)).usePlaintext().build();
-//                ayncStub = FileServiceGrpc.newStub(ch);
+                SlaveNode.get(fileInfo);
+                String IPtoReplicateTo=null;
+                while(true){
+                    IPtoReplicateTo=roundRobinIP();
+                    if(!nodesNottobeReplicated.get().contains(IPtoReplicateTo))
+                        break;
+                }
+                ManagedChannel ch=ManagedChannelBuilder.forAddress(IPtoReplicateTo,Integer.parseInt(slave1port)).usePlaintext().build();
+                ayncStub = FileServiceGrpc.newStub(ch);*/
 
 
 
