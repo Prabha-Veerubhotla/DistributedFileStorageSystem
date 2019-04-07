@@ -635,8 +635,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
               logger.info("FileName:" + fn.toString());
                 fis = new FileInputStream(fn);
                 logger.info("fis: " + fis.toString());
+                logger.info("file length: "+fn.length());
                 long seq = 0l;
-                final int blen = (int) Math.pow(10, 6)*4;
+                final int blen = 4194000;
                 byte[] raw = new byte[blen];
                 boolean done = false;
                 while (!done) {
