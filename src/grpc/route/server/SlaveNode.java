@@ -6,7 +6,7 @@ import io.grpc.stub.StreamObserver;
 import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.*;
+import fileservice.*;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -17,10 +17,10 @@ import java.util.*;
 
 
 //For HeartBeat
-import route.FileResponse;
+import fileservice.FileListResponse;
 
-import route.NodeInfo;
-import route.Stats;
+import fileservice.NodeInfo;
+import fileservice.ClusterStats;
 
 
 
@@ -43,16 +43,16 @@ public class SlaveNode extends RouteServerImpl {
      * @param fileData
      * @return boolean
      */
-    public static boolean put(FileData fileData) {
+    public static boolean put(FileData fileData, String seqID) {
 //        logger.info("All Data" + new String(fileData.getContent().toByteArray()));
-        UserInfo userName = fileData.getUsername();
-        byte[] payload = fileData.getContent().toByteArray();
-        String seqID = Long.toString(fileData.getSeqnum());
-        String fileName = getFileName(fileData.getFilename().getFilename());
+        String userName = fileData.getUsername();
+        byte[] payload = fileData.getData().toByteArray();
+        String fileName = getFileName(fileData.getFilename());
         logger.info("Put details: " + userName + " seq num: " + seqID);
         //logger.info("content: " + new String(payload));
         //TODO: store the file in db from method : writeChunksIntoFile -- done
-        rh.put(userName.getUsername(), fileName, seqID, payload);
+        rh.put(userName, fileName, seqID, payload);
+
         return true;
     }
 
@@ -80,8 +80,8 @@ public class SlaveNode extends RouteServerImpl {
      */
     public static FileEntity get(FileInfo fileInfo) {
         logger.info("SlaveNode.GET");
-        String userName = fileInfo.getUsername().getUsername();
-        String fileName = getFileName(fileInfo.getFilename().getFilename());
+        String userName = fileInfo.getUsername();
+        String fileName = getFileName(fileInfo.getFilename());
         logger.info("retrieving information of: " + fileName);
         Map<String, byte[]> result = rh.get(userName, fileName);
 //        logger.info("Result ---> " + result);
@@ -98,11 +98,10 @@ public class SlaveNode extends RouteServerImpl {
      *
      * @param fileData
      */
-    public static boolean update(FileData fileData) {
-        String userName = fileData.getUsername().getUsername();
-        String fileName = getFileName(fileData.getFilename().getFilename());
-        String seqID = Long.toString(fileData.getSeqnum());
-        byte[] payload = fileData.getContent().toByteArray();
+    public static boolean update(FileData fileData, String seqID) {
+        String userName = fileData.getUsername();
+        String fileName = getFileName(fileData.getFilename());
+        byte[] payload = fileData.getData().toByteArray();
         rh.update(userName, fileName, seqID, payload);
         return true;
     }
@@ -127,8 +126,8 @@ public class SlaveNode extends RouteServerImpl {
 
     public static boolean delete(FileInfo fileInfo) {
         boolean status;
-        String userName = fileInfo.getUsername().getUsername();
-        String fileName = getFileName(fileInfo.getFilename().getFilename());
+        String userName = fileInfo.getUsername();
+        String fileName = getFileName(fileInfo.getFilename());
         logger.info("deleting file " + fileName + " from Redis.");
         status = rh.remove(userName, fileName);
         logger.info("deleting file " + fileName + " from Mongo.");

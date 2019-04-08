@@ -7,7 +7,7 @@ import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.*;
+import fileservice.*;
 
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -18,12 +18,12 @@ public class MasterNode extends RouteServerImpl {
     protected static Logger logger = LoggerFactory.getLogger("server-master");
     static List<String> slaveip = new ArrayList<>();
     static Map<String, ManagedChannel> nodeIpChannelMap = new HashMap<>();
-    static Map<String, Stats> nodeStatsMap = new HashMap<>();
+    static Map<String, ClusterStats> nodeStatsMap = new HashMap<>();
     static String slave1port = "2345";
     static String slave1 = "localhost";
     private static ManagedChannel ch;
-    private static FileServiceGrpc.FileServiceStub ayncStub;
-    private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
+    private static FileserviceGrpc.FileserviceStub ayncStub;
+    private static FileserviceGrpc.FileserviceBlockingStub blockingStub;
     private static String currentIP;
     private static int currentIPIxd = 0;
     private static int NOOFSHARDS = 1;
@@ -54,7 +54,7 @@ public class MasterNode extends RouteServerImpl {
         double mem = 0.0;
         Map<String, Double> scoreMap = new HashMap<>();
         logger.info("In claculateSlaveStatsScore: nodeStatsMapSize: " + nodeStatsMap.size());
-        for (Map.Entry<String, Stats> m : nodeStatsMap.entrySet()) {
+        for (Map.Entry<String, ClusterStats> m : nodeStatsMap.entrySet()) {
 
             double cpu = Double.parseDouble(m.getValue().getCpuUsage());
             if (m.getValue().getUsedMem() != "") {
@@ -87,22 +87,22 @@ public class MasterNode extends RouteServerImpl {
         logger.info("creating channel for slave");
         logger.info("slave 1 ip is: " + slave1);
         ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
-        ayncStub = FileServiceGrpc.newStub(ch);
+        ayncStub = FileserviceGrpc.newStub(ch);
         logger.info("creating async stub ");
-        blockingStub = FileServiceGrpc.newBlockingStub(ch);
+        blockingStub = FileserviceGrpc.newBlockingStub(ch);
         return ch;
     }
 
 
     public static boolean streamFileToServer(FileData fileData, boolean complete, ManagedChannel channel) {
         CountDownLatch cdl = new CountDownLatch(1);
-        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+        StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
             @Override
-            public void onNext(Ack ack) {
-                ackStatus = ack.getSuccess();
-                logger.info("Received ack status from the server: " + ack.getSuccess());
-                logger.info("Received ack  message from the server: " + ack.getMessage());
+            public void onNext(ack ack1) {
+                ackStatus = ack1.getSuccess();
+                logger.info("Received ack status from the server: " + ack1.getSuccess());
+                logger.info("Received ack  message from the server: " + ack1.getMessage());
             }
 
             @Override
@@ -117,16 +117,15 @@ public class MasterNode extends RouteServerImpl {
                 cdl.countDown();
             }
         };
-        ayncStub = FileServiceGrpc.newStub(channel);
+        ayncStub = FileserviceGrpc.newStub(channel);
         StreamObserver<FileData> fileDataStreamObserver = ayncStub.uploadFile(ackStreamObserver);
 
         if (complete) {
-            fileDataStreamObserver.onNext(fileData);
             logger.info("sending completed to slave");
             fileDataStreamObserver.onCompleted();
+            ackStatus = true;
         } else {
             fileDataStreamObserver.onNext(fileData);
-            logger.info("sent data with seq num:  " + fileData.getSeqnum() + " to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -138,13 +137,13 @@ public class MasterNode extends RouteServerImpl {
 
     public static boolean updateFileToServer(FileData fileData, boolean complete) {
         CountDownLatch cdl = new CountDownLatch(1);
-        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+        StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
             @Override
-            public void onNext(Ack ack) {
-                ackStatus = ack.getSuccess();
-                logger.info("Received ack status from the server: " + ack.getSuccess());
-                logger.info("Received ack  message from the server: " + ack.getMessage());
+            public void onNext(ack ack1) {
+                ackStatus = ack1.getSuccess();
+                logger.info("Received ack status from the server: " + ack1.getSuccess());
+                logger.info("Received ack  message from the server: " + ack1.getMessage());
             }
 
             @Override
@@ -163,12 +162,12 @@ public class MasterNode extends RouteServerImpl {
         StreamObserver<FileData> fileDataStreamObserver = ayncStub.updateFile(ackStreamObserver);
 
         if (complete) {
-            fileDataStreamObserver.onNext(fileData);
             logger.info("sending completed to slave");
             fileDataStreamObserver.onCompleted();
+            ackStatus = true;
         } else {
             fileDataStreamObserver.onNext(fileData);
-            logger.info("sent data with seq num:  " + fileData.getSeqnum() + " to slave");
+            logger.info("sent data of:  " + fileData.getFilename() + " to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -179,9 +178,9 @@ public class MasterNode extends RouteServerImpl {
     }
 
     public static boolean deleteFileFromServer(FileInfo fileInfo) {
-        logger.info("deleting file: " + fileInfo.getFilename().getFilename());
-        Ack ack = blockingStub.deleteFile(fileInfo);
-        return ack.getSuccess();
+        logger.info("deleting file: " + fileInfo.getFilename());
+        ack ack1 = blockingStub.fileDelete(fileInfo);
+        return ack1.getSuccess();
     }
 
 
@@ -197,32 +196,32 @@ public class MasterNode extends RouteServerImpl {
             nodeIpChannelMap.put(ip, ch);
         }
         logger.info("Fetching cpu and mem stats of slaves");
-        Map<String, Stats> tempStats = new HashMap<>();
+        Map<String, ClusterStats> tempStats = new HashMap<>();
         //local testing.
         if (nodeIpChannelMap.isEmpty()) {
             ManagedChannel channel = nodeIpChannelMap.get("localhost");
-            blockingStub = FileServiceGrpc.newBlockingStub(channel);
+            blockingStub = FileserviceGrpc.newBlockingStub(channel);
             NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
             nodeInfo.setIp("localhost");
             nodeInfo.setPort("2345");
-            Stats stats = blockingStub.isAlive(nodeInfo.build());
-            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: " + stats.getCpuUsage() + "\n\tmemoryUsed: " + stats.getUsedMem() + "\n\tFreeSpace: " + stats.getDiskSpace());
+            ClusterStats clusterStats = blockingStub.isAlive(nodeInfo.build());
+            logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: " + clusterStats.getCpuUsage() + "\n\tmemoryUsed: " + clusterStats.getUsedMem() + "\n\tFreeSpace: " + clusterStats.getDiskSpace());
         }
 
         nodeIpChannelMap.forEach((ip, channel1) -> {
-            blockingStub = FileServiceGrpc.newBlockingStub(channel1);
+            blockingStub = FileserviceGrpc.newBlockingStub(channel1);
 
             NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
             nodeInfo.setIp(ip);
             nodeInfo.setPort("2345");
-            Stats stats = blockingStub.isAlive(nodeInfo.build());
-            tempStats.put(ip, stats);
-            logger.info("Got CPU stats from slave:" + ip + " \n\tcpuUsage: " + stats.getCpuUsage() + "\n\tmemoryUsed: " + stats.getUsedMem() + "\n\tFreeSpace: " + stats.getDiskSpace());
+            ClusterStats clusterStats = blockingStub.isAlive(nodeInfo.build());
+            tempStats.put(ip, clusterStats);
+            logger.info("Got CPU stats from slave:" + ip + " \n\tcpuUsage: " + clusterStats.getCpuUsage() + "\n\tmemoryUsed: " + clusterStats.getUsedMem() + "\n\tFreeSpace: " + clusterStats.getDiskSpace());
         });
         updateNodeStats(tempStats);
     }
 
-    public synchronized static void updateNodeStats(Map<String, Stats> newStats) {
+    public synchronized static void updateNodeStats(Map<String, ClusterStats> newStats) {
         logger.info("In node stats");
         Set<String> nodeSet = new HashSet<>();
         List<String> deadNodes = new ArrayList<>();
@@ -249,7 +248,7 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
-    public synchronized static Map<String, Stats> getNodeStats() {
+    public synchronized static Map<String, ClusterStats> getNodeStats() {
         return nodeStatsMap;
     }
 
@@ -276,13 +275,13 @@ public class MasterNode extends RouteServerImpl {
                 nodesNottobeReplicated.set(masterMetaData.getMetaData(username, fileList.get(i)));
                 nodesNottobeReplicated.get().remove(nodeIP);
                 FileInfo.Builder fileInfo = FileInfo.newBuilder();
-                fileInfo.setUsername(UserInfo.newBuilder().setUsername(username).build());
-                fileInfo.setFilename(FileResponse.newBuilder().setFilename(fileList.get(i)));
+                fileInfo.setUsername(username);
+                fileInfo.setFilename(fileList.get(i));
                 List<String> replicaips = nodesNottobeReplicated.get();
                 if (replicaips.size() > 0) {
                     ManagedChannel ch = ManagedChannelBuilder.forAddress(replicaips.get(0), Integer.parseInt("2345")).usePlaintext(true).build();
-                    FileServiceGrpc.FileServiceStub asyncstub = FileServiceGrpc.newStub(ch);
-                    FileServiceGrpc.FileServiceStub uploadStub;
+                    FileserviceGrpc.FileserviceStub asyncstub = FileserviceGrpc.newStub(ch);
+                    FileserviceGrpc.FileserviceStub uploadStub;
                     String roundrobinip = null;
                     if (new Dhcp_Lease_Test().getCurrentIpList().size() > 1) {
                         roundrobinip = roundRobinIP();
@@ -295,15 +294,15 @@ public class MasterNode extends RouteServerImpl {
                         ch1 = ManagedChannelBuilder.forAddress(roundrobinip, Integer.parseInt("2345")).usePlaintext(true).build();
                     }
                     if (ch1 != null) {
-                        uploadStub = FileServiceGrpc.newStub(ch1);
+                        uploadStub = FileserviceGrpc.newStub(ch1);
                         if (roundrobinip != null) {
                             CountDownLatch cdl1 = new CountDownLatch(1);
-                            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+                            StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
                                 @Override
-                                public void onNext(Ack ack) {
-                                    ackStatus = ack.getSuccess();
-                                    logger.info("Received ack status from the server: " + ack.getSuccess());
-                                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                                public void onNext(ack ack1) {
+                                    ackStatus = ack1.getSuccess();
+                                    logger.info("Received ack status from the server: " + ack1.getSuccess());
+                                    logger.info("Received ack  message from the server: " + ack1.getMessage());
                                 }
 
                                 @Override
@@ -362,17 +361,17 @@ public class MasterNode extends RouteServerImpl {
                         break;
                 }
                 ManagedChannel ch=ManagedChannelBuilder.forAddress(IPtoReplicateTo,Integer.parseInt(slave1port)).usePlaintext().build();
-                ayncStub = FileServiceGrpc.newStub(ch);*/
+                ayncStub = FileserviceGrpc.newStub(ch);*/
 
 
 
 
 
                 /*CountDownLatch cdl = new CountDownLatch(1);
-                StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+                StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                     @Override
-                    public void onNext(Ack ack) {
+                    public void onNext(ack ack) {
                         ackStatus = ack.getSuccess();
                         logger.info("Received ack status from the replicated server when a node is dead: " + ack.getSuccess());
                         logger.info("Received ack  message from the replicated server when a node is dead: " + ack.getMessage());
@@ -474,7 +473,7 @@ public class MasterNode extends RouteServerImpl {
 
     /* get the heartbeat and stats of individual node.
     public static Stats getHeartBeatofSelectedSlaves(List<String> nodes){
-            blockingStub=FileServiceGrpc.newBlockingStub(node_ip_channel.getChannel());
+            blockingStub=FileserviceGrpc.newBlockingStub(node_ip_channel.getChannel());
             NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
             nodeInfo.setIp(node_ip_channel.getIpAddress());
             nodeInfo.setPort("2345");

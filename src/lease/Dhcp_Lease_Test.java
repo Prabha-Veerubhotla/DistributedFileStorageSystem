@@ -5,10 +5,10 @@ import grpc.route.server.MasterNode;
 import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.FileServiceGrpc;
-import route.NodeInfo;
-import route.NodeName;
-import route.UpdateMessage;
+import fileservice.FileserviceGrpc;
+import fileservice.NodeInfo;
+import fileservice.NodeName;
+import fileservice.UpdateMessage;
 import utility.FetchConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -62,7 +62,7 @@ public class Dhcp_Lease_Test {
             }
 
             ManagedChannel ch = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(server_port.trim())).usePlaintext(true).build();
-            FileServiceGrpc.FileServiceBlockingStub blockingStub = FileServiceGrpc.newBlockingStub(ch);
+            FileserviceGrpc.FileserviceBlockingStub blockingStub = FileserviceGrpc.newBlockingStub(ch);
 
             if (!set.contains(newip)) {
                 logger.info("Sending hello to new node!");

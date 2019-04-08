@@ -1,25 +1,26 @@
 package main.election;
 
-import grpc.route.server.MasterNode;
+import fileservice.FileserviceGrpc;
+import fileservice.NodeInfo;
+import fileservice.ack;
 import grpc.route.server.Node_ip_channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import main.db.RedisHandler;
-import route.*;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.*;
 import java.util.logging.Logger;
 
-public class LeaderElection extends FileServiceGrpc.FileServiceImplBase {
+public class LeaderElection extends FileserviceGrpc.FileserviceImplBase {
     Logger logger = Logger.getLogger(RedisHandler.class.getName());
     Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     String nodePort = "2345";
     Map<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
-    FileServiceGrpc.FileServiceBlockingStub blockingStub;
+    FileserviceGrpc.FileserviceBlockingStub blockingStub;
     List<NodeInfo> ips = new ArrayList<>();
     private final static int NODES = 4;
     NodeInfo leaderNode = null;
@@ -42,7 +43,7 @@ public class LeaderElection extends FileServiceGrpc.FileServiceImplBase {
     }
 
     @Override
-    public void vote(NodeInfo request, StreamObserver<Ack> responseObserver) {
+    public void vote(NodeInfo request, StreamObserver<ack> responseObserver) {
         super.vote(request, responseObserver);
         ips.add(request);
         if (ips.size()  == NODES) {
@@ -74,7 +75,7 @@ public class LeaderElection extends FileServiceGrpc.FileServiceImplBase {
         }
 
         nodeIpChannelMap.forEach((ip,channel1)->{
-            blockingStub=FileServiceGrpc.newBlockingStub(channel1);
+            blockingStub=FileserviceGrpc.newBlockingStub(channel1);
             NodeInfo.Builder nodeInfo=NodeInfo.newBuilder();
             nodeInfo.setIp(ip);
             nodeInfo.setPort(nodePort);
