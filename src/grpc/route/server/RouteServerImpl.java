@@ -87,7 +87,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         return b;
     }
 
-
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
             logger.info("Missing server configuration");
@@ -97,6 +96,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         Properties conf = FetchConfig.getConfiguration(new File(path));
         RouteServer.configure(conf);
 
+        //    TODO: Integrate Leader Election here
         final RouteServerImpl impl = new RouteServerImpl();
         if (conf.getProperty("server.name").equalsIgnoreCase("master")) {
             isMaster = true;

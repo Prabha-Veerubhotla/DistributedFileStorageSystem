@@ -44,12 +44,17 @@ public class SlaveNode extends RouteServerImpl {
      * @return boolean
      */
     public static boolean put(FileData fileData) {
+
+//        logger.info("All Data" + new String(fileData.getContent().toByteArray()));
         String userName = fileData.getUsername();
-        byte[] payload = fileData.getData().toByteArray();
-//        String seqID = Long.toString(fileData.getSeqnum());
-        String fileName = getFileName(fileData.getFilename());
-        logger.info("Put details: " + userName + " file name: " + fileName);
-        rh.put(userName, fileName, seqID, payload);
+        byte[] payload = fileData.getContent().toByteArray();
+        String seqID = Long.toString(fileData.getSeqnum());
+        String fileName = getFileName(fileData.getFilename().getFilename());
+        logger.info("Put details: " + userName + " seq num: " + seqID);
+        //logger.info("content: " + new String(payload));
+        //TODO: store the file in db from method : writeChunksIntoFile -- done
+        rh.put(userName.getUsername(), fileName, seqID, payload);
+
         return true;
     }
 
@@ -81,7 +86,7 @@ public class SlaveNode extends RouteServerImpl {
         String fileName = getFileName(fileInfo.getFilename());
         logger.info("retrieving information of: " + fileName);
         Map<String, byte[]> result = rh.get(userName, fileName);
-        logger.info("Result ---> " + result);
+//        logger.info("Result ---> " + result);
         if (result != null) {
             logger.info("File found in redis!");
             return new FileEntity(fileName, result);
@@ -134,56 +139,9 @@ public class SlaveNode extends RouteServerImpl {
         return status;
     }
 
-
-
-
 }
-
-
-
 
 /*
-    }
-//    @SuppressWarnings("unchecked")
-    public static void main(String[] args) {
-//        String filePath = "temp.jpg";
-//        String userName = "prabha";
-////        long seq = 0l;
-//        try{
-//            FileInputStream fis = new FileInputStream(filePath);
-//            int i = 0;
-//            do {
-//                byte[] buf = new byte[1024];
-//                i = fis.read(buf);
-//                if (i != -1 ) {
-//                    rh.put(userName, filePath, Long.toString(seq), buf);
-//                }
-//                seq++;
-//            } while (i != -1);
-//            byte[] payload = null;
-//            Map<String, byte[]> res = rh.get(userName, filePath);
-
-//            byte[] temp = combineBytes(res);
-//            BufferedOutputStream bw = null;
-//            bw = new BufferedOutputStream(new FileOutputStream("tempRedis.jpg"));
-//            bw.write(temp);
-//            bw.flush();
-//            bw.close();
-//            logger.info("Putting into DB");
-//            mh.put(userName, new FileEntity(filePath, res));
-//            FileEntity mongoDBres = mh.get(userName, filePath);
-//            Map<String, byte[]> r = (Map<String, byte[]>)mongoDBres.getFileContents();
-//            byte[] temp = combineBytes(r);
-//            bw = null;
-//            bw = new BufferedOutputStream(new FileOutputStream("tempMongo.jpg"));
-//            bw.write(temp);
-//            bw.flush();
-//            bw.close();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-    }
-}
 // v2: 4. maintain a in memory, cache
 
  v2: 4. maintain a in memory, cache
