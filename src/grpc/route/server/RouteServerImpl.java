@@ -613,9 +613,73 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
+
+                    asyncStub = FileserviceGrpc.newStub(originalChannel);
+                    DataType.Builder datatype = DataType.newBuilder();
+                    datatype.setFilename(fd.getFilename());
+                    datatype.setType("update");
+                    datatype.setUsername(username);
+
+                    StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
+
+                        @Override
+                        public void onNext(ack ack1) {
+                            logger.info("Received ack status from the server: " + ack1.getSuccess());
+                            logger.info("Received ack  message from the server: " + ack1.getMessage());
+                        }
+
+                        @Override
+                        public void onError(Throwable throwable) {
+                            logger.info("Exception in the response from server: " + throwable);
+                            cdl.countDown();
+                        }
+
+                        @Override
+                        public void onCompleted() {
+                            logger.info("Server is done sending data");
+                            cdl.countDown();
+
+                            // replicaChannel.shutdown();
+                        }
+                    };
+
+
+                    asyncStub.completeStreaming(datatype.build(), ackStreamObserver);
+
+
                     masterMetaData.deleteFileFormMetaData(username, getFileName(filepath));
                     if (managedChannelList.size() > 1 && replicaIp != null) {
                         replicate(fd, true, fdsm);
+                        DataType.Builder datatype1 = DataType.newBuilder();
+                        datatype1.setFilename(fd.getFilename());
+                        datatype1.setType("update");
+                        datatype1.setUsername(username);
+
+                        StreamObserver<ack> ackStreamObserver1 = new StreamObserver<ack>() {
+
+                            @Override
+                            public void onNext(ack ack1) {
+                                logger.info("Received ack status from the server: " + ack1.getSuccess());
+                                logger.info("Received ack  message from the server: " + ack1.getMessage());
+                            }
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                logger.info("Exception in the response from server: " + throwable);
+                                cdl.countDown();
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                                logger.info("Server is done sending data");
+                                cdl.countDown();
+
+                                // replicaChannel.shutdown();
+                            }
+                        };
+
+                        replicaStub.completeStreaming(datatype1.build(), ackStreamObserver1);
+
                         logger.info("putting metadata of file, slave in master");
                         logger.info("username: " + username);
                         logger.info("filepath: " + filepath);
