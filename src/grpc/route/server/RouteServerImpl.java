@@ -63,6 +63,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     List<String> cpuUsages = new ArrayList<>();
     List<String> totalDiskSpace = new ArrayList<>();
     List<String> usedDiskSpace = new ArrayList<>();
+    private static boolean isDhcpRunning = false;
 
     Map<ClusterInfo, ClusterStats> clusterStatsMap = new HashMap<>();
 
@@ -106,6 +107,11 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             return;
         }
         String path = args[0];
+        String isDhcpSetup = args[1];
+        if(isDhcpSetup.equalsIgnoreCase("yes")) {
+            isDhcpRunning = true;
+        }
+
         Properties conf = FetchConfig.getConfiguration(new File(path));
 
         RouteServer.configure(conf);
@@ -128,7 +134,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         FileserviceGrpc.FileserviceBlockingStub stub = FileserviceGrpc.newBlockingStub(ch);
         ClusterInfo.Builder clusterInfo = ClusterInfo.newBuilder();
         clusterInfo.setClusterName("prabha");
-        clusterInfo.setIp("10.250.10.70");
+        clusterInfo.setIp("192.168.0.33");
         clusterInfo.setPort("9000");
         ack received = stub.getLeaderInfo(clusterInfo.build());
         logger.info("ack status: "+ received.getSuccess());
@@ -145,7 +151,10 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         svr.start();
 
         if (isMaster) {
-            invokeDhcpMonitorThread();
+            if(isDhcpRunning) {
+                invokeDhcpMonitorThread();
+            }
+            logger.info("dhcp running :" +isDhcpRunning);
             slaveIpThread();
             getSlavesHeartBeat();
             // send leader info to super node
@@ -168,7 +177,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         Thread thread = new Thread() {
             public void run() {
                 logger.info("Starting DHCP Lease Monitor Thread...");
-                dhcp_lease_test.monitorLease();
+                dhcp_lease_test.monitorLease(isDhcpRunning);
             }
         };
         thread.start();

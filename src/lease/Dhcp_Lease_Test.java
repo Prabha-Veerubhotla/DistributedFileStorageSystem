@@ -25,6 +25,7 @@ public class Dhcp_Lease_Test {
     static List<String> oldIpList = new ArrayList<>();
     Map<String, List<String>> nodesInNetwork = new HashMap<>();
     List<String> newIpList = new ArrayList<>();
+    boolean isDhcp = false;
 
 
     public static void main(String args[]) {
@@ -95,7 +96,11 @@ public class Dhcp_Lease_Test {
         }
     }
 
-    public void monitorLease() {
+    public void monitorLease(boolean dhcp) {
+        isDhcp = dhcp;
+        if(!isDhcp) {
+            return;
+        }
         //Check for changes in dhcpd lease file
         TimerTask task = new Dhcp_Lease_Changes_Monitor(new File("/var/lib/dhcpd/dhcpd.leases")) {
 
@@ -144,6 +149,11 @@ public class Dhcp_Lease_Test {
     }
 
     public List<String> getCurrentIpList() {
+        if(!isDhcp) {
+            oldIpList.clear();
+            oldIpList.add("192.168.0.34"); // prabha
+            oldIpList.add("192.168.0.38"); // nrupa
+        }
         logger.info("old IP list content: "+ oldIpList);
         return oldIpList;
     }
