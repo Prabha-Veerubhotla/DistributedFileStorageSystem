@@ -211,24 +211,4 @@ public class MasterMetaData {
         }
     }
 
-
-
-//    public static void main(String[] args){
-//        MasterMetaData md = new MasterMetaData();
-//        md.putMetaData("Nrupa", "pic.jpg","10.250.10.320");
-//        md.putMetaData("Nrupa", "pic1.jpg","10.250.10.321");
-//        md.putMetaData("Nrupa", "pic1.jpg", "10.250.10.320");
-
-
-//        Set<String> ans = md.getAllFiles("Nrupa");
-//        System.out.println("ans: " + ans);
-
-//        List<String> ans = md.getMetaData("Nrupa", "pic1.jpg");
-//        System.out.println("ans: " + ans);
-//        List<String> ans = md.updateMetaData("Nrupa", "pic.jpg");
-//        System.out.println("Ans: " + ans);
-//        boolean flag = md.checkIfFileExists("Nrupa", "pic2.jpg");
-//        System.out.println("Flag: " + flag);
-//        md.deleteFileFormMetaData("Nrupa", "pic.jpg");
-//    }
 }
