@@ -24,6 +24,12 @@ service Fileservice {
     // heartbeat
     rpc isAlive (NodeInfo) returns (ClusterStats) {
     }
+    rpc vote (NodeInfo) returns(ack){
+
+    }
+
+    rpc getClusterStats (Empty) returns (ClusterStats);
+    rpc getLeaderInfo (ClusterInfo) returns (ack);
 }
 
 message FileData {
