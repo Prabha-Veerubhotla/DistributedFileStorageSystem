@@ -19,7 +19,8 @@ public class MasterNode extends RouteServerImpl {
     static List<String> slaveip = new ArrayList<>();
     static Map<String, ManagedChannel> nodeIpChannelMap = new HashMap<>();
     static Map<String, ClusterStats> nodeStatsMap = new HashMap<>();
-    static String slave1port = "2345";
+//    static String slave1port = "2345";
+    static String slave1port = "9000";
     static String slave1 = "localhost";
     private static ManagedChannel ch;
     private static FileserviceGrpc.FileserviceStub ayncStub;
@@ -203,7 +204,8 @@ public class MasterNode extends RouteServerImpl {
             blockingStub = FileserviceGrpc.newBlockingStub(channel);
             NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
             nodeInfo.setIp("localhost");
-            nodeInfo.setPort("2345");
+//            nodeInfo.setPort("2345");
+            nodeInfo.setPort("9000");
             ClusterStats clusterStats = blockingStub.isAlive(nodeInfo.build());
             logger.info("Got CPU stats from \"local-slave\" \n\tcpuUsage: " + clusterStats.getCpuUsage() + "\n\tmemoryUsed: " + clusterStats.getUsedMem() + "\n\tFreeSpace: " + clusterStats.getDiskSpace());
         }
@@ -213,7 +215,8 @@ public class MasterNode extends RouteServerImpl {
 
             NodeInfo.Builder nodeInfo = NodeInfo.newBuilder();
             nodeInfo.setIp(ip);
-            nodeInfo.setPort("2345");
+//            nodeInfo.setPort("2345");
+            nodeInfo.setPort("9000");
             ClusterStats clusterStats = blockingStub.isAlive(nodeInfo.build());
             tempStats.put(ip, clusterStats);
             logger.info("Got CPU stats from slave:" + ip + " \n\tcpuUsage: " + clusterStats.getCpuUsage() + "\n\tmemoryUsed: " + clusterStats.getUsedMem() + "\n\tFreeSpace: " + clusterStats.getDiskSpace());
@@ -279,7 +282,8 @@ public class MasterNode extends RouteServerImpl {
                 fileInfo.setFilename(fileList.get(i));
                 List<String> replicaips = nodesNottobeReplicated.get();
                 if (replicaips.size() > 0) {
-                    ManagedChannel ch = ManagedChannelBuilder.forAddress(replicaips.get(0), Integer.parseInt("2345")).usePlaintext(true).build();
+//                    ManagedChannel ch = ManagedChannelBuilder.forAddress(replicaips.get(0), Integer.parseInt("2345")).usePlaintext(true).build();
+                    ManagedChannel ch = ManagedChannelBuilder.forAddress(replicaips.get(0), Integer.parseInt("9000")).usePlaintext(true).build();
                     FileserviceGrpc.FileserviceStub asyncstub = FileserviceGrpc.newStub(ch);
                     FileserviceGrpc.FileserviceStub uploadStub;
                     String roundrobinip = null;
@@ -291,7 +295,8 @@ public class MasterNode extends RouteServerImpl {
                     }
                     ManagedChannel ch1 = null;
                     if (roundrobinip != null) {
-                        ch1 = ManagedChannelBuilder.forAddress(roundrobinip, Integer.parseInt("2345")).usePlaintext(true).build();
+//                        ch1 = ManagedChannelBuilder.forAddress(roundrobinip, Integer.parseInt("2345")).usePlaintext(true).build();
+                        ch1 = ManagedChannelBuilder.forAddress(roundrobinip, Integer.parseInt("9000")).usePlaintext(true).build();
                     }
                     if (ch1 != null) {
                         uploadStub = FileserviceGrpc.newStub(ch1);

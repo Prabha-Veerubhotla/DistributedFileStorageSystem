@@ -18,7 +18,8 @@ import java.util.logging.Logger;
 public class LeaderElection extends FileserviceGrpc.FileserviceImplBase {
     Logger logger = Logger.getLogger(RedisHandler.class.getName());
     Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
-    String nodePort = "2345";
+//    String nodePort = "2345";
+    String nodePort = "9000";
     Map<String,ManagedChannel> nodeIpChannelMap=new HashMap<>();
     FileserviceGrpc.FileserviceBlockingStub blockingStub;
     List<NodeInfo> ips = new ArrayList<>();
