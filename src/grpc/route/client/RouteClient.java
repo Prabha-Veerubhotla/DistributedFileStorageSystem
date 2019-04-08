@@ -10,7 +10,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import route.*;
+import fileservice.*;
 
 
 
@@ -36,8 +36,8 @@ import route.*;
 
 public class RouteClient {
     private static ManagedChannel ch;
-    private static FileServiceGrpc.FileServiceStub asyncStub;
-    private static FileServiceGrpc.FileServiceBlockingStub blockingStub;
+    private static FileserviceGrpc.FileserviceStub asyncStub;
+    private static FileserviceGrpc.FileserviceBlockingStub blockingStub;
     private Properties setup;
     private String name;
     private static String myIp = "client"; // intially , later master node will assign an ip
@@ -68,8 +68,8 @@ public class RouteClient {
         }
         ch = ManagedChannelBuilder.forAddress(host, Integer.parseInt(port)).usePlaintext(true).build();
         //TODO: make it async stub -- done
-        asyncStub = FileServiceGrpc.newStub(ch);
-        blockingStub = FileServiceGrpc.newBlockingStub(ch);
+        asyncStub = FileserviceGrpc.newStub(ch);
+        blockingStub = FileserviceGrpc.newBlockingStub(ch);
         logger.info("Client running...");
     }
 
@@ -90,10 +90,10 @@ public class RouteClient {
         } else {
             logger.info("file is not present. saving now");
             CountDownLatch cdl = new CountDownLatch(1);
-            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+            StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                 @Override
-                public void onNext(Ack ack) {
+                public void onNext(ack ack) {
                     ackStatus = ack.getSuccess();
                     logger.info("Received ack status from the server: " + ack.getSuccess());
                     logger.info("Received ack  message from the server: " + ack.getMessage());
@@ -113,13 +113,13 @@ public class RouteClient {
                 }
             };
 
-            route.FileData.Builder fileData = FileData.newBuilder();
+            fileservice.FileData.Builder fileData = FileData.newBuilder();
 
-            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
-            fileData.setFilename(fileResponse.build());
+//            fileservice.FileListResponse.Builder fileResponse = FileListResponse.newBuilder().setFilenames(filename);
+            fileData.setFilename(filename);
 
-            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
-            fileData.setUsername(userInfo.build());
+//            fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileData.setUsername(name);
 
             StreamObserver<FileData> fileDataStreamObserver = asyncStub.uploadFile(ackStreamObserver);
 
@@ -142,9 +142,9 @@ public class RouteClient {
                         // identifying sequence number
                         seq++;
                         logger.info("Streaming seq num: " + seq);
-                        fileData.setContent(ByteString.copyFrom(raw, 0, n));
+                        fileData.setData(ByteString.copyFrom(raw, 0, n));
                         logger.info("seq num is: " + seq);
-                        fileData.setSeqnum(seq);
+//                        fileData.setSeqnum(seq);
                         logger.info("Sending file data to server with seq num: " + seq);
                         fileDataStreamObserver.onNext(fileData.build());
                     }
@@ -186,13 +186,13 @@ public class RouteClient {
     public String deleteFileFromServer(String msg) {
         if(searchFileInServer(msg)) {
             logger.info("file is present. deleting now");
-            route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
-            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
-            fileInfo.setFilename(fileResponse.build());
-            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
-            fileInfo.setUsername(userInfo.build());
+            fileservice.FileInfo.Builder fileInfo = FileInfo.newBuilder();
+//            fileservice.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
+            fileInfo.setFilename(msg);
+//            fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileInfo.setUsername(name);
 
-            Ack ack = blockingStub.deleteFile(fileInfo.build());
+            ack ack = blockingStub.fileDelete(fileInfo.build());
             if(ack.getSuccess()) {
                 return "deleted successfully";
             } else {
@@ -203,13 +203,13 @@ public class RouteClient {
 
     public boolean searchFileInServer(String msg) {
         logger.info("searching file in server");
-        route.FileInfo.Builder fileInfo = FileInfo.newBuilder();
-        route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
-        fileInfo.setFilename(fileResponse.build());
-        route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
-        fileInfo.setUsername(userInfo.build());
+        fileservice.FileInfo.Builder fileInfo = FileInfo.newBuilder();
+//        fileservice.FileListResponse.Builder fileResponse = FileListResponse.newBuilder().setFilename(msg);
+        fileInfo.setFilename(msg);
+//        fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+        fileInfo.setUsername(name);
 
-        Ack ack = blockingStub.searchFile(fileInfo.build());
+        ack ack = blockingStub.fileSearch(fileInfo.build());
         return ack.getSuccess();
     }
 
@@ -222,18 +222,18 @@ public class RouteClient {
     public String listFilesInServer(String userName) {
         UserInfo.Builder userInfo = UserInfo.newBuilder();
         userInfo.setUsername(userName);
-        FileResponse fileResponse = blockingStub.listFile(userInfo.build());
-        return fileResponse.getFilename();
+        FileListResponse fileResponse = blockingStub.fileList(userInfo.build());
+        return fileResponse.getFilenames();
     }
 
     public String updateFileInServer(String filename) {
         if (searchFileInServer(filename)) {
             logger.info("file is present. updating now");
             CountDownLatch cdl = new CountDownLatch(1);
-            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+            StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                 @Override
-                public void onNext(Ack ack) {
+                public void onNext(ack ack) {
                     ackStatus = ack.getSuccess();
                     logger.info("Received ack status from the server: " + ack.getSuccess());
                     logger.info("Received ack  message from the server: " + ack.getMessage());
@@ -253,11 +253,11 @@ public class RouteClient {
                 }
             };
 
-            route.FileData.Builder fileData = FileData.newBuilder();
-            route.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(filename);
-            fileData.setFilename(fileResponse.build());
-            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
-            fileData.setUsername(userInfo.build());
+            fileservice.FileData.Builder fileData = FileData.newBuilder();
+//            route.FileListResponse.Builder fileResponse = FileListResponse.newBuilder().setFilename(filename);
+            fileData.setFilename(filename);
+//            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            fileData.setUsername(name);
 
             StreamObserver<FileData> fileDataStreamObserver = asyncStub.updateFile(ackStreamObserver);
             if (checkIfFile(filename)) {
@@ -277,9 +277,8 @@ public class RouteClient {
                         // identifying sequence number
                         seq++;
                         logger.info("Streaming seq num: " + seq);
-                        fileData.setContent(ByteString.copyFrom(raw, 0, n));
-                        logger.info("seq num is: " + seq);
-                        fileData.setSeqnum(seq);
+                        fileData.setData(ByteString.copyFrom(raw, 0, n));
+
                         logger.info("Sending file data to server with seq num: " + seq);
                         fileDataStreamObserver.onNext(fileData.build());
                     }
@@ -340,8 +339,8 @@ public class RouteClient {
                     try {
                         //logger.info(new String(fileData.getContent().toByteArray()));
 
-                        logger.info("writing seq num: " + fileData.getSeqnum()+" into file");
-                        f.write(fileData.getContent().toByteArray());
+                        logger.info("writing "+fileData.getFilename());
+                        f.write(fileData.getData().toByteArray());
                     } catch (IOException ie) {
                         ie.printStackTrace();
                     }
@@ -365,8 +364,8 @@ public class RouteClient {
                 }
             };
             FileInfo.Builder fileInfo = FileInfo.newBuilder();
-            fileInfo.setFilename(FileResponse.newBuilder().setFilename(filename).build());
-            fileInfo.setUsername(UserInfo.newBuilder().setUsername(name).build());
+            fileInfo.setFilename(filename);
+            fileInfo.setUsername(name);
             asyncStub.downloadFile(fileInfo.build(), fileDataStreamObserver);
         } catch (IOException io) {
             io.printStackTrace();

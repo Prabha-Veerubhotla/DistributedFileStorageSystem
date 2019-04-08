@@ -18,7 +18,7 @@ import main.db.RedisHandler;
 import main.entities.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.*;
+import fileservice.*;
 import utility.FetchConfig;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -26,7 +26,7 @@ import io.grpc.ServerBuilder;
 import static grpc.route.server.MasterNode.*;
 
 
-public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
+public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     protected static Logger logger = LoggerFactory.getLogger("server");
     private Server svr;
     private String name;
@@ -38,8 +38,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     static MongoDBHandler mh = new MongoDBHandler();
     static RedisHandler rh = new RedisHandler();
     private static String slave1 = "localhost";
-    private static FileServiceGrpc.FileServiceStub ayncStub;
-    private static FileServiceGrpc.FileServiceStub replicaStub;
+    private static FileserviceGrpc.FileserviceStub ayncStub;
+    private static FileserviceGrpc.FileserviceStub replicaStub;
     private static ManagedChannel ch1;
     private static MasterMetaData masterMetaData = new MasterMetaData();
     ManagedChannel originalChannel = null;
@@ -50,6 +50,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     String originalIp;
     String replicaIp;
     boolean isChannelCreated = false;
+    private static String seqId="1";
 
 
 
@@ -206,12 +207,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     }
 
     public void replicate(FileData fileData, boolean complete, StreamObserver<FileData> fileDataStreamObserver) {
-        logger.info("replicating file: "+fileData.getFilename().getFilename());
-        route.FileData.Builder fileData1 = FileData.newBuilder();
+        logger.info("replicating file: "+fileData.getFilename());
+        fileservice.FileData.Builder fileData1 = FileData.newBuilder();
         fileData1.setFilename(fileData.getFilename());
         fileData1.setUsername(fileData.getUsername());
-        fileData1.setSeqnum(fileData.getSeqnum());
-        fileData1.setContent(fileData.getContent());
+        fileData1.setData(fileData.getData());
 
         if (complete) {
             fileDataStreamObserver.onNext(fileData1.build());
@@ -219,7 +219,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData1.build());
-            logger.info("sent data with seq num:  "+fileData1.getSeqnum()+" to slave");
+            logger.info("sent data filename:  "+fileData1.getFilename()+" to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -230,7 +230,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
 
     @Override
-    public StreamObserver<FileData> uploadFile(StreamObserver<Ack> ackStreamObserver) {
+    public StreamObserver<FileData> uploadFile(StreamObserver<ack> ackStreamObserver) {
         logger.info("Calling Upload file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
@@ -241,10 +241,10 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
             @Override
             public void onNext(FileData fileData) {
-                logger.info("Received seq num:  " + fileData.getSeqnum() + " for file: " + fileData.getFilename().getFilename());
+                logger.info("Received file:  " + fileData.getFilename() + " for file: " + fileData.getFilename());
                 fd = fileData;
-                username = fileData.getUsername().getUsername();
-                filepath = fileData.getFilename().getFilename();
+                username = fileData.getUsername();
+                filepath = fileData.getFilename();
 
 
                 if (isMaster) {
@@ -255,11 +255,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         if(slaveIpList.size() > 1) {
                             replicaIp = roundRobinIP();
                             replicaChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
-                            replicaStub = FileServiceGrpc.newStub(replicaChannel);
-                            StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+                            replicaStub = FileserviceGrpc.newStub(replicaChannel);
+                            StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                                 @Override
-                                public void onNext(Ack ack) {
+                                public void onNext(ack ack) {
                                     logger.info("Received ack status from the server: " + ack.getSuccess());
                                     logger.info("Received ack  message from the server: " + ack.getMessage());
                                 }
@@ -281,7 +281,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                             fdsm = replicaStub.replicateFile(ackStreamObserver);
                         }
                         originalChannel = ManagedChannelBuilder.forAddress(originalIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
-                        ayncStub = FileServiceGrpc.newStub(originalChannel);
+                        ayncStub = FileserviceGrpc.newStub(originalChannel);
                         setIsRoundRobinCalled(true);
                     } else {
                         logger.info("round robin not called");
@@ -316,9 +316,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 logger.info("Node is done sending messages");
                 if (isMaster) {
                     if (MasterNode.streamFileToServer(fd, true,originalChannel )) {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
                     }
                     if(managedChannelList.size() > 1) {
                         replicate(fd, true, fdsm);
@@ -344,9 +344,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     MasterNode.isRoundRobinCalled = false;
                 } else {
                     if (SlaveNode.put(username, filepath)) {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
                 }
@@ -356,20 +356,20 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     }
 
     @Override
-    public void deleteFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
-        logger.info("Calling delete file for: " + fileInfo.getFilename().getFilename());
-        Ack.Builder ack = Ack.newBuilder();
+    public void fileDelete(FileInfo fileInfo, StreamObserver<ack> ackStreamObserver) {
+        logger.info("Calling delete file for: " + fileInfo.getFilename());
+        ack.Builder ack1 = ack.newBuilder();
         boolean ackStatus;
         String ackMessage = "Unable to save file";
 
         if (isMaster) {
-            List<String> ips = masterMetaData.getMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+            List<String> ips = masterMetaData.getMetaData(fileInfo.getUsername(), getFileName(fileInfo.getFilename()));
 
             logger.info("deleting metadata of file, slave in master");
-            logger.info("username: " + fileInfo.getUsername().getUsername());
-            logger.info("filepath: " + fileInfo.getFilename().getFilename());
-            logger.info("file name: " + getFileName(fileInfo.getFilename().getFilename()));
-            masterMetaData.deleteFileFormMetaData(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+            logger.info("username: " + fileInfo.getUsername());
+            logger.info("filepath: " + fileInfo.getFilename());
+            logger.info("file name: " + getFileName(fileInfo.getFilename()));
+            masterMetaData.deleteFileFormMetaData(fileInfo.getUsername(), getFileName(fileInfo.getFilename()));
 
             for(String ip: ips) {
                 managedChannelList.add(MasterNode.createChannel(ip));
@@ -378,11 +378,11 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     ackMessage = "success";
                 }
                 logger.info("ack status: " + ackStatus);
-                logger.info("Ack message: " + ackMessage);
+                logger.info("ack message: " + ackMessage);
 
-                ack.setMessage(ackMessage);
-                ack.setSuccess(ackStatus);
-                ackStreamObserver.onNext(ack.build());
+                ack1.setMessage(ackMessage);
+                ack1.setSuccess(ackStatus);
+                ackStreamObserver.onNext(ack1.build());
                 ackStreamObserver.onCompleted();
             }
 
@@ -394,22 +394,22 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             if (ackStatus) {
                 ackMessage = "success";
             }
-            ack.setMessage(ackMessage);
-            ack.setSuccess(ackStatus);
-            ackStreamObserver.onNext(ack.build());
+            ack1.setMessage(ackMessage);
+            ack1.setSuccess(ackStatus);
+            ackStreamObserver.onNext(ack1.build());
             ackStreamObserver.onCompleted();
         }
     }
 
     public static boolean search(FileInfo fileInfo) {
-        logger.info("Searching for file: " + fileInfo.getFilename().getFilename() + " in DB.");
-        return new MasterMetaData().checkIfFileExists(fileInfo.getUsername().getUsername(), getFileName(fileInfo.getFilename().getFilename()));
+        logger.info("Searching for file: " + fileInfo.getFilename() + " in DB.");
+        return new MasterMetaData().checkIfFileExists(fileInfo.getUsername(), getFileName(fileInfo.getFilename()));
 
     }
 
     @Override
-    public void searchFile(FileInfo fileInfo, StreamObserver<Ack> ackStreamObserver) {
-        Ack.Builder ack = Ack.newBuilder();
+    public void fileSearch(FileInfo fileInfo, StreamObserver<ack> ackStreamObserver) {
+        ack.Builder ack1 = ack.newBuilder();
         boolean ackStatus = false;
         String ackMessage = "File is not present";
         if (isMaster) {
@@ -418,18 +418,18 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 ackMessage = "present";
             }
         }
-        ack.setMessage(ackMessage);
-        ack.setSuccess(ackStatus);
-        ackStreamObserver.onNext(ack.build());
+        ack1.setMessage(ackMessage);
+        ack1.setSuccess(ackStatus);
+        ackStreamObserver.onNext(ack1.build());
         ackStreamObserver.onCompleted();
     }
 
     @Override
-    public void listFile(UserInfo userInfo, StreamObserver<FileResponse> fileResponseStreamObserver) {
+    public void fileList(UserInfo userInfo, StreamObserver<FileListResponse> fileResponseStreamObserver) {
         logger.info("Listing files for user: " + userInfo.getUsername());
-        FileResponse.Builder fileResponse = FileResponse.newBuilder();
+        FileListResponse.Builder fileResponse = FileListResponse.newBuilder();
         if (isMaster) {
-            fileResponse.setFilename(masterMetaData.getAllFiles(userInfo.getUsername()).toString());
+            fileResponse.setFilenames(masterMetaData.getAllFiles(userInfo.getUsername()).toString());
         }
         fileResponseStreamObserver.onNext(fileResponse.build());
         fileResponseStreamObserver.onCompleted();
@@ -437,7 +437,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
 
     @Override
-    public StreamObserver<FileData> updateFile(StreamObserver<Ack> ackStreamObserver) {
+    public StreamObserver<FileData> updateFile(StreamObserver<ack> ackStreamObserver) {
         logger.info("calling update file");
 
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
@@ -450,10 +450,10 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
             @Override
             public void onNext(FileData fileData) {
-                logger.info("Received seq num:  " + fileData.getSeqnum() + " for file: " + fileData.getFilename().getFilename());
+                logger.info("Received file:  " + fileData.getFilename());
                 fd = fileData;
-                username = fileData.getUsername().getUsername();
-                filepath = fileData.getFilename().getFilename();
+                username = fileData.getUsername();
+                filepath = fileData.getFilename();
                 if (isMaster) {
                     if(!isChannelCreated) {
                         List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
@@ -472,10 +472,10 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         isChannelCreated = true;
                     }
                     logger.info("managed channel list size: "+managedChannelList.size());
-                        StreamObserver<Ack> ackStreamObserver = new StreamObserver<Ack>() {
+                        StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                             @Override
-                            public void onNext(Ack ack) {
+                            public void onNext(ack ack) {
                                 logger.info("Received ack status from the server: " + ack.getSuccess());
                                 logger.info("Received ack  message from the server: " + ack.getMessage());
                             }
@@ -497,7 +497,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     ackStatus = MasterNode.updateFileToServer(fileData, false);
                         if(managedChannelList.size() > 1 && replicaIp != null) {
                             logger.info("entering replica part");
-                            replicaStub = FileServiceGrpc.newStub(managedChannelList.get(1));
+                            replicaStub = FileserviceGrpc.newStub(managedChannelList.get(1));
                             fdsm = replicaStub.replicateFile(ackStreamObserver);
                             replicate(fileData, false, fdsm);
                         }
@@ -527,9 +527,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 logger.info("Node is done sending messages");
                 if (isMaster) {
                     if (MasterNode.updateFileToServer(fd, true)) {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
                     masterMetaData.deleteFileFormMetaData(username, getFileName(filepath));
@@ -557,9 +557,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 } else {
                     logger.info("Calling Update Mongo");
                     if (SlaveNode.updateMongo(username, filepath)) {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
                 }
@@ -573,16 +573,16 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
         if (isMaster) {
             logger.info("creating channel -download");
             ch1 = slaveIpThread();
-            ayncStub = FileServiceGrpc.newStub(ch1);
-            String username = fileInfo.getUsername().getUsername();
-            String filename = fileInfo.getFilename().getFilename();
-            logger.info("getting information of " + fileInfo.getFilename().getFilename() + " from server");
+            ayncStub = FileserviceGrpc.newStub(ch1);
+            String username = fileInfo.getUsername();
+            String filename = fileInfo.getFilename();
+            logger.info("getting information of " + fileInfo.getFilename() + " from server");
             CountDownLatch cdl = new CountDownLatch(1);
             StreamObserver<FileData> fileDataStreamObserver1 = new StreamObserver<FileData>() {
 
                 @Override
                 public void onNext(FileData fileData) {
-                    logger.info("received file data with seq num: " + fileData.getSeqnum());
+                    logger.info("received file: " + fileData.getFilename());
                     fileDataStreamObserver.onNext(fileData);
                 }
 
@@ -611,7 +611,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                 ch1 = MasterNode.createChannel(ips.get(i));
             }
             if(ch1 != null) {
-                ayncStub = FileServiceGrpc.newStub(ch1);
+                ayncStub = FileserviceGrpc.newStub(ch1);
                 ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
             }
             try {
@@ -653,13 +653,12 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     if (n <= 0)
                         break;
                     // identifying sequence number
-                    fileData1.setContent(ByteString.copyFrom(raw, 0, n));
-                    fileData1.setSeqnum(seq);
+                    fileData1.setData(ByteString.copyFrom(raw, 0, n));
                     fileData1.setUsername(fileInfo.getUsername());
                     fileData1.setFilename(fileInfo.getFilename());
                     seq++;
                     fileDataStreamObserver.onNext(fileData1.build());
-                    logger.info("sending data with seq num: " + fileData1.getSeqnum());
+                    logger.info("sending data of file: " + fileData1.getFilename());
                 }
             } catch (IOException io) {
                 io.printStackTrace();
@@ -673,7 +672,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
     }
 
     @Override
-    public StreamObserver<FileData> replicateFile(StreamObserver<Ack> ackStreamObserver) {
+    public StreamObserver<FileData> replicateFile(StreamObserver<ack> ackStreamObserver) {
         logger.info("Calling replicate file");
         StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
             boolean ackStatus;
@@ -685,8 +684,8 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             @Override
             public void onNext(FileData fileData) {
                 fd = fileData;
-                username = fileData.getUsername().getUsername();
-                filepath = fileData.getFilename().getFilename();
+                username = fileData.getUsername();
+                filepath = fileData.getFilename();
                     logger.info("received data from master");
                     ackStatus = SlaveNode.put(fileData);
                     if (ackStatus) {
@@ -705,9 +704,9 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             public void onCompleted() {
                 logger.info("Node is done sending messages");
                     if (SlaveNode.put(username, filepath)) {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("success").setSuccess(true).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
-                        ackStreamObserver.onNext(Ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
+                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
                     }
                     ackStreamObserver.onCompleted();
                 }
@@ -717,19 +716,21 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
 
     //This is slave's service.
     @Override
-    public void isAlive(NodeInfo request, StreamObserver<Stats> responseObserver) {
+    public void isAlive(NodeInfo request, StreamObserver<ClusterStats> responseObserver) {
 
         sendStatstoMaster(responseObserver);
 
     }
 
-    public void sendStatstoMaster(StreamObserver<Stats> responseObserver){
+    public void sendStatstoMaster(StreamObserver<ClusterStats> responseObserver){
 
         OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
 
-        Stats.Builder stats = Stats.newBuilder();
+        ClusterStats.Builder stats = ClusterStats.newBuilder();
         stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
-        stats.setDiskSpace(Double.toString(((UnixOperatingSystemMXBean) mxBean).getFreePhysicalMemorySize()));
+        File systemFile=new File("/");
+        stats.setDiskSpace(Double.toString(systemFile.getTotalSpace()));
+        stats.setUsedMem(Double.toString(systemFile.getTotalSpace()-systemFile.getFreeSpace()));
 //        stats.setUsedMem(Double.toString(mxBean.))
 
         responseObserver.onNext(stats.build());
