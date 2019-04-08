@@ -50,7 +50,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     String originalIp;
     String replicaIp;
     boolean isChannelCreated = false;
-    private static String seqId="1";
+    private int seqID = 1;
+    private int repSeqID = 1;
 
 
 
@@ -297,7 +298,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     }
                 } else {
                     logger.info("received data from master");
-                    ackStatus = SlaveNode.put(fileData);
+                    ackStatus = SlaveNode.put(fileData, Integer.toString(seqID));
+                    seqID++;
                     if (ackStatus) {
                         ackMessage = "success";
                     } else {
@@ -348,6 +350,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     } else {
                         ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
                     }
+                    seqID = 1;
                     ackStreamObserver.onCompleted();
                 }
             }
@@ -508,7 +511,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     }
                 } else {
                     //logger.info("Updating in redis" + new String(fileData.getContent().toByteArray()));
-                    ackStatus = SlaveNode.update(fileData);
+                    ackStatus = SlaveNode.update(fileData, Integer.toString(seqID));
+                    seqID++;
                     if (ackStatus) {
                         ackMessage = "success";
                     } else {
@@ -561,6 +565,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     } else {
                         ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
                     }
+                    seqID = 1;
                     ackStreamObserver.onCompleted();
                 }
             }
@@ -687,7 +692,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 username = fileData.getUsername();
                 filepath = fileData.getFilename();
                     logger.info("received data from master");
-                    ackStatus = SlaveNode.put(fileData);
+                    ackStatus = SlaveNode.put(fileData, Integer.toString(repSeqID));
+                    repSeqID++;
                     if (ackStatus) {
                         ackMessage = "success";
                     } else {
@@ -708,6 +714,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     } else {
                         ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
                     }
+                    repSeqID = 1;
                     ackStreamObserver.onCompleted();
                 }
         };

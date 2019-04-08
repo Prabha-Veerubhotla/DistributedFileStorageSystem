@@ -43,19 +43,15 @@ public class SlaveNode extends RouteServerImpl {
      * @param fileData
      * @return boolean
      */
-    public static boolean put(FileData fileData) {
-
-
-
+    public static boolean put(FileData fileData, String seqID) {
 //        logger.info("All Data" + new String(fileData.getContent().toByteArray()));
         String userName = fileData.getUsername();
-        byte[] payload = fileData.getContent().toByteArray();
-        String seqID = Long.toString(fileData.getSeqnum());
-        String fileName = getFileName(fileData.getFilename().getFilename());
+        byte[] payload = fileData.getData().toByteArray();
+        String fileName = getFileName(fileData.getFilename());
         logger.info("Put details: " + userName + " seq num: " + seqID);
         //logger.info("content: " + new String(payload));
         //TODO: store the file in db from method : writeChunksIntoFile -- done
-        rh.put(userName.getUsername(), fileName, seqID, payload);
+        rh.put(userName, fileName, seqID, payload);
 
         return true;
     }
@@ -102,10 +98,9 @@ public class SlaveNode extends RouteServerImpl {
      *
      * @param fileData
      */
-    public static boolean update(FileData fileData) {
+    public static boolean update(FileData fileData, String seqID) {
         String userName = fileData.getUsername();
         String fileName = getFileName(fileData.getFilename());
-        String seqID = Long.toString(fileData.getSeqnum());
         byte[] payload = fileData.getData().toByteArray();
         rh.update(userName, fileName, seqID, payload);
         return true;
