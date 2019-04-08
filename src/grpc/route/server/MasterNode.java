@@ -121,12 +121,10 @@ public class MasterNode extends RouteServerImpl {
         StreamObserver<FileData> fileDataStreamObserver = ayncStub.uploadFile(ackStreamObserver);
 
         if (complete) {
-            fileDataStreamObserver.onNext(fileData);
             logger.info("sending completed to slave");
             fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData);
-//            logger.info("sent data:  " + fileData.getFilename() + " to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -163,7 +161,6 @@ public class MasterNode extends RouteServerImpl {
         StreamObserver<FileData> fileDataStreamObserver = ayncStub.updateFile(ackStreamObserver);
 
         if (complete) {
-            fileDataStreamObserver.onNext(fileData);
             logger.info("sending completed to slave");
             fileDataStreamObserver.onCompleted();
         } else {

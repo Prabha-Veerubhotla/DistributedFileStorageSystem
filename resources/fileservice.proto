@@ -29,6 +29,7 @@ service Fileservice {
     }
     rpc UpdateReplicateFile (stream FileData) returns (ack) {}
 
+    rpc completeStreaming(DataType) returns (ack) {}
 
 }
 
@@ -84,4 +85,10 @@ message NodeName {
 
 message UpdateMessage {
     string message = 1;
+}
+
+message DataType {
+    string username = 1;
+    string filename = 2;
+    string type = 3;
 }

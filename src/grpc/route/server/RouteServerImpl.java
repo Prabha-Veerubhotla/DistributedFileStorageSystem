@@ -7,6 +7,7 @@ import java.util.*;
 import java.lang.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
 import com.google.protobuf.ByteString;
 import com.mongodb.connection.Cluster;
 import com.sun.management.UnixOperatingSystemMXBean;
@@ -39,7 +40,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     static MongoDBHandler mh = new MongoDBHandler();
     static RedisHandler rh = new RedisHandler();
     private static String slave1 = "localhost";
-    private static FileserviceGrpc.FileserviceStub ayncStub;
+    private static FileserviceGrpc.FileserviceStub asyncStub;
     private static FileserviceGrpc.FileserviceBlockingStub blockingStub;
     private static FileserviceGrpc.FileserviceStub replicaStub;
     private static ManagedChannel ch1;
@@ -55,15 +56,14 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     private int seqID = 1;
     private int repSeqID = 1;
     // for master to send its ip to supernode
-    private static String myIP=null;
-    private static boolean supernode=false;
+    private static String myIP = null;
+    private static boolean supernode = false;
     // for storing slave stats
-    List<String> cpuUsages=new ArrayList<>();
-    List<String> totalDiskSpace=new ArrayList<>();
-    List<String> usedDiskSpace=new ArrayList<>();
+    List<String> cpuUsages = new ArrayList<>();
+    List<String> totalDiskSpace = new ArrayList<>();
+    List<String> usedDiskSpace = new ArrayList<>();
 
-    Map<ClusterInfo,ClusterStats> clusterStatsMap=new HashMap<>();
-
+    Map<ClusterInfo, ClusterStats> clusterStatsMap = new HashMap<>();
 
 
     public void getSlaveIpList() {
@@ -109,7 +109,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
         RouteServer.configure(conf);
 
-        //    TODO: Integrate Leader Election here
+        //TODO: Integrate Leader Election here
         final RouteServerImpl impl = new RouteServerImpl();
         if (conf.getProperty("server.name").equalsIgnoreCase("master")) {
             isMaster = true;
@@ -133,7 +133,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             slaveIpThread();
             getSlavesHeartBeat();
         }
-        if(supernode){
+        if (supernode) {
             getOtherClusterStats();
         }
 
@@ -169,25 +169,24 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     }
 
     //gets and updates the nodeStatsMap<String ip, Stats stats> in MasterNode every 5 seconds
-    private void getSlavesHeartBeat(){
+    private void getSlavesHeartBeat() {
         logger.info("Started monitoring heart beat of slaves..");
-        TimerTask timerTask=new TimerTask(){
+        TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
                 logger.info("running heart beat monitoring service...");
-                if(dhcp_lease_test.getCurrentIpList().size() > 0) {
+                if (dhcp_lease_test.getCurrentIpList().size() > 0) {
                     MasterNode.getHeartBeatofAllSlaves();
                 }
             }
         };
-        Timer timer=new Timer();
-        timer.scheduleAtFixedRate(timerTask,0,60000);
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(timerTask, 0, 60000);
     }
 
-    private void getOtherClusterStats(){
+    private void getOtherClusterStats() {
 
     }
-
 
 
     protected void stop() {
@@ -215,7 +214,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     public void nodeUpdate(UpdateMessage updateMessage, StreamObserver<UpdateMessage> updateMessageStreamObserver) {
         UpdateMessage.Builder um = UpdateMessage.newBuilder();
         um.setMessage("Update received");
-        logger.info("Current Node update received from master: "+updateMessage.getMessage());
+        logger.info("Current Node update received from master: " + updateMessage.getMessage());
         updateMessageStreamObserver.onNext(um.build());
         updateMessageStreamObserver.onCompleted();
     }
@@ -227,19 +226,18 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     }
 
     public void replicate(FileData fileData, boolean complete, StreamObserver<FileData> fileDataStreamObserver) {
-        logger.info("replicating file: "+fileData.getFilename());
+        logger.info("replicating file: " + fileData.getFilename());
         fileservice.FileData.Builder fileData1 = FileData.newBuilder();
         fileData1.setFilename(fileData.getFilename());
         fileData1.setUsername(fileData.getUsername());
         fileData1.setData(fileData.getData());
 
         if (complete) {
-            fileDataStreamObserver.onNext(fileData1.build());
             logger.info("sending completed to slave");
             fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData1.build());
-            logger.info("sent data filename:  "+fileData1.getFilename()+" to slave");
+            logger.info("sent data filename:  " + fileData1.getFilename() + " to slave");
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -266,13 +264,12 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 username = fileData.getUsername();
                 filepath = fileData.getFilename();
 
-
                 if (isMaster) {
-                    if(!MasterNode.isRoundRobinCalled){
+                    if (!MasterNode.isRoundRobinCalled) {
                         List<String> slaveIpList = dhcp_lease_test.getCurrentIpList();
-                       MasterNode.assignSlaveIp(slaveIpList);
+                        MasterNode.assignSlaveIp(slaveIpList);
                         originalIp = roundRobinIP();
-                        if(slaveIpList.size() > 1) {
+                        if (slaveIpList.size() > 1) {
                             replicaIp = roundRobinIP();
                             replicaChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
                             managedChannelList.add(replicaChannel);
@@ -303,12 +300,11 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         }
                         originalChannel = ManagedChannelBuilder.forAddress(originalIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
                         managedChannelList.add(originalChannel);
-                        ayncStub = FileserviceGrpc.newStub(originalChannel);
                         setIsRoundRobinCalled(true);
                     } else {
                         logger.info("round robin not called");
                     }
-                    if(managedChannelList.size() > 1) {
+                    if (managedChannelList.size() > 1) {
                         replicate(fileData, false, fdsm);
                     }
                     ackStatus = MasterNode.streamFileToServer(fileData, false, originalChannel);
@@ -338,15 +334,78 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             public void onCompleted() {
                 logger.info("Node is done sending messages");
                 if (isMaster) {
-                    if (MasterNode.streamFileToServer(fd, true,originalChannel )) {
+                    if (MasterNode.streamFileToServer(fd, true, originalChannel)) {
                         ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
                     } else {
                         ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file").setSuccess(false).build());
                     }
-                    if(managedChannelList.size() > 1) {
+                    if (managedChannelList.size() > 1) {
                         replicate(fd, true, fdsm);
+
+                        asyncStub = FileserviceGrpc.newStub(replicaChannel);
+                        DataType.Builder datatype = DataType.newBuilder();
+                        datatype.setFilename(fd.getFilename());
+                        datatype.setType("put");
+                        datatype.setUsername(username);
+
+                        StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
+
+                            @Override
+                            public void onNext(ack ack1) {
+                                logger.info("Received ack status from the server: " + ack1.getSuccess());
+                                logger.info("Received ack  message from the server: " + ack1.getMessage());
+                            }
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                logger.info("Exception in the response from server: " + throwable);
+                                cdl.countDown();
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                                logger.info("Server is done sending data");
+                                cdl.countDown();
+                                replicaChannel.shutdown();
+                            }
+                        };
+
+                        asyncStub.completeStreaming(datatype.build(), ackStreamObserver);
                     }
+
                     ackStreamObserver.onCompleted();
+                    asyncStub = FileserviceGrpc.newStub(originalChannel);
+                    DataType.Builder datatype = DataType.newBuilder();
+                    datatype.setFilename(fd.getFilename());
+                    datatype.setType("put");
+                    datatype.setUsername(username);
+
+                    StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
+
+                        @Override
+                        public void onNext(ack ack1) {
+                            logger.info("Received ack status from the server: " + ack1.getSuccess());
+                            logger.info("Received ack  message from the server: " + ack1.getMessage());
+                        }
+
+                        @Override
+                        public void onError(Throwable throwable) {
+                            logger.info("Exception in the response from server: " + throwable);
+                            cdl.countDown();
+                        }
+
+                        @Override
+                        public void onCompleted() {
+                            logger.info("Server is done sending data");
+                            cdl.countDown();
+
+                            // replicaChannel.shutdown();
+                        }
+                    };
+
+
+                    asyncStub.completeStreaming(datatype.build(), ackStreamObserver);
+
                     originalChannel.shutdown();
                     logger.info("putting metadata of file, slave in master");
                     logger.info("username: " + username);
@@ -354,24 +413,19 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     logger.info("original ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
-                    masterMetaData.putMetaDataForIP(username,getFileName(filepath),originalIp);
-                    if(managedChannelList.size() > 1) {
+                    masterMetaData.putMetaDataForIP(username, getFileName(filepath), originalIp);
+                    if (managedChannelList.size() > 1) {
                         logger.info("putting metadata of replicated file, slave in master");
                         logger.info("username: " + username);
                         logger.info("filepath: " + filepath);
                         logger.info("replica ip: " + replicaIp);
                         logger.info("file name: " + getFileName(filepath));
                         masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
-                        masterMetaData.putMetaDataForIP(username,getFileName(filepath),replicaIp);
+                        masterMetaData.putMetaDataForIP(username, getFileName(filepath), replicaIp);
                     }
                     MasterNode.isRoundRobinCalled = false;
                     managedChannelList.clear();
                 } else {
-                    if (SlaveNode.put(username, filepath)) {
-                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
-                    } else {
-                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
-                    }
                     seqID = 1;
                     ackStreamObserver.onCompleted();
                 }
@@ -396,7 +450,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             logger.info("file name: " + getFileName(fileInfo.getFilename()));
             masterMetaData.deleteFileFormMetaData(fileInfo.getUsername(), getFileName(fileInfo.getFilename()));
 
-            for(String ip: ips) {
+            for (String ip : ips) {
                 managedChannelList.add(MasterNode.createChannel(ip));
                 ackStatus = MasterNode.deleteFileFromServer(fileInfo);
                 if (ackStatus) {
@@ -411,7 +465,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 ackStreamObserver.onCompleted();
             }
 
-            for(ManagedChannel managedChannel: managedChannelList) {
+            for (ManagedChannel managedChannel : managedChannelList) {
                 managedChannel.shutdown();
             }
         } else {
@@ -480,9 +534,9 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 username = fileData.getUsername();
                 filepath = fileData.getFilename();
                 if (isMaster) {
-                    if(!isChannelCreated) {
+                    if (!isChannelCreated) {
                         List<String> ips = masterMetaData.getMetaData(username, getFileName(filepath));
-                        logger.info("meta data: "+ ips+"  for file: "+filepath);
+                        logger.info("meta data: " + ips + "  for file: " + filepath);
                         ManagedChannel managedChannel;
                         for (int i = 0; i < ips.size(); i++) {
                             if (i == 0) {
@@ -496,37 +550,37 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         }
                         isChannelCreated = true;
                     }
-                    logger.info("managed channel list size: "+managedChannelList.size());
-                        StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
+                    logger.info("managed channel list size: " + managedChannelList.size());
+                    StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
-                            @Override
-                            public void onNext(ack ack1) {
-                                logger.info("Received ack status from the server: " + ack1.getSuccess());
-                                logger.info("Received ack  message from the server: " + ack1.getMessage());
-                            }
+                        @Override
+                        public void onNext(ack ack1) {
+                            logger.info("Received ack status from the server: " + ack1.getSuccess());
+                            logger.info("Received ack  message from the server: " + ack1.getMessage());
+                        }
 
-                            @Override
-                            public void onError(Throwable throwable) {
-                                logger.info("Exception in the response from server: " + throwable);
-                                cdl.countDown();
-                            }
+                        @Override
+                        public void onError(Throwable throwable) {
+                            logger.info("Exception in the response from server: " + throwable);
+                            cdl.countDown();
+                        }
 
-                            @Override
-                            public void onCompleted() {
-                                logger.info("Server is done sending data");
-                                cdl.countDown();
+                        @Override
+                        public void onCompleted() {
+                            logger.info("Server is done sending data");
+                            cdl.countDown();
 
-                                // replicaChannel.shutdown();
-                            }
-                        };
+                            // replicaChannel.shutdown();
+                        }
+                    };
 
                     ackStatus = MasterNode.updateFileToServer(fileData, false);
-                        if(managedChannelList.size() > 1 && replicaIp != null) {
-                            logger.info("entering replica part");
-                            replicaStub = FileserviceGrpc.newStub(managedChannelList.get(1));
-                            fdsm = replicaStub.updateReplicateFile(ackStreamObserver);
-                            replicate(fileData, false, fdsm);
-                        }
+                    if (managedChannelList.size() > 1 && replicaIp != null) {
+                        logger.info("entering replica part");
+                        replicaStub = FileserviceGrpc.newStub(managedChannelList.get(1));
+                        fdsm = replicaStub.updateReplicateFile(ackStreamObserver);
+                        replicate(fileData, false, fdsm);
+                    }
                     if (ackStatus) {
                         ackMessage = "success";
                     } else {
@@ -560,7 +614,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     }
                     ackStreamObserver.onCompleted();
                     masterMetaData.deleteFileFormMetaData(username, getFileName(filepath));
-                    if(managedChannelList.size() > 1 && replicaIp != null) {
+                    if (managedChannelList.size() > 1 && replicaIp != null) {
                         replicate(fd, true, fdsm);
                         logger.info("putting metadata of file, slave in master");
                         logger.info("username: " + username);
@@ -578,17 +632,11 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
                     masterMetaData.putMetaDataForIP(username, getFileName(filepath), originalIp);
                     logger.info("channel is shutitng down");
-                    for(ManagedChannel channel: managedChannelList) {
+                    for (ManagedChannel channel : managedChannelList) {
                         channel.shutdown();
                     }
                     managedChannelList.clear();
                 } else {
-                    logger.info("Calling Update Mongo");
-                    if (SlaveNode.updateMongo(username, filepath)) {
-                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
-                    } else {
-                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
-                    }
                     seqID = 1;
                     ackStreamObserver.onCompleted();
                 }
@@ -602,7 +650,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         if (isMaster) {
             logger.info("creating channel -download");
             ch1 = slaveIpThread();
-            ayncStub = FileserviceGrpc.newStub(ch1);
+            asyncStub = FileserviceGrpc.newStub(ch1);
             String username = fileInfo.getUsername();
             String filename = fileInfo.getFilename();
             logger.info("getting information of " + fileInfo.getFilename() + " from server");
@@ -633,15 +681,15 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             };
 
             List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
-            for(int i = 0 ; i< ips.size();i++) {
+            for (int i = 0; i < ips.size(); i++) {
                 if (!new Dhcp_Lease_Test().getCurrentIpList().contains(ips.get(i))) {
                     continue;
                 }
                 ch1 = MasterNode.createChannel(ips.get(i));
             }
-            if(ch1 != null) {
-                ayncStub = FileserviceGrpc.newStub(ch1);
-                ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
+            if (ch1 != null) {
+                asyncStub = FileserviceGrpc.newStub(ch1);
+                asyncStub.downloadFile(fileInfo, fileDataStreamObserver1);
             }
             try {
                 cdl.await(3, TimeUnit.SECONDS);
@@ -652,11 +700,11 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         } else {
             FileData.Builder fileData1 = FileData.newBuilder();
             FileEntity fileEntity = SlaveNode.get(fileInfo);
-            Map<String, byte[]> res = (Map<String, byte[]>)fileEntity.getFileContents();
+            Map<String, byte[]> res = (Map<String, byte[]>) fileEntity.getFileContents();
             byte[] temp = combineBytes(res);
             BufferedOutputStream bw = null;
             try {
-                bw = new BufferedOutputStream(new FileOutputStream("output-"+fileEntity.getFileName()));
+                bw = new BufferedOutputStream(new FileOutputStream("output-" + fileEntity.getFileName()));
                 bw.write(temp);
                 bw.flush();
                 bw.close();
@@ -664,14 +712,14 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 e.printStackTrace();
             }
 
-            File fn = new File("output-"+fileEntity.getFileName());
-            logger.info("FileEntity Name:" + "output-"+fileEntity.getFileName().toString());
+            File fn = new File("output-" + fileEntity.getFileName());
+            logger.info("FileEntity Name:" + "output-" + fileEntity.getFileName().toString());
             FileInputStream fis = null;
             try {
-              logger.info("FileName:" + fn.toString());
+                logger.info("FileName:" + fn.toString());
                 fis = new FileInputStream(fn);
                 logger.info("fis: " + fis.toString());
-                logger.info("file length: "+fn.length());
+                logger.info("file length: " + fn.length());
                 long seq = 0l;
                 final int blen = 4194000;
                 byte[] raw = new byte[blen];
@@ -733,11 +781,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             @Override
             public void onCompleted() {
                 logger.info("Node is done sending messages");
-                if (SlaveNode.updateMongo(username, filepath)) {
-                    ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
-                } else {
-                    ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
-                }
                 repSeqID = 1;
                 ackStreamObserver.onCompleted();
             }
@@ -760,14 +803,14 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 fd = fileData;
                 username = fileData.getUsername();
                 filepath = fileData.getFilename();
-                    logger.info("received data from master");
-                    ackStatus = SlaveNode.put(fileData, Integer.toString(repSeqID));
-                    repSeqID++;
-                    if (ackStatus) {
-                        ackMessage = "success";
-                    } else {
-                        ackMessage = "Unable to save file";
-                    }
+                logger.info("received data from master");
+                ackStatus = SlaveNode.put(fileData, Integer.toString(repSeqID));
+                repSeqID++;
+                if (ackStatus) {
+                    ackMessage = "success";
+                } else {
+                    ackMessage = "Unable to save file";
+                }
             }
 
             @Override
@@ -778,14 +821,9 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             @Override
             public void onCompleted() {
                 logger.info("Node is done sending messages");
-                    if (SlaveNode.put(username, filepath)) {
-                        ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
-                    } else {
-                        ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to save file in DB").setSuccess(false).build());
-                    }
-                    repSeqID = 1;
-                    ackStreamObserver.onCompleted();
-                }
+                repSeqID = 1;
+                ackStreamObserver.onCompleted();
+            }
         };
         return fileDataStreamObserver;
     }
@@ -798,28 +836,29 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
     }
 
-    public void sendStatstoMaster(StreamObserver<ClusterStats> responseObserver){
+    public void sendStatstoMaster(StreamObserver<ClusterStats> responseObserver) {
 
         OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
 
         ClusterStats.Builder stats = ClusterStats.newBuilder();
         stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
-        File systemFile=new File("/");
+        File systemFile = new File("/");
         stats.setDiskSpace(Double.toString(systemFile.getTotalSpace()));
-        stats.setUsedMem(Double.toString(systemFile.getTotalSpace()-systemFile.getFreeSpace()));
+        stats.setUsedMem(Double.toString(systemFile.getTotalSpace() - systemFile.getFreeSpace()));
 //        stats.setUsedMem(Double.toString(mxBean.))
 
         responseObserver.onNext(stats.build());
         responseObserver.onCompleted();
 
     }
+
     @Override
-    public void getClusterStats(Empty empty,StreamObserver<ClusterStats> statsStreamObserver){
+    public void getClusterStats(Empty empty, StreamObserver<ClusterStats> statsStreamObserver) {
 
-        List<String> availableNodes=new Dhcp_Lease_Test().getCurrentIpList();
+        List<String> availableNodes = new Dhcp_Lease_Test().getCurrentIpList();
 
-        if(isMaster){
-            for(int i=0;i<availableNodes.size();i++){
+        if (isMaster) {
+            for (int i = 0; i < availableNodes.size(); i++) {
                 StreamObserver<ClusterStats> slaveStatsStreamObserver = new StreamObserver<ClusterStats>() {
 
 
@@ -841,10 +880,10 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     }
                 };
 
-                ManagedChannel channel=ManagedChannelBuilder.forAddress(availableNodes.get(i),2345).usePlaintext().build();
-                ayncStub= FileserviceGrpc.newStub(channel);
-                Empty.Builder empty1=Empty.newBuilder();
-                ayncStub.getClusterStats(empty1.build(),statsStreamObserver);
+                ManagedChannel channel = ManagedChannelBuilder.forAddress(availableNodes.get(i), 2345).usePlaintext().build();
+                asyncStub = FileserviceGrpc.newStub(channel);
+                Empty.Builder empty1 = Empty.newBuilder();
+                asyncStub.getClusterStats(empty1.build(), statsStreamObserver);
 
 
                 /*cpuUsages.add(clusterStats.getCpuUsage());
@@ -852,15 +891,14 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 usedDiskSpace.add(clusterStats.getUsedMem());
                 channel.shutdown();*/
             }
-        }
-        else{
+        } else {
             OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
 
             ClusterStats.Builder slaveStats = ClusterStats.newBuilder();
             slaveStats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
-            File systemFile=new File("/");
+            File systemFile = new File("/");
             slaveStats.setDiskSpace(Double.toString(systemFile.getTotalSpace()));
-            slaveStats.setUsedMem(Double.toString(systemFile.getTotalSpace()-systemFile.getFreeSpace()));
+            slaveStats.setUsedMem(Double.toString(systemFile.getTotalSpace() - systemFile.getFreeSpace()));
 
 
             statsStreamObserver.onNext(slaveStats.build());
@@ -876,4 +914,23 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
     }
 
+    @Override
+    public void completeStreaming(DataType dataType, StreamObserver<ack> ackStreamObserver) {
+        logger.info("Calling complete streaming");
+        if(dataType.getType().equalsIgnoreCase("put")) {
+            if (SlaveNode.put(dataType.getUsername(), dataType.getFilename())) {
+                ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
+            } else {
+                ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
+            }
+        }
+        if(dataType.getType().equalsIgnoreCase("update")) {
+            if (SlaveNode.updateMongo(dataType.getUsername(), dataType.getFilename())) {
+                ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
+            } else {
+                ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
+            }
+        }
+        ackStreamObserver.onCompleted();
+    }
 }
