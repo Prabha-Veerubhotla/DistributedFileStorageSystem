@@ -45,6 +45,8 @@ public class SlaveNode extends RouteServerImpl {
      */
     public static boolean put(FileData fileData) {
 
+
+
 //        logger.info("All Data" + new String(fileData.getContent().toByteArray()));
         String userName = fileData.getUsername();
         byte[] payload = fileData.getContent().toByteArray();
