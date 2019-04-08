@@ -1,23 +1,20 @@
 syntax = "proto3";
 option java_multiple_files = true;
 option optimize_for = SPEED;
-package route;
+package fileservice;
 
-service FileService {
-    rpc uploadFile (stream FileData) returns (Ack) {
-    }
-    rpc downloadFile (FileInfo) returns (stream FileData) {
-    }
-    rpc searchFile (FileInfo) returns (Ack) {
-    }
-    rpc replicateFile (stream FileData) returns (Ack) {
-    }
-    rpc listFile (UserInfo) returns (FileResponse) {
-    }
-    rpc deleteFile (FileInfo) returns (Ack) {
-    }
-    rpc updateFile (stream FileData) returns (Ack) {
-    }
+service Fileservice {
+
+    rpc UploadFile (stream FileData) returns (ack);
+    rpc DownloadFile (FileInfo) returns (stream FileData);
+    rpc FileSearch (FileInfo) returns (ack);
+    rpc ReplicateFile (stream FileData) returns (ack);
+    rpc FileList (UserInfo) returns (FileListResponse);
+    rpc FileDelete (FileInfo) returns (ack);
+    rpc UpdateFile (stream FileData) returns (ack);
+    rpc getClusterStats (Empty) returns (ClusterStats);
+    rpc getLeaderInfo (ClusterInfo) returns (ack);
+
     // to all nodes
     rpc assignNodeIp (NodeInfo) returns (NodeName) {
     }
@@ -25,59 +22,32 @@ service FileService {
     rpc nodeUpdate(UpdateMessage) returns (UpdateMessage) {
     }
     // heartbeat
-    rpc isAlive (NodeInfo) returns (Stats) {
+    rpc isAlive (NodeInfo) returns (ClusterStats) {
     }
-
-    rpc getClusterStats (Empty) returns (ClusterStats);
-    rpc getLeaderInfo (ClusterInfo) returns (Ack);
 }
 
 message FileData {
-    FileResponse filename = 1;
-    UserInfo username = 2;
-    bytes content = 3;
-    int64 seqnum = 4;
+    string username = 1;
+    string filename =2;
+    bytes data =3;
 }
 
-message Ack {
-    bool success = 1;
+message ack {
+    bool success =1;
     string message = 2;
+}
 
+message UserInfo {
+    string username=1;
 }
 
 message FileInfo {
-    UserInfo username = 1;
-    FileResponse filename = 2;
-}
-
-
-message UserInfo {
     string username = 1;
+    string filename = 2;
 }
 
-message FileResponse {
-    string filename = 1;
-}
-
-
-message NodeInfo {
-    string ip = 1;
-    string port = 2;
-}
-
-message NodeName {
-    string name = 1;
-}
-
-// The response message containing the status of the server
-message Stats {
-    string cpu_usage = 1;
-    string disk_space = 2;
-    string used_mem = 3;
-}
-
-message UpdateMessage {
-    string message = 1;
+message FileListResponse {
+    string Filenames =1;
 }
 
 // The request message containing ip address and leader status
@@ -97,3 +67,15 @@ message ClusterStats {
 message Empty {}
 
 
+message NodeInfo {
+    string ip = 1;
+    string port = 2;
+}
+
+message NodeName {
+    string name = 1;
+}
+
+message UpdateMessage {
+    string message = 1;
+}

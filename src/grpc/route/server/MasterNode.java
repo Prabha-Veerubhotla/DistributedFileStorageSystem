@@ -192,7 +192,7 @@ public class MasterNode extends RouteServerImpl {
         for (String ip : currentIpList) {
             Node_ip_channel node_ip_channel = new Node_ip_channel();
             node_ip_channel.setIpAddress(ip);
-            ManagedChannel ch = ManagedChannelBuilder.forAddress(slave1, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+            ManagedChannel ch = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
             node_ip_channel.setChannel(ch);
             nodeIpChannelMap.put(ip, ch);
         }
