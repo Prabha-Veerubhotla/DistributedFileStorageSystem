@@ -5,15 +5,15 @@ package fileservice;
 
 service Fileservice {
 
-    rpc UploadFile (stream FileData) returns (ack);
-    rpc DownloadFile (FileInfo) returns (stream FileData);
-    rpc FileSearch (FileInfo) returns (ack);
-    rpc ReplicateFile (stream FileData) returns (ack);
-    rpc FileList (UserInfo) returns (FileListResponse);
-    rpc FileDelete (FileInfo) returns (ack);
-    rpc UpdateFile (stream FileData) returns (ack);
-    rpc getClusterStats (Empty) returns (ClusterStats);
-    rpc getLeaderInfo (ClusterInfo) returns (ack);
+    rpc UploadFile (stream FileData) returns (ack) {}
+    rpc DownloadFile (FileInfo) returns (stream FileData) {}
+    rpc FileSearch (FileInfo) returns (ack) {}
+    rpc ReplicateFile (stream FileData) returns (ack) {}
+    rpc FileList (UserInfo) returns (FileListResponse) {}
+    rpc FileDelete (FileInfo) returns (ack) {}
+    rpc UpdateFile (stream FileData) returns (ack) {}
+    rpc getClusterStats (Empty) returns (ClusterStats) {}
+    rpc getLeaderInfo (ClusterInfo) returns (ack) {}
 
     // to all nodes
     rpc assignNodeIp (NodeInfo) returns (NodeName) {
@@ -27,6 +27,8 @@ service Fileservice {
     rpc vote (NodeInfo) returns(ack){
 
     }
+    rpc UpdateReplicateFile (stream FileData) returns (ack) {}
+
 
 }
 

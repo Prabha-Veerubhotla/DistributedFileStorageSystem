@@ -524,7 +524,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         if(managedChannelList.size() > 1 && replicaIp != null) {
                             logger.info("entering replica part");
                             replicaStub = FileserviceGrpc.newStub(managedChannelList.get(1));
-                            fdsm = replicaStub.replicateFile(ackStreamObserver);
+                            fdsm = replicaStub.updateReplicateFile(ackStreamObserver);
                             replicate(fileData, false, fdsm);
                         }
                     if (ackStatus) {
@@ -656,7 +656,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             byte[] temp = combineBytes(res);
             BufferedOutputStream bw = null;
             try {
-                bw = new BufferedOutputStream(new FileOutputStream(fileEntity.getFileName()));
+                bw = new BufferedOutputStream(new FileOutputStream("output-"+fileEntity.getFileName()));
                 bw.write(temp);
                 bw.flush();
                 bw.close();
@@ -664,8 +664,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 e.printStackTrace();
             }
 
-            File fn = new File(fileEntity.getFileName());
-            logger.info("FileEntity Name:" + fileEntity.toString());
+            File fn = new File("output-"+fileEntity.getFileName());
+            logger.info("FileEntity Name:" + "output-"+fileEntity.getFileName().toString());
             FileInputStream fis = null;
             try {
               logger.info("FileName:" + fn.toString());
@@ -698,6 +698,51 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
         }
 
+    }
+
+    @Override
+    public StreamObserver<FileData> updateReplicateFile(StreamObserver<ack> ackStreamObserver) {
+        logger.info("Calling update replicate file");
+        StreamObserver<FileData> fileDataStreamObserver = new StreamObserver<FileData>() {
+            boolean ackStatus;
+            String ackMessage;
+            String username;
+            String filepath;
+            FileData fd;
+
+            @Override
+            public void onNext(FileData fileData) {
+                fd = fileData;
+                username = fileData.getUsername();
+                filepath = fileData.getFilename();
+                logger.info("received data from master");
+                ackStatus = SlaveNode.update(fileData, Integer.toString(repSeqID));
+                repSeqID++;
+                if (ackStatus) {
+                    ackMessage = "success";
+                } else {
+                    ackMessage = "Unable to update file";
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                logger.info("Exception in the request from node: " + throwable);
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.info("Node is done sending messages");
+                if (SlaveNode.updateMongo(username, filepath)) {
+                    ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
+                } else {
+                    ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
+                }
+                repSeqID = 1;
+                ackStreamObserver.onCompleted();
+            }
+        };
+        return fileDataStreamObserver;
     }
 
     @Override
