@@ -63,6 +63,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     List<String> cpuUsages = new ArrayList<>();
     List<String> totalDiskSpace = new ArrayList<>();
     List<String> usedDiskSpace = new ArrayList<>();
+    private static boolean isDhcpRunning = false;
 
     Map<ClusterInfo, ClusterStats> clusterStatsMap = new HashMap<>();
 
@@ -106,6 +107,11 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             return;
         }
         String path = args[0];
+        String isDhcpSetup = args[1];
+        if(isDhcpSetup.equalsIgnoreCase("yes")) {
+            isDhcpRunning = true;
+        }
+
         Properties conf = FetchConfig.getConfiguration(new File(path));
 
         RouteServer.configure(conf);
@@ -122,6 +128,21 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         impl.blockUntilShutdown();
     }
 
+    private void sendLeaderInfo() {
+        logger.info("sending leader information to super node");
+        ManagedChannel ch = ManagedChannelBuilder.forAddress("192.168.0.9", Integer.parseInt("9000")).usePlaintext(true).build();
+        FileserviceGrpc.FileserviceBlockingStub stub = FileserviceGrpc.newBlockingStub(ch);
+        ClusterInfo.Builder clusterInfo = ClusterInfo.newBuilder();
+        clusterInfo.setClusterName("prabha");
+        clusterInfo.setIp("192.168.0.33");
+        clusterInfo.setPort("9000");
+        ack received = stub.getLeaderInfo(clusterInfo.build());
+        logger.info("ack status: "+ received.getSuccess());
+        if(received.getMessage() != null) {
+            logger.info("received message from super node: "+received.getMessage());
+        }
+    }
+
     private void start() throws Exception {
         svr = ServerBuilder.forPort(RouteServer.getInstance().getServerPort()).addService(new RouteServerImpl())
                 .build();
@@ -130,9 +151,15 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         svr.start();
 
         if (isMaster) {
-            invokeDhcpMonitorThread();
+            if(isDhcpRunning) {
+                invokeDhcpMonitorThread();
+            }
+            logger.info("dhcp running :" +isDhcpRunning);
             slaveIpThread();
             getSlavesHeartBeat();
+            // send leader info to super node
+            // sending only once, as we have not implemented leader election yet
+            sendLeaderInfo();
         }
         if (supernode) {
             getOtherClusterStats();
@@ -150,7 +177,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         Thread thread = new Thread() {
             public void run() {
                 logger.info("Starting DHCP Lease Monitor Thread...");
-                dhcp_lease_test.monitorLease();
+                dhcp_lease_test.monitorLease(isDhcpRunning);
             }
         };
         thread.start();
@@ -921,58 +948,33 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
     @Override
     public void getClusterStats(Empty empty, StreamObserver<ClusterStats> statsStreamObserver) {
-
-        List<String> availableNodes = new Dhcp_Lease_Test().getCurrentIpList();
-
-        if (isMaster) {
-            for (int i = 0; i < availableNodes.size(); i++) {
-                StreamObserver<ClusterStats> slaveStatsStreamObserver = new StreamObserver<ClusterStats>() {
-
-
-                    @Override
-                    public void onNext(ClusterStats clusterStats) {
-                        cpuUsages.add(clusterStats.getCpuUsage());
-                        totalDiskSpace.add(clusterStats.getDiskSpace());
-                        usedDiskSpace.add(clusterStats.getUsedMem());
-                    }
-
-                    @Override
-                    public void onError(Throwable throwable) {
-                        logger.info("Exception in the request from node: " + throwable);
-                    }
-
-                    @Override
-                    public void onCompleted() {
-                        logger.info("Received stats from slaves");
-                    }
-                };
-
-//                ManagedChannel channel = ManagedChannelBuilder.forAddress(availableNodes.get(i), 2345).usePlaintext().build();
-                ManagedChannel channel = ManagedChannelBuilder.forAddress(availableNodes.get(i), 9000).usePlaintext().build();
-                asyncStub = FileserviceGrpc.newStub(channel);
-                Empty.Builder empty1 = Empty.newBuilder();
-                asyncStub.getClusterStats(empty1.build(), statsStreamObserver);
-
-
-                /*cpuUsages.add(clusterStats.getCpuUsage());
-                totalDiskSpace.add(clusterStats.getDiskSpace());
-                usedDiskSpace.add(clusterStats.getUsedMem());
-                channel.shutdown();*/
-            }
-        } else {
-            OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
-
-            ClusterStats.Builder slaveStats = ClusterStats.newBuilder();
-            slaveStats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
-            File systemFile = new File("/");
-            slaveStats.setDiskSpace(Double.toString(systemFile.getTotalSpace()));
-            slaveStats.setUsedMem(Double.toString(systemFile.getTotalSpace() - systemFile.getFreeSpace()));
-
-
-            statsStreamObserver.onNext(slaveStats.build());
-            statsStreamObserver.onCompleted();
+        logger.info("got request for cluster stats");
+        Map<String, ClusterStats> nodeStats = MasterNode.getNodeStats();
+        double averagemem = 0.0;
+        double averagecpu = 0.0;
+        double averagedisk = 0.0;
+        for (Map.Entry<String, ClusterStats> m : nodeStats.entrySet()) {
+            averagecpu = averagecpu + Double.parseDouble(m.getValue().getCpuUsage());
+            averagemem = averagemem + Double.parseDouble(m.getValue().getUsedMem());
+            averagedisk = averagedisk + Double.parseDouble(m.getValue().getDiskSpace());
         }
+        averagecpu = averagecpu / nodeStats.size();
+        averagemem = averagemem / nodeStats.size();
+        averagedisk = averagedisk / nodeStats.size();
 
+        logger.info("average cpu usage of cluster: "+averagecpu);
+        logger.info("average mem usage of cluster: "+averagemem);
+        logger.info("average disk usage of cluster: "+averagedisk);
+
+        ClusterStats.Builder clusterStats = ClusterStats.newBuilder();
+        clusterStats.setCpuUsage(String.valueOf(averagecpu));
+        clusterStats.setDiskSpace(String.valueOf(averagedisk));
+        clusterStats.setUsedMem(String.valueOf(averagemem));
+
+
+        logger.info("Sending cluster stats...");
+        statsStreamObserver.onNext(clusterStats.build());
+        statsStreamObserver.onCompleted();
     }
 
     // If super node then listen to cluster master
@@ -985,14 +987,14 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     @Override
     public void completeStreaming(DataType dataType, StreamObserver<ack> ackStreamObserver) {
         logger.info("Calling complete streaming");
-        if(dataType.getType().equalsIgnoreCase("put")) {
+        if (dataType.getType().equalsIgnoreCase("put")) {
             if (SlaveNode.put(dataType.getUsername(), dataType.getFilename())) {
                 ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
             } else {
                 ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
             }
         }
-        if(dataType.getType().equalsIgnoreCase("update")) {
+        if (dataType.getType().equalsIgnoreCase("update")) {
             if (SlaveNode.updateMongo(dataType.getUsername(), dataType.getFilename())) {
                 ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
             } else {

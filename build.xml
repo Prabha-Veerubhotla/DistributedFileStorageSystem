@@ -47,6 +47,7 @@
        <java fork="yes" classname="grpc.route.server.RouteServerImpl">
            <classpath refid="project.classpath" />
            <arg value="conf/server.conf" />
+           <arg value = "yes" />
            <jvmarg value = '-server' />
            <jvmarg value = '-Xms500m' />
            <jvmarg value = '-Xmx10g' />
@@ -59,6 +60,7 @@
         <java fork="yes" classname="grpc.route.server.RouteServerImpl">
             <classpath refid="project.classpath" />
             <arg value="conf/slave.conf" />
+            <arg value = "no" />
             <jvmarg value = '-server' />
             <jvmarg value = '-Xms500m' />
             <jvmarg value = '-Xmx10g' />
