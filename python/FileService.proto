@@ -1,8 +1,4 @@
 syntax = "proto3";
-option java_multiple_files = true;
-option optimize_for = SPEED;
-package route;
-
 service FileService {
     rpc uploadFile (stream FileData) returns (Ack) {
     }
@@ -26,9 +22,6 @@ service FileService {
     }
     // heartbeat
     rpc isAlive (NodeInfo) returns (Stats) {
-    }
-    rpc vote (NodeInfo) returns(Ack){
-
     }
 
     rpc getClusterStats (Empty) returns (ClusterStats);

@@ -331,6 +331,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     logger.info("original ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
+                    masterMetaData.putMetaDataForIP(username,getFileName(filepath),originalIp);
                     if(managedChannelList.size() > 1) {
                         logger.info("putting metadata of replicated file, slave in master");
                         logger.info("username: " + username);
@@ -338,6 +339,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         logger.info("replica ip: " + replicaIp);
                         logger.info("file name: " + getFileName(filepath));
                         masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
+                        masterMetaData.putMetaDataForIP(username,getFileName(filepath),replicaIp);
                     }
                     MasterNode.isRoundRobinCalled = false;
                 } else {
@@ -539,6 +541,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                         logger.info("replica ip: " + replicaIp);
                         logger.info("file name: " + getFileName(filepath));
                         masterMetaData.putMetaData(username, getFileName(filepath), replicaIp);
+                        masterMetaData.putMetaDataForIP(username, getFileName(filepath), replicaIp);
                     }
                     logger.info("putting metadata of  replica file, slave in master");
                     logger.info("username: " + username);
@@ -546,6 +549,7 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
                     logger.info("original ip: " + originalIp);
                     logger.info("file name: " + getFileName(filepath));
                     masterMetaData.putMetaData(username, getFileName(filepath), originalIp);
+                    masterMetaData.putMetaDataForIP(username, getFileName(filepath), originalIp);
                     logger.info("channel is shutitng down");
                     for(ManagedChannel channel: managedChannelList) {
                         channel.shutdown();
@@ -600,13 +604,16 @@ public class RouteServerImpl extends FileServiceGrpc.FileServiceImplBase {
             };
 
             List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
-            if (ips.size() > 0) {
-                ch1 = MasterNode.createChannel(ips.get(0));
-            } else {
-                ch1 = MasterNode.createChannel("localhost");
+            for(int i = 0 ; i< ips.size();i++) {
+                if (!new Dhcp_Lease_Test().getCurrentIpList().contains(ips.get(i))) {
+                    continue;
+                }
+                ch1 = MasterNode.createChannel(ips.get(i));
             }
-            ayncStub = FileServiceGrpc.newStub(ch1);
-            ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
+            if(ch1 != null) {
+                ayncStub = FileServiceGrpc.newStub(ch1);
+                ayncStub.downloadFile(fileInfo, fileDataStreamObserver1);
+            }
             try {
                 cdl.await(3, TimeUnit.SECONDS);
             } catch (InterruptedException ie) {
