@@ -34,7 +34,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
-    private static String myPort = "2345";
+//    private static String myPort = "2345";
+    private static String myPort = "9000";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     static MongoDBHandler mh = new MongoDBHandler();
@@ -946,7 +947,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     }
                 };
 
-                ManagedChannel channel = ManagedChannelBuilder.forAddress(availableNodes.get(i), 2345).usePlaintext().build();
+//                ManagedChannel channel = ManagedChannelBuilder.forAddress(availableNodes.get(i), 2345).usePlaintext().build();
+                ManagedChannel channel = ManagedChannelBuilder.forAddress(availableNodes.get(i), 9000).usePlaintext().build();
                 asyncStub = FileserviceGrpc.newStub(channel);
                 Empty.Builder empty1 = Empty.newBuilder();
                 asyncStub.getClusterStats(empty1.build(), statsStreamObserver);

@@ -44,7 +44,8 @@ public class Dhcp_Lease_Test {
         for (String old : oldIpList) {
             set.add(old);
         }
-        String server_port = "2345";
+//        String server_port = "2345";
+        String server_port = "9000";
 
         StringBuffer sb = new StringBuffer();
         for (String ip : newIpList) {

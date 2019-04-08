@@ -164,7 +164,8 @@ public class MessageClient {
         // client config properties
         Properties p = new Properties();
         p.setProperty("host", args[0]);
-        p.setProperty("port", "2345");
+//        p.setProperty("port", "2345");
+        p.setProperty("port", "9000");
 
         MessageClient ca = new MessageClient(p);
         ca.run();
