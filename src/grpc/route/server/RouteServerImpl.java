@@ -643,7 +643,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         }
                     };
 
-
+                    asyncStub = FileserviceGrpc.newStub(originalChannel);
+                    logger.info("calling  complete streaming-original");
                     asyncStub.completeStreaming(datatype.build(), ackStreamObserver);
 
 
@@ -678,6 +679,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                             }
                         };
 
+                        replicaStub = FileserviceGrpc.newStub(managedChannelList.get(1));
+                        logger.info("calling  complete streaming-replica");
                         replicaStub.completeStreaming(datatype1.build(), ackStreamObserver1);
 
                         logger.info("putting metadata of file, slave in master");
