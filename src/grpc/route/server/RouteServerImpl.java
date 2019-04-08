@@ -8,6 +8,7 @@ import java.lang.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import com.google.protobuf.ByteString;
+import com.mongodb.connection.Cluster;
 import com.sun.management.UnixOperatingSystemMXBean;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -39,6 +40,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     static RedisHandler rh = new RedisHandler();
     private static String slave1 = "localhost";
     private static FileserviceGrpc.FileserviceStub ayncStub;
+    private static FileserviceGrpc.FileserviceBlockingStub blockingStub;
     private static FileserviceGrpc.FileserviceStub replicaStub;
     private static ManagedChannel ch1;
     private static MasterMetaData masterMetaData = new MasterMetaData();
@@ -52,6 +54,15 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     boolean isChannelCreated = false;
     private int seqID = 1;
     private int repSeqID = 1;
+    // for master to send its ip to supernode
+    private static String myIP=null;
+    private static boolean supernode=false;
+    // for storing slave stats
+    List<String> cpuUsages=new ArrayList<>();
+    List<String> totalDiskSpace=new ArrayList<>();
+    List<String> usedDiskSpace=new ArrayList<>();
+
+    Map<ClusterInfo,ClusterStats> clusterStatsMap=new HashMap<>();
 
 
 
@@ -95,6 +106,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         }
         String path = args[0];
         Properties conf = FetchConfig.getConfiguration(new File(path));
+
         RouteServer.configure(conf);
 
         //    TODO: Integrate Leader Election here
@@ -120,6 +132,9 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             invokeDhcpMonitorThread();
             slaveIpThread();
             getSlavesHeartBeat();
+        }
+        if(supernode){
+            getOtherClusterStats();
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -167,6 +182,10 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         };
         Timer timer=new Timer();
         timer.scheduleAtFixedRate(timerTask,0,60000);
+    }
+
+    private void getOtherClusterStats(){
+
     }
 
 
@@ -256,13 +275,14 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         if(slaveIpList.size() > 1) {
                             replicaIp = roundRobinIP();
                             replicaChannel = ManagedChannelBuilder.forAddress(replicaIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+                            managedChannelList.add(replicaChannel);
                             replicaStub = FileserviceGrpc.newStub(replicaChannel);
                             StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                                 @Override
-                                public void onNext(ack ack) {
-                                    logger.info("Received ack status from the server: " + ack.getSuccess());
-                                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                                public void onNext(ack ack1) {
+                                    logger.info("Received ack status from the server: " + ack1.getSuccess());
+                                    logger.info("Received ack  message from the server: " + ack1.getMessage());
                                 }
 
                                 @Override
@@ -282,6 +302,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                             fdsm = replicaStub.replicateFile(ackStreamObserver);
                         }
                         originalChannel = ManagedChannelBuilder.forAddress(originalIp, Integer.parseInt(slave1port.trim())).usePlaintext(true).build();
+                        managedChannelList.add(originalChannel);
                         ayncStub = FileserviceGrpc.newStub(originalChannel);
                         setIsRoundRobinCalled(true);
                     } else {
@@ -344,6 +365,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         masterMetaData.putMetaDataForIP(username,getFileName(filepath),replicaIp);
                     }
                     MasterNode.isRoundRobinCalled = false;
+                    managedChannelList.clear();
                 } else {
                     if (SlaveNode.put(username, filepath)) {
                         ackStreamObserver.onNext(ack.newBuilder().setMessage("success").setSuccess(true).build());
@@ -478,9 +500,9 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                             @Override
-                            public void onNext(ack ack) {
-                                logger.info("Received ack status from the server: " + ack.getSuccess());
-                                logger.info("Received ack  message from the server: " + ack.getMessage());
+                            public void onNext(ack ack1) {
+                                logger.info("Received ack status from the server: " + ack1.getSuccess());
+                                logger.info("Received ack  message from the server: " + ack1.getMessage());
                             }
 
                             @Override
@@ -493,6 +515,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                             public void onCompleted() {
                                 logger.info("Server is done sending data");
                                 cdl.countDown();
+
                                 // replicaChannel.shutdown();
                             }
                         };
@@ -558,6 +581,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     for(ManagedChannel channel: managedChannelList) {
                         channel.shutdown();
                     }
+                    managedChannelList.clear();
                 } else {
                     logger.info("Calling Update Mongo");
                     if (SlaveNode.updateMongo(username, filepath)) {
@@ -744,6 +768,67 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         responseObserver.onCompleted();
 
     }
+    @Override
+    public void getClusterStats(Empty empty,StreamObserver<ClusterStats> statsStreamObserver){
 
+        List<String> availableNodes=new Dhcp_Lease_Test().getCurrentIpList();
+
+        if(isMaster){
+            for(int i=0;i<availableNodes.size();i++){
+                StreamObserver<ClusterStats> slaveStatsStreamObserver = new StreamObserver<ClusterStats>() {
+
+
+                    @Override
+                    public void onNext(ClusterStats clusterStats) {
+                        cpuUsages.add(clusterStats.getCpuUsage());
+                        totalDiskSpace.add(clusterStats.getDiskSpace());
+                        usedDiskSpace.add(clusterStats.getUsedMem());
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        logger.info("Exception in the request from node: " + throwable);
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        logger.info("Received stats from slaves");
+                    }
+                };
+
+                ManagedChannel channel=ManagedChannelBuilder.forAddress(availableNodes.get(i),2345).usePlaintext().build();
+                ayncStub= FileserviceGrpc.newStub(channel);
+                Empty.Builder empty1=Empty.newBuilder();
+                ayncStub.getClusterStats(empty1.build(),statsStreamObserver);
+
+
+                /*cpuUsages.add(clusterStats.getCpuUsage());
+                totalDiskSpace.add(clusterStats.getDiskSpace());
+                usedDiskSpace.add(clusterStats.getUsedMem());
+                channel.shutdown();*/
+            }
+        }
+        else{
+            OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
+
+            ClusterStats.Builder slaveStats = ClusterStats.newBuilder();
+            slaveStats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
+            File systemFile=new File("/");
+            slaveStats.setDiskSpace(Double.toString(systemFile.getTotalSpace()));
+            slaveStats.setUsedMem(Double.toString(systemFile.getTotalSpace()-systemFile.getFreeSpace()));
+
+
+            statsStreamObserver.onNext(slaveStats.build());
+            statsStreamObserver.onCompleted();
+        }
+
+    }
+
+    // If super node then listen to cluster master
+    @Override
+    public void getLeaderInfo(fileservice.ClusterInfo request,
+                              io.grpc.stub.StreamObserver<fileservice.ack> ackObserver) {
+
+    }
 
 }

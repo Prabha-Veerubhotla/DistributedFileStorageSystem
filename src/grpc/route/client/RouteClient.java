@@ -93,10 +93,10 @@ public class RouteClient {
             StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                 @Override
-                public void onNext(ack ack) {
-                    ackStatus = ack.getSuccess();
-                    logger.info("Received ack status from the server: " + ack.getSuccess());
-                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                public void onNext(ack ack1) {
+                    ackStatus = ack1.getSuccess();
+                    logger.info("Received ack status from the server: " + ack1.getSuccess());
+                    logger.info("Received ack  message from the server: " + ack1.getMessage());
                 }
 
                 @Override
@@ -192,8 +192,8 @@ public class RouteClient {
 //            fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
             fileInfo.setUsername(name);
 
-            ack ack = blockingStub.fileDelete(fileInfo.build());
-            if(ack.getSuccess()) {
+            ack ack1 = blockingStub.fileDelete(fileInfo.build());
+            if(ack1.getSuccess()) {
                 return "deleted successfully";
             } else {
                 return "unable to delete file";
@@ -209,8 +209,8 @@ public class RouteClient {
 //        fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
         fileInfo.setUsername(name);
 
-        ack ack = blockingStub.fileSearch(fileInfo.build());
-        return ack.getSuccess();
+        ack ack1 = blockingStub.fileSearch(fileInfo.build());
+        return ack1.getSuccess();
     }
 
 
@@ -233,10 +233,10 @@ public class RouteClient {
             StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
                 @Override
-                public void onNext(ack ack) {
-                    ackStatus = ack.getSuccess();
-                    logger.info("Received ack status from the server: " + ack.getSuccess());
-                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                public void onNext(ack ack1) {
+                    ackStatus = ack1.getSuccess();
+                    logger.info("Received ack status from the server: " + ack1.getSuccess());
+                    logger.info("Received ack  message from the server: " + ack1.getMessage());
                 }
 
                 @Override

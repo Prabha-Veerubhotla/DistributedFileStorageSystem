@@ -220,12 +220,12 @@ public class MasterMetaData {
         try {
             if (redisConnector.exists(ipByte)) {
                 byte[] val = redisConnector.get(ipByte);
-                Map<String, List<String>> ipFilesMap = (Map<String, List<String>>)deserialize(val);
+                Map<String, Set<String>> ipFilesMap = (Map<String, Set<String>>)deserialize(val);
                 if (ipFilesMap.containsKey(userName)) {
-                    List<String> fileList = ipFilesMap.get(userName);
+                    Set<String> fileList = ipFilesMap.get(userName);
                     fileList.add(fileName);
                 } else {
-                    List<String> t = new ArrayList();
+                    Set<String> t = new HashSet<>();
                     t.add(fileName);
                     ipFilesMap.put(userName, t);
                 }
@@ -236,8 +236,8 @@ public class MasterMetaData {
                     return false;
                 }
             } else {
-                Map<String, List<String>> innerMap = new HashMap<>();
-                List<String> fileList = new ArrayList<>();
+                Map<String, Set<String>> innerMap = new HashMap<>();
+                Set<String> fileList = new HashSet<>();
                 fileList.add(fileName);
                 innerMap.put(userName, fileList);
                 logger.info("newMap: user file map ----> " + innerMap);

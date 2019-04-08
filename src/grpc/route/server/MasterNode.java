@@ -99,10 +99,10 @@ public class MasterNode extends RouteServerImpl {
         StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
             @Override
-            public void onNext(ack ack) {
-                ackStatus = ack.getSuccess();
-                logger.info("Received ack status from the server: " + ack.getSuccess());
-                logger.info("Received ack  message from the server: " + ack.getMessage());
+            public void onNext(ack ack1) {
+                ackStatus = ack1.getSuccess();
+                logger.info("Received ack status from the server: " + ack1.getSuccess());
+                logger.info("Received ack  message from the server: " + ack1.getMessage());
             }
 
             @Override
@@ -141,10 +141,10 @@ public class MasterNode extends RouteServerImpl {
         StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
 
             @Override
-            public void onNext(ack ack) {
-                ackStatus = ack.getSuccess();
-                logger.info("Received ack status from the server: " + ack.getSuccess());
-                logger.info("Received ack  message from the server: " + ack.getMessage());
+            public void onNext(ack ack1) {
+                ackStatus = ack1.getSuccess();
+                logger.info("Received ack status from the server: " + ack1.getSuccess());
+                logger.info("Received ack  message from the server: " + ack1.getMessage());
             }
 
             @Override
@@ -180,8 +180,8 @@ public class MasterNode extends RouteServerImpl {
 
     public static boolean deleteFileFromServer(FileInfo fileInfo) {
         logger.info("deleting file: " + fileInfo.getFilename());
-        ack ack = blockingStub.fileDelete(fileInfo);
-        return ack.getSuccess();
+        ack ack1 = blockingStub.fileDelete(fileInfo);
+        return ack1.getSuccess();
     }
 
 
@@ -300,10 +300,10 @@ public class MasterNode extends RouteServerImpl {
                             CountDownLatch cdl1 = new CountDownLatch(1);
                             StreamObserver<ack> ackStreamObserver = new StreamObserver<ack>() {
                                 @Override
-                                public void onNext(ack ack) {
-                                    ackStatus = ack.getSuccess();
-                                    logger.info("Received ack status from the server: " + ack.getSuccess());
-                                    logger.info("Received ack  message from the server: " + ack.getMessage());
+                                public void onNext(ack ack1) {
+                                    ackStatus = ack1.getSuccess();
+                                    logger.info("Received ack status from the server: " + ack1.getSuccess());
+                                    logger.info("Received ack  message from the server: " + ack1.getMessage());
                                 }
 
                                 @Override
