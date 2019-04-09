@@ -3,6 +3,7 @@ package grpc.route.server;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import org.slf4j.Logger;
@@ -186,7 +187,7 @@ public class MasterNode extends RouteServerImpl {
 
 
     // gets the hearbeat of all slaves and updates the nodeStatsMap.
-    public static void getHeartBeatofAllSlaves() {
+    public static void getHeartBeatofAllSlaves()  throws StatusRuntimeException {
         logger.info("getting current ip list from dhcp lease file");
         List<String> currentIpList = new Dhcp_Lease_Test().getCurrentIpList();
         for (String ip : currentIpList) {

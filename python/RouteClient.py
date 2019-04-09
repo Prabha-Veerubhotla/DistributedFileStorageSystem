@@ -39,7 +39,7 @@ class RouteClient():
         if self.stub.searchFile(message).success:
             return "File: {} already present".format(message)
         file_iterator = self.generate_file_chunks(message)
-        response = self.stub.uploadFile(file_iterator)
+        response = self.stub.UploadFile(file_iterator)
         if response.success:
             return "Successfully saved file: {}".format(message)
         else:
@@ -54,7 +54,7 @@ class RouteClient():
         fileinfo = FileService_pb2.FileInfo
         fileinfo.username = self.name
         fileinfo.filename = message
-        responses = self.stub.downloadFile(fileinfo)
+        responses = self.stub.DownloadFile(fileinfo)
         mode = 'a' if os.path.exists("output-"+message) else 'w'
         with open(message, mode) as f:
             for response in responses:
