@@ -11,8 +11,7 @@ import java.util.concurrent.TimeUnit;
 import com.google.protobuf.ByteString;
 import com.mongodb.connection.Cluster;
 import com.sun.management.UnixOperatingSystemMXBean;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
+import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 import lease.Dhcp_Lease_Test;
 import main.db.MongoDBHandler;
@@ -22,8 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import fileservice.*;
 import utility.FetchConfig;
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
 
 import static grpc.route.server.MasterNode.*;
 
@@ -34,7 +31,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
-//    private static String myPort = "2345";
+    //    private static String myPort = "2345";
     private static String myPort = "9000";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
@@ -108,7 +105,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         }
         String path = args[0];
         String isDhcpSetup = args[1];
-        if(isDhcpSetup.equalsIgnoreCase("yes")) {
+        if (isDhcpSetup.equalsIgnoreCase("yes")) {
             isDhcpRunning = true;
         }
 
@@ -128,7 +125,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         impl.blockUntilShutdown();
     }
 
-    private void sendLeaderInfo() {
+    private void sendLeaderInfo() throws StatusRuntimeException {
         logger.info("sending leader information to super node");
         ManagedChannel ch = ManagedChannelBuilder.forAddress("192.168.0.9", Integer.parseInt("9000")).usePlaintext(true).build();
         FileserviceGrpc.FileserviceBlockingStub stub = FileserviceGrpc.newBlockingStub(ch);
@@ -137,9 +134,9 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         clusterInfo.setIp("192.168.0.33");
         clusterInfo.setPort("9000");
         ack received = stub.getLeaderInfo(clusterInfo.build());
-        logger.info("ack status: "+ received.getSuccess());
-        if(received.getMessage() != null) {
-            logger.info("received message from super node: "+received.getMessage());
+        logger.info("ack status: " + received.getSuccess());
+        if (received.getMessage() != null) {
+            logger.info("received message from super node: " + received.getMessage());
         }
     }
 
@@ -151,15 +148,19 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         svr.start();
 
         if (isMaster) {
-            if(isDhcpRunning) {
+            if (isDhcpRunning) {
                 invokeDhcpMonitorThread();
             }
-            logger.info("dhcp running :" +isDhcpRunning);
+            logger.info("dhcp running :" + isDhcpRunning);
             slaveIpThread();
             getSlavesHeartBeat();
             // send leader info to super node
             // sending only once, as we have not implemented leader election yet
-            sendLeaderInfo();
+            try {
+                sendLeaderInfo();
+            } catch (StatusRuntimeException sre) {
+                logger.info("Exception: " + sre + " while trying to send leader node info to the super node");
+            }
         }
         if (supernode) {
             getOtherClusterStats();
@@ -204,7 +205,12 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             public void run() {
                 logger.info("running heart beat monitoring service...");
                 if (dhcp_lease_test.getCurrentIpList().size() > 0) {
-                    MasterNode.getHeartBeatofAllSlaves();
+
+                    try {
+                        MasterNode.getHeartBeatofAllSlaves();
+                    } catch (StatusRuntimeException sre) {
+                        logger.info("Exception: " + sre + " while trying to get heart beat from slaves");
+                    }
                 }
             }
         };
@@ -962,9 +968,9 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         averagemem = averagemem / nodeStats.size();
         averagedisk = averagedisk / nodeStats.size();
 
-        logger.info("average cpu usage of cluster: "+averagecpu);
-        logger.info("average mem usage of cluster: "+averagemem);
-        logger.info("average disk usage of cluster: "+averagedisk);
+        logger.info("average cpu usage of cluster: " + averagecpu);
+        logger.info("average mem usage of cluster: " + averagemem);
+        logger.info("average disk usage of cluster: " + averagedisk);
 
         ClusterStats.Builder clusterStats = ClusterStats.newBuilder();
         clusterStats.setCpuUsage(String.valueOf(averagecpu));
