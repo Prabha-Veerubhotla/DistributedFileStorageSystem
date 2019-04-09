@@ -187,7 +187,7 @@ public class MasterNode extends RouteServerImpl {
 
 
     // gets the hearbeat of all slaves and updates the nodeStatsMap.
-    public static void getHeartBeatofAllSlaves()  throws StatusRuntimeException {
+    public static Map<String, ClusterStats> getHeartBeatofAllSlaves()  throws StatusRuntimeException {
         logger.info("getting current ip list from dhcp lease file");
         List<String> currentIpList = new Dhcp_Lease_Test().getCurrentIpList();
         for (String ip : currentIpList) {
@@ -222,10 +222,12 @@ public class MasterNode extends RouteServerImpl {
             tempStats.put(ip, clusterStats);
             logger.info("Got CPU stats from slave:" + ip + " \n\tcpuUsage: " + clusterStats.getCpuUsage() + "\n\tmemoryUsed: " + clusterStats.getUsedMem() + "\n\tFreeSpace: " + clusterStats.getDiskSpace());
         });
+
         updateNodeStats(tempStats);
+        return tempStats;
     }
 
-    public synchronized static void updateNodeStats(Map<String, ClusterStats> newStats) {
+    public static void updateNodeStats(Map<String, ClusterStats> newStats) {
         logger.info("In node stats");
         Set<String> nodeSet = new HashSet<>();
         List<String> deadNodes = new ArrayList<>();
@@ -252,8 +254,8 @@ public class MasterNode extends RouteServerImpl {
 
     }
 
-    public synchronized static Map<String, ClusterStats> getNodeStats() {
-        return nodeStatsMap;
+    public  static Map<String, ClusterStats> getNodeStats() {
+            return nodeStatsMap;
     }
 
     public synchronized static void removeDeadNodeStats(List<String> deadNodeIp) {
