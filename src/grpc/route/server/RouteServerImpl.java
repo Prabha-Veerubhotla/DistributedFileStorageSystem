@@ -31,8 +31,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
-        private static String myPort = "2345";
-    //private static String myPort = "9000";
+    private static String myPort = "9000";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     static MongoDBHandler mh = new MongoDBHandler();
@@ -790,7 +789,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 }
                 ch1 = MasterNode.createChannel(ips.get(i));
             }
-           //ch1 = MasterNode.createChannel("127.0.0.1");
             if (ch1 != null) {
                 asyncStub = FileserviceGrpc.newStub(ch1);
                 asyncStub.downloadFile(fileInfo, fileDataStreamObserver1);
