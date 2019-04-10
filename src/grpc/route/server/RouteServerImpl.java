@@ -786,13 +786,13 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             };
 
             List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
-           /* for (int i = 0; i < ips.size(); i++) {
+            for (int i = 0; i < ips.size(); i++) {
                 if (!new Dhcp_Lease_Test().getCurrentIpList().contains(ips.get(i))) {
                     continue;
                 }
                 ch1 = MasterNode.createChannel(ips.get(i));
-            }*/
-           ch1 = MasterNode.createChannel("127.0.0.1");
+            }
+           //ch1 = MasterNode.createChannel("127.0.0.1");
             if (ch1 != null) {
                 asyncStub = FileserviceGrpc.newStub(ch1);
                 asyncStub.downloadFile(fileInfo, fileDataStreamObserver1);
