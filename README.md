@@ -5,10 +5,13 @@ Project Fluffy is a distributed system that acts a data-storage platform where n
 Various distributed systems concepts are used to make Project Fluffy fault tolerant and highly scalable. The whole system is built on the gRPC framework which uses
 protobuf message format.
 DHCP server is being used to assign ips for the nodes in the network. So, the server node settings has to be changed to get ip from a DHCP server.
-Redis is being used as in-memory database to store the data in key-value pairs.
+Redis is being used as in-memory database to store Master metadata and cache in Slave nodes.
 MongoDB is being used as backup database for each server node.
-You can process the files of any type(zip files are not handled) in the fluffy. Every file is converted to chunks of byte stream and stored in the memory(Database-Redis).
- 
+You can process the files of any type in the fluffy. Every file is converted to chunks of byte stream and stored in the Slave node memory(Database-Redis and MongoDB).
+
+### Cluster Architecture
+
+
 ### Software requirements:
 1. Java 1.8
 2. Apache Ant
