@@ -32,7 +32,7 @@ public class MessageClient {
             if (choice.equalsIgnoreCase("put")) {
                 System.out.print("Enter file path: ");
                 String msg = br.readLine();
-                System.out.println(rc.streamFileToServer(msg));
+                System.out.println(rc.streamFileToServer(msg, 0));
 
             } else if (choice.equalsIgnoreCase("get")) {
                 System.out.print("Enter file name to retrieve: ");
@@ -67,7 +67,9 @@ public class MessageClient {
             } else {
                 // if the choice is not one of the above options { get, put, list, delete }
                 // the default is put
-                rc.streamFileToServer(choice);
+                System.out.print("Enter file path: ");
+                String msg = br.readLine();
+                System.out.println(rc.streamFileToServer(msg, 0));
             }
         } catch (IOException ie) {
             System.out.println("Exception: " + ie + " while handling the client choice: " + choice);

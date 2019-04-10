@@ -30,9 +30,6 @@ import fileservice.*;
  * the License.
  */
 
-//TODO: make get, put , list, update asynchronous
-//TODO: make the rem, calls blocking -- done
-//TODO: listen continuously for messages from server on a background thread
 
 public class RouteClient {
     private static ManagedChannel ch;
@@ -40,7 +37,7 @@ public class RouteClient {
     private static FileserviceGrpc.FileserviceBlockingStub blockingStub;
     private Properties setup;
     private String name;
-    private static String myIp = "client"; // intially , later master node will assign an ip
+    private static String myIp = "client";
     protected static Logger logger = LoggerFactory.getLogger("client");
     boolean ackStatus = false;
     boolean putCompleted = false;
@@ -84,7 +81,7 @@ public class RouteClient {
         return true;
     }
 
-    public String streamFileToServer(String filename) {
+    public String streamFileToServer(String filename, int x) {
         if (searchFileInServer(filename)) {
             return "File already present";
         } else {
@@ -114,11 +111,11 @@ public class RouteClient {
             };
 
             fileservice.FileData.Builder fileData = FileData.newBuilder();
-
-//            fileservice.FileListResponse.Builder fileResponse = FileListResponse.newBuilder().setFilenames(filename);
-            fileData.setFilename(filename);
-
-//            fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
+            if( x != 0) {
+                fileData.setFilename(filename+x);
+            } else {
+                fileData.setFilename(filename);
+            }
             fileData.setUsername(name);
 
             StreamObserver<FileData> fileDataStreamObserver = asyncStub.uploadFile(ackStreamObserver);
@@ -144,18 +141,17 @@ public class RouteClient {
                         logger.info("Streaming seq num: " + seq);
                         fileData.setData(ByteString.copyFrom(raw, 0, n));
                         logger.info("seq num is: " + seq);
-//                        fileData.setSeqnum(seq);
                         logger.info("Sending file data to server with seq num: " + seq);
                         fileDataStreamObserver.onNext(fileData.build());
                     }
                 } catch (IOException e) {
-                    ; // ignore? really?
+                    e.printStackTrace();
                     fileDataStreamObserver.onError(e);
                 } finally {
                     try {
                         fis.close();
                     } catch (IOException e) {
-                        ; // ignore
+                        e.printStackTrace();
                     }
                 }
             }
@@ -187,9 +183,7 @@ public class RouteClient {
         if(searchFileInServer(msg)) {
             logger.info("file is present. deleting now");
             fileservice.FileInfo.Builder fileInfo = FileInfo.newBuilder();
-//            fileservice.FileResponse.Builder fileResponse = FileResponse.newBuilder().setFilename(msg);
             fileInfo.setFilename(msg);
-//            fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
             fileInfo.setUsername(name);
 
             ack ack1 = blockingStub.fileDelete(fileInfo.build());
@@ -204,9 +198,7 @@ public class RouteClient {
     public boolean searchFileInServer(String msg) {
         logger.info("searching file in server");
         fileservice.FileInfo.Builder fileInfo = FileInfo.newBuilder();
-//        fileservice.FileListResponse.Builder fileResponse = FileListResponse.newBuilder().setFilename(msg);
         fileInfo.setFilename(msg);
-//        fileservice.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
         fileInfo.setUsername(name);
 
         ack ack1 = blockingStub.fileSearch(fileInfo.build());
@@ -254,9 +246,7 @@ public class RouteClient {
             };
 
             fileservice.FileData.Builder fileData = FileData.newBuilder();
-//            route.FileListResponse.Builder fileResponse = FileListResponse.newBuilder().setFilename(filename);
             fileData.setFilename(filename);
-//            route.UserInfo.Builder userInfo = UserInfo.newBuilder().setUsername(name);
             fileData.setUsername(name);
 
             StreamObserver<FileData> fileDataStreamObserver = asyncStub.updateFile(ackStreamObserver);
@@ -283,13 +273,13 @@ public class RouteClient {
                         fileDataStreamObserver.onNext(fileData.build());
                     }
                 } catch (IOException e) {
-                    ; // ignore? really?
+                    e.printStackTrace();
                     fileDataStreamObserver.onError(e);
                 } finally {
                     try {
                         fis.close();
                     } catch (IOException e) {
-                        ; // ignore
+                        e.printStackTrace();
                     }
                 }
             }
@@ -337,8 +327,6 @@ public class RouteClient {
                 public void onNext(FileData fileData) {
                     // write into the file , every chunk received from master
                     try {
-                        //logger.info(new String(fileData.getContent().toByteArray()));
-
                         logger.info("writing "+fileData.getFilename());
                         f.write(fileData.getData().toByteArray());
                     } catch (IOException ie) {
