@@ -148,19 +148,21 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         svr.start();
 
         if (isMaster) {
+
             if (isDhcpRunning) {
                 invokeDhcpMonitorThread();
             }
             logger.info("dhcp running :" + isDhcpRunning);
+            try {
+                sendLeaderThread();
+            } catch (StatusRuntimeException sre) {
+                logger.info("Exception: " + sre + " while trying to send leader node info to the super node");
+            }
             slaveIpThread();
             getSlavesHeartBeat();
             // send leader info to super node
             // sending only once, as we have not implemented leader election yet
-            try {
-                sendLeaderInfo();
-            } catch (StatusRuntimeException sre) {
-                logger.info("Exception: " + sre + " while trying to send leader node info to the super node");
-            }
+
         }
         if (supernode) {
             getOtherClusterStats();
@@ -195,6 +197,22 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         };
         thread.start();
         return ch1;
+    }
+
+    private void sendLeaderThread()  {
+        TimerTask timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                logger.info("running send leader info thread...");
+                try {
+                    sendLeaderInfo();
+                } catch (StatusRuntimeException statusRuntimeException) {
+                    logger.info("exception : "+statusRuntimeException);
+                }
+            }
+        };
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(timerTask, 0, 6000);
     }
 
     //gets and updates the nodeStatsMap<String ip, Stats stats> in MasterNode every 5 seconds
@@ -945,10 +963,10 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         OperatingSystemMXBean mxBean = ManagementFactory.getPlatformMXBean(UnixOperatingSystemMXBean.class);
 
         ClusterStats.Builder stats = ClusterStats.newBuilder();
-        stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemCpuLoad()));
+        stats.setCpuUsage(Double.toString(((UnixOperatingSystemMXBean) mxBean).getSystemLoadAverage()*100));
         File systemFile = new File("/");
-        stats.setDiskSpace(Double.toString(systemFile.getTotalSpace()));
-        stats.setUsedMem(Double.toString(systemFile.getTotalSpace() - systemFile.getFreeSpace()));
+        stats.setDiskSpace(Double.toString(((systemFile.getTotalSpace()-systemFile.getUsableSpace())*100)/systemFile.getTotalSpace()));
+        stats.setUsedMem(Double.toString((((UnixOperatingSystemMXBean) mxBean).getTotalPhysicalMemorySize()-((UnixOperatingSystemMXBean) mxBean).getFreePhysicalMemorySize())*100/((UnixOperatingSystemMXBean) mxBean).getTotalPhysicalMemorySize()));
 //        stats.setUsedMem(Double.toString(mxBean.))
 
         responseObserver.onNext(stats.build());
