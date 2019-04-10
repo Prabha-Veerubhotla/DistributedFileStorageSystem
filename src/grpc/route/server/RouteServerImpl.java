@@ -272,11 +272,10 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
         if (complete) {
             logger.info("sending completed to slave");
-           // fileDataStreamObserver.onCompleted();
+            fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData1.build());
             logger.info("sent data filename:  " + fileData1.getFilename() + " to slave");
-            fileDataStreamObserver.onCompleted();
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -465,7 +464,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     MasterNode.isRoundRobinCalled = false;
                     managedChannelList.clear();
                 } else {
-                   // seqID = 1;
                     ackStreamObserver.onCompleted();
                 }
             }

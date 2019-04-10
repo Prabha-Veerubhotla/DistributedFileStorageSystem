@@ -125,11 +125,10 @@ public class MasterNode extends RouteServerImpl {
 
         if (complete) {
             logger.info("sending completed to slave");
-           // fileDataStreamObserver.onCompleted();
+            fileDataStreamObserver.onCompleted();
             ackStatus = true;
         } else {
             fileDataStreamObserver.onNext(fileData);
-            fileDataStreamObserver.onCompleted();
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -167,12 +166,11 @@ public class MasterNode extends RouteServerImpl {
 
         if (complete) {
             logger.info("sending completed to slave");
-           // fileDataStreamObserver.onCompleted();
+           fileDataStreamObserver.onCompleted();
             ackStatus = true;
         } else {
             fileDataStreamObserver.onNext(fileData);
             logger.info("sent data of:  " + fileData.getFilename() + " to slave");
-            fileDataStreamObserver.onCompleted();
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
