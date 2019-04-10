@@ -9,7 +9,7 @@ sudo rm /var/lib/dhcpd/*
 
 echo "deleting dhcpd lease file"
 
-docker run -d --net=host -v /etc/dhcp/:/etc/dhcp -v /var/lib/dhcpd:/var/lib/dhcpd --name dhcp vinodkatta3/dhcpd
+#docker run -d --net=host -v /etc/dhcp/:/etc/dhcp -v /var/lib/dhcpd:/var/lib/dhcpd --name dhcp vinodkatta3/dhcpd
 
-ant master
+#ant master
 

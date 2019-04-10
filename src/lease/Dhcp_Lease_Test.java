@@ -152,8 +152,8 @@ public class Dhcp_Lease_Test {
         if(!isDhcp) {
             oldIpList.clear();
             oldIpList.add("192.168.0.34"); // prabha
-            oldIpList.add("192.168.0.38"); // nrupa
-            oldIpList.add("192.168.0.35");// prathamesh
+//            oldIpList.add("192.168.0.38"); // nrupa
+//            oldIpList.add("192.168.0.35");// prathamesh
         }
         logger.info("old IP list content: "+ oldIpList);
         return oldIpList;
