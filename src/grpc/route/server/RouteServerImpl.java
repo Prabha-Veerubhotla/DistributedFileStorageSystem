@@ -31,8 +31,8 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
-    //    private static String myPort = "2345";
-    private static String myPort = "9000";
+        private static String myPort = "2345";
+    //private static String myPort = "9000";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
     static MongoDBHandler mh = new MongoDBHandler();
@@ -219,7 +219,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             }
         };
         Timer timer = new Timer();
-        timer.scheduleAtFixedRate(timerTask, 0, 60000);
+        timer.scheduleAtFixedRate(timerTask, 0, 6000);
     }
 
     private void getOtherClusterStats() {
@@ -272,10 +272,11 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
         if (complete) {
             logger.info("sending completed to slave");
-            fileDataStreamObserver.onCompleted();
+           // fileDataStreamObserver.onCompleted();
         } else {
             fileDataStreamObserver.onNext(fileData1.build());
             logger.info("sent data filename:  " + fileData1.getFilename() + " to slave");
+            fileDataStreamObserver.onCompleted();
         }
         try {
             cdl.await(3, TimeUnit.SECONDS);
@@ -464,7 +465,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     MasterNode.isRoundRobinCalled = false;
                     managedChannelList.clear();
                 } else {
-                    seqID = 1;
+                   // seqID = 1;
                     ackStreamObserver.onCompleted();
                 }
             }
@@ -785,12 +786,13 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             };
 
             List<String> ips = masterMetaData.getMetaData(username, getFileName(filename));
-            for (int i = 0; i < ips.size(); i++) {
+           /* for (int i = 0; i < ips.size(); i++) {
                 if (!new Dhcp_Lease_Test().getCurrentIpList().contains(ips.get(i))) {
                     continue;
                 }
                 ch1 = MasterNode.createChannel(ips.get(i));
-            }
+            }*/
+           ch1 = MasterNode.createChannel("127.0.0.1");
             if (ch1 != null) {
                 asyncStub = FileserviceGrpc.newStub(ch1);
                 asyncStub.downloadFile(fileInfo, fileDataStreamObserver1);
@@ -1011,6 +1013,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
             }
         }
+        seqID = 1;
         ackStreamObserver.onCompleted();
     }
 }
