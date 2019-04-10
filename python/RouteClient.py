@@ -66,11 +66,11 @@ class RouteClient():
 
     def update(self, message):
         print("calling route client update")
-        if not self.stub.searchFile(message).success:
+        if not self.stub.FileSearch(message).success:
             return "File: {} not present".format(message)
 
         file_iterator = self.generate_file_chunks(message)
-        response = self.stub.updateFile(file_iterator)
+        response = self.stub.UpdateFile(file_iterator)
         if response.success:
             return "Successfully updated file: {}".format(message)
         else:
@@ -81,7 +81,7 @@ class RouteClient():
         fileinfo = FileService_pb2.FileInfo
         fileinfo.username = self.name
         fileinfo.filename = message
-        ack = self.stub.searchFile(message)
+        ack = self.stub.FileSearch(message)
         if ack.success: 
             return "{} is present".format(message)
         else:
@@ -89,12 +89,12 @@ class RouteClient():
 
     def delete(self, message):
         print("calling route client delete")
-        if not self.stub.searchFile(message).success:
+        if not self.stub.FileSearch(message).success:
             return "File: {} not present".format(message)
         fileinfo = FileService_pb2.FileInfo
         fileinfo.username = self.name
         fileinfo.filename = message
-        ack = self.stub.deleteFile(fileinfo)
+        ack = self.stub.FileDelete(fileinfo)
         if ack.success:
             return "Successfully deleted {}".format(message)
         else:
@@ -104,7 +104,7 @@ class RouteClient():
         print("calling route client list")
         userinfo = FileService_pb2.UserInfo
         userinfo.username = self.name
-        ack = self.stub.deleteFile(userinfo)
+        ack = self.stub.FileList(userinfo)
         if not ack:
             return "Unable to retrieve list of files saved"
         else:
