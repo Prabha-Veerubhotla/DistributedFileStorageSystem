@@ -10,7 +10,7 @@ MongoDB is being used as backup database for each server node.
 You can process the files of any type in the fluffy. Every file is converted to chunks of byte stream and stored in the Slave node memory(Database-Redis and MongoDB).
 
 ### Cluster Architecture
-![cluster architecture] architecture.png)
+![cluster architecture](architecture.png)
 
 ### Software requirements:
 1. Java 1.8
