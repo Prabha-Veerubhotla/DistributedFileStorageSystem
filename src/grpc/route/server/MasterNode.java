@@ -166,7 +166,7 @@ public class MasterNode extends RouteServerImpl {
 
         if (complete) {
             logger.info("sending completed to slave");
-            fileDataStreamObserver.onCompleted();
+           fileDataStreamObserver.onCompleted();
             ackStatus = true;
         } else {
             fileDataStreamObserver.onNext(fileData);

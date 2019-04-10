@@ -5,4 +5,7 @@ echo $SVR_HOME
 
 echo "** starting client from ${SVR_HOME} **"
 
-python3 src/message/MessageClient.py
+echo "Enter ip address to connect with: "
+read ipaddress
+
+python3 python/MessageClient.py $ipaddress

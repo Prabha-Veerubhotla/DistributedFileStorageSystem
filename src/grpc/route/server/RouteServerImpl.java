@@ -31,7 +31,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     private String name;
     private static boolean isMaster = false;
     private static String myIp = "server";
-    //    private static String myPort = "2345";
     private static String myPort = "9000";
     private static List<String> slaveips = new ArrayList<>();
     private static Dhcp_Lease_Test dhcp_lease_test = new Dhcp_Lease_Test();
@@ -237,7 +236,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
             }
         };
         Timer timer = new Timer();
-        timer.scheduleAtFixedRate(timerTask, 0, 60000);
+        timer.scheduleAtFixedRate(timerTask, 0, 6000);
     }
 
     private void getOtherClusterStats() {
@@ -482,7 +481,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                     MasterNode.isRoundRobinCalled = false;
                     managedChannelList.clear();
                 } else {
-                    seqID = 1;
                     ackStreamObserver.onCompleted();
                 }
             }
@@ -1029,6 +1027,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 ackStreamObserver.onNext(ack.newBuilder().setMessage("Unable to update file in DB").setSuccess(false).build());
             }
         }
+        seqID = 1;
         ackStreamObserver.onCompleted();
     }
 }

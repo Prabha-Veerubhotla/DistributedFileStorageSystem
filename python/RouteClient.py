@@ -3,7 +3,7 @@ import FileService_pb2_grpc
 import grpc
 import os
 
-class RouteClient():
+class RouteClient(FileService_pb2_grpc.FileserviceServicer):
 
     def __init__(self,ip, port):
         self.ip = ip
@@ -17,26 +17,22 @@ class RouteClient():
     def startClient(self):
         print("Starting route client ...")
         self.channel = grpc.insecure_channel(self.ip+self.port)
-        self.stub = FileService_pb2_grpc.FileServiceStub(self.channel)
+        self.stub = FileService_pb2_grpc.FileserviceStub(self.channel)
 
     def generate_file_chunks(self, message):
-        filedata = FileService_pb2.FileData
-        filedata.filename = message
-        filedata.username = self.name
         seq = 0
-        with open(message, 'rb') as f:
+        with open(message.strip(), 'r') as f:
                 while True:
                     chunk = f.read(4194000)
                     if not chunk:
                         break
-                    filedata.content = chunk
                     seq = seq + 1
-                    filedata.seqnum = seq
-                    yield filedata
+                    print("sending seq num: {} to server".format(seq))
+                    yield FileService_pb2.FileData(username=self.name, filename=message, data=bytes(chunk,'utf-8'))
 
     def put(self, message):
         print("calling route client put")
-        if self.stub.searchFile(message).success:
+        if self.stub.FileSearch(FileService_pb2.FileInfo(username = self.name, filename = message)).success:
             return "File: {} already present".format(message)
         file_iterator = self.generate_file_chunks(message)
         response = self.stub.UploadFile(file_iterator)
@@ -48,29 +44,28 @@ class RouteClient():
     
     def get(self, message):
         print("calling route client get")
-        if not self.stub.searchFile(message).success:
+        if not self.stub.FileSearch(FileService_pb2.FileInfo(username = self.name, filename = message)).success:
             return "File {} is not present".format(message) 
 
-        fileinfo = FileService_pb2.FileInfo
-        fileinfo.username = self.name
-        fileinfo.filename = message
+        fileinfo = FileService_pb2.FileInfo(username = self.name, filename = message)
         responses = self.stub.DownloadFile(fileinfo)
-        mode = 'a' if os.path.exists("output-"+message) else 'w'
-        with open(message, mode) as f:
+        outputfilename = "output-"+message.strip()
+        mode = 'ab' if os.path.exists(outputfilename) else 'wb'
+        with open(outputfilename, mode) as f:
             for response in responses:
-                print("writing seq num: {} into file".format(response.seqnum))
-                f.write(response.content)
+               # print("writing seq num: {} into file".format(response.seqnum))
+                f.write(response.data)
             f.close()
         return "File retrieved: {}".format("output-"+message)
 
 
     def update(self, message):
         print("calling route client update")
-        if not self.stub.searchFile(message).success:
+        if not self.stub.FileSearch(FileService_pb2.FileInfo(username = self.name, filename = message)).success:
             return "File: {} not present".format(message)
 
         file_iterator = self.generate_file_chunks(message)
-        response = self.stub.updateFile(file_iterator)
+        response = self.stub.UpdateFile(file_iterator)
         if response.success:
             return "Successfully updated file: {}".format(message)
         else:
@@ -78,10 +73,8 @@ class RouteClient():
 
     def search(self, message):
         print("calling route client search")
-        fileinfo = FileService_pb2.FileInfo
-        fileinfo.username = self.name
-        fileinfo.filename = message
-        ack = self.stub.searchFile(message)
+        fileinfo = FileService_pb2.FileInfo(username = self.name, filename = message)
+        ack = self.stub.FileSearch(fileinfo)
         if ack.success: 
             return "{} is present".format(message)
         else:
@@ -89,12 +82,10 @@ class RouteClient():
 
     def delete(self, message):
         print("calling route client delete")
-        if not self.stub.searchFile(message).success:
+        if not self.stub.FileSearch(FileService_pb2.FileInfo(username = self.name, filename = message)).success:
             return "File: {} not present".format(message)
-        fileinfo = FileService_pb2.FileInfo
-        fileinfo.username = self.name
-        fileinfo.filename = message
-        ack = self.stub.deleteFile(fileinfo)
+        fileinfo = FileService_pb2.FileInfo(username = self.name, filename = message)
+        ack = self.stub.FileDelete(fileinfo)
         if ack.success:
             return "Successfully deleted {}".format(message)
         else:
@@ -102,9 +93,8 @@ class RouteClient():
 
     def list(self):
         print("calling route client list")
-        userinfo = FileService_pb2.UserInfo
-        userinfo.username = self.name
-        ack = self.stub.deleteFile(userinfo)
+        userinfo = FileService_pb2.UserInfo(username = self.name)
+        ack = self.stub.FileList(userinfo)
         if not ack:
             return "Unable to retrieve list of files saved"
         else:
@@ -112,7 +102,7 @@ class RouteClient():
 
 
 
-    
+
 
 
 
