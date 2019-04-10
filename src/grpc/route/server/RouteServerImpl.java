@@ -207,7 +207,11 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                 if (dhcp_lease_test.getCurrentIpList().size() > 0) {
 
                     try {
-                        MasterNode.getHeartBeatofAllSlaves();
+                        Map<String, ClusterStats> clusterStatsMap = MasterNode.getHeartBeatofAllSlaves();
+                        for(Map.Entry<String, ClusterStats> m : clusterStatsMap.entrySet()) {
+                            logger.info("ip: "+m.getKey());
+                            logger.info("cpu: "+m.getValue().getCpuUsage()+ " mem: "+m.getValue().getUsedMem()+"  disk: "+m.getValue().getDiskSpace());
+                        }
                     } catch (StatusRuntimeException sre) {
                         logger.info("Exception: " + sre + " while trying to get heart beat from slaves");
                     }
@@ -955,7 +959,7 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
     @Override
     public void getClusterStats(Empty empty, StreamObserver<ClusterStats> statsStreamObserver) {
         logger.info("got request for cluster stats");
-        Map<String, ClusterStats> nodeStats = MasterNode.getNodeStats();
+        Map<String, ClusterStats> nodeStats = MasterNode.getHeartBeatofAllSlaves();
         double averagemem = 0.0;
         double averagecpu = 0.0;
         double averagedisk = 0.0;
