@@ -82,6 +82,8 @@ public class MongoDBHandler implements DbHandler {
             Document doc = collection.find(query).first();
             logger.info("Query Successful");
             List<Document> dataList = (List<Document>)doc.get("allData");
+            if(dataList.size() == 0)
+                return null;
             for( Document docu : dataList){
                 String checkFile = (String) docu.get("fileName");
                 if(checkFile.equals(fileName)){

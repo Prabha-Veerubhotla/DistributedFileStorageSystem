@@ -220,12 +220,12 @@ public class MasterMetaData {
         try {
             if (redisConnector.exists(ipByte)) {
                 byte[] val = redisConnector.get(ipByte);
-                Map<String, List<String>> ipFilesMap = (Map<String, List<String>>)deserialize(val);
+                Map<String, Set<String>> ipFilesMap = (Map<String, Set<String>>)deserialize(val);
                 if (ipFilesMap.containsKey(userName)) {
-                    List<String> fileList = ipFilesMap.get(userName);
+                    Set<String> fileList = ipFilesMap.get(userName);
                     fileList.add(fileName);
                 } else {
-                    List<String> t = new ArrayList();
+                    Set<String> t = new HashSet<>();
                     t.add(fileName);
                     ipFilesMap.put(userName, t);
                 }
@@ -236,8 +236,8 @@ public class MasterMetaData {
                     return false;
                 }
             } else {
-                Map<String, List<String>> innerMap = new HashMap<>();
-                List<String> fileList = new ArrayList<>();
+                Map<String, Set<String>> innerMap = new HashMap<>();
+                Set<String> fileList = new HashSet<>();
                 fileList.add(fileName);
                 innerMap.put(userName, fileList);
                 logger.info("newMap: user file map ----> " + innerMap);
@@ -274,25 +274,4 @@ public class MasterMetaData {
         }
         return null;
     }
-
-
-
-//    public static void main(String[] args){
-//        MasterMetaData md = new MasterMetaData();
-//        md.putMetaData("Nrupa", "pic.jpg","10.250.10.320");
-//        md.putMetaData("Nrupa", "pic1.jpg","10.250.10.321");
-//        md.putMetaData("Nrupa", "pic1.jpg", "10.250.10.320");
-
-
-//        Set<String> ans = md.getAllFiles("Nrupa");
-//        System.out.println("ans: " + ans);
-
-//        List<String> ans = md.getMetaData("Nrupa", "pic1.jpg");
-//        System.out.println("ans: " + ans);
-//        List<String> ans = md.updateMetaData("Nrupa", "pic.jpg");
-//        System.out.println("Ans: " + ans);
-//        boolean flag = md.checkIfFileExists("Nrupa", "pic2.jpg");
-//        System.out.println("Flag: " + flag);
-//        md.deleteFileFormMetaData("Nrupa", "pic.jpg");
-//    }
 }

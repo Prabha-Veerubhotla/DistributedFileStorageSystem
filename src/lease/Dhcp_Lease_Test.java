@@ -5,10 +5,10 @@ import grpc.route.server.MasterNode;
 import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import route.FileServiceGrpc;
-import route.NodeInfo;
-import route.NodeName;
-import route.UpdateMessage;
+import fileservice.FileserviceGrpc;
+import fileservice.NodeInfo;
+import fileservice.NodeName;
+import fileservice.UpdateMessage;
 import utility.FetchConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -25,6 +25,7 @@ public class Dhcp_Lease_Test {
     static List<String> oldIpList = new ArrayList<>();
     Map<String, List<String>> nodesInNetwork = new HashMap<>();
     List<String> newIpList = new ArrayList<>();
+    boolean isDhcp = false;
 
 
     public static void main(String args[]) {
@@ -44,7 +45,8 @@ public class Dhcp_Lease_Test {
         for (String old : oldIpList) {
             set.add(old);
         }
-        String server_port = "2345";
+//        String server_port = "2345";
+        String server_port = "9000";
 
         StringBuffer sb = new StringBuffer();
         for (String ip : newIpList) {
@@ -62,7 +64,7 @@ public class Dhcp_Lease_Test {
             }
 
             ManagedChannel ch = ManagedChannelBuilder.forAddress(ip, Integer.parseInt(server_port.trim())).usePlaintext(true).build();
-            FileServiceGrpc.FileServiceBlockingStub blockingStub = FileServiceGrpc.newBlockingStub(ch);
+            FileserviceGrpc.FileserviceBlockingStub blockingStub = FileserviceGrpc.newBlockingStub(ch);
 
             if (!set.contains(newip)) {
                 logger.info("Sending hello to new node!");
@@ -94,7 +96,11 @@ public class Dhcp_Lease_Test {
         }
     }
 
-    public void monitorLease() {
+    public void monitorLease(boolean dhcp) {
+        isDhcp = dhcp;
+        if(!isDhcp) {
+            return;
+        }
         //Check for changes in dhcpd lease file
         TimerTask task = new Dhcp_Lease_Changes_Monitor(new File("/var/lib/dhcpd/dhcpd.leases")) {
 
@@ -143,6 +149,12 @@ public class Dhcp_Lease_Test {
     }
 
     public List<String> getCurrentIpList() {
+        if(!isDhcp) {
+            oldIpList.clear();
+            oldIpList.add("192.168.0.34"); // prabha
+            oldIpList.add("192.168.0.38"); // nrupa
+            oldIpList.add("192.168.0.35");// prathamesh
+        }
         logger.info("old IP list content: "+ oldIpList);
         return oldIpList;
     }

@@ -4,7 +4,8 @@ from RouteClient import RouteClient
 class MessageClient():
     def __init__(self, ip):
         self.ip = ip
-        self.port = "2345"
+        # self.port = "2345"
+        self.port = "9000"
         print("Intializing Message Client config..")
         print("Connecting to server on: {} :{} ".format(self.ip, self.port))
         self.name = "client"
