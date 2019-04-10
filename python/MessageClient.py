@@ -15,7 +15,7 @@ class MessageClient():
     def setClientName(self):
         print("Enter your name in order to join: ")
         message = sys.stdin.readline()
-        self.name = message
+        self.name = message.strip()
         self.rc.setClientName(message)
         self.startClientSession()
     
