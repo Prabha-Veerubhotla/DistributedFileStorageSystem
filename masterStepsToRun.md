@@ -24,5 +24,6 @@
 2. Compile .proto file in the resourses folder using protoc.Use build_pb.sh in the project folder to compile the .proto file.
    - COMMAND: *".build_pb.sh"*
 3. Run redis on a terminal using the command **redis-server**
-4. Run the master using build.xml file in project folder.
+4. By default DHCP is disabled. To enable DHCP change arg value of target master to yes and then build.
+5. Run the master using build.xml file in project folder.
    - COMMAND: *"ant master"*
