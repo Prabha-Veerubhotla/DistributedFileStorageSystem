@@ -40,6 +40,8 @@ You can process the files of any type in the fluffy. Every file is converted to 
 3. You can upload a file, download a file, update a file, search a file, list all files and delete a file.
 4. When you download a file, output file is generated as output-*yourOriginalFileName* in the project folder.
 
+[Documentation](documentation/CMPE%20275%20Project1%20Report.pdf)
+
 ### Contributors
 1. [Nrupa Chitley](https://github.com/nrupachitley)
 2. [Prahba Veerubhotla](https://github.com/Prabha-Veerubhotla)
