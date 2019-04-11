@@ -31,7 +31,8 @@ You can process the files of any type in the fluffy. Every file is converted to 
 1. To run the master, use cleanUp.sh which does the following steps for you - [Instructions to run the Master](masterStepsToRun.md)
 2. To run the slaves - [Instructions to run the Slaves](slaveStepsToRun.md)  
 3. Connect the nodes to the switch or network.
-4. Run the java or python clients using runClient.sh or runPythonClient.sh
+4. If you wish to run java client generate gRPC java classes using java codegen plugin and the run runClient.sh script.
+5. Else if python client, generate gRPC python classes using python gRPC tools and then run runPythonCllient.sh script.
 
 ### Fluffy Functionalities:
 1. Client has to join the system using his username.

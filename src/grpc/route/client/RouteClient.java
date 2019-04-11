@@ -64,7 +64,6 @@ public class RouteClient {
             throw new RuntimeException("Missing port and/or host");
         }
         ch = ManagedChannelBuilder.forAddress(host, Integer.parseInt(port)).usePlaintext(true).build();
-        //TODO: make it async stub -- done
         asyncStub = FileserviceGrpc.newStub(ch);
         blockingStub = FileserviceGrpc.newBlockingStub(ch);
         logger.info("Client running...");
