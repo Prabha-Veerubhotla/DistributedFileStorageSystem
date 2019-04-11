@@ -8,7 +8,6 @@ read ipaddress
 
 JAVA_MAIN='message.MessageClient'
 JAVA_ARGS="$ipaddress"
-#JAVA_ARGS="localhost"
 JAVA_TUNE='-client -Xms512m -Xmx4g'
 
 java ${JAVA_TUNE} -cp .:${SVR_HOME}/lib/'*':${SVR_HOME}/classes ${JAVA_MAIN} ${JAVA_ARGS} 

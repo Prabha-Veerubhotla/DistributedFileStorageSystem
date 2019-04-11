@@ -45,7 +45,6 @@ public class Dhcp_Lease_Test {
         for (String old : oldIpList) {
             set.add(old);
         }
-//        String server_port = "2345";
         String server_port = "9000";
 
         StringBuffer sb = new StringBuffer();
@@ -56,7 +55,6 @@ public class Dhcp_Lease_Test {
         for (String newip : newIpList) {
             String ip = newip;
             try {
-                //TODO: use relative path here
                 Properties prop = FetchConfig.getConfiguration(new File("/home/vinod/cmpe275/WednesdayTest/275-project1/conf/server.conf"));
                 server_port = prop.getProperty("server.port");
             } catch (IOException ie) {
@@ -107,7 +105,6 @@ public class Dhcp_Lease_Test {
             protected void onChange(File file) {
                 // here we code the action on a change
                 try {
-                    //TODO: replace the command with relative path or use root dir
                     logger.info("Calling onchange dhcpd.lease file");
                     Process p = new ProcessBuilder("/home/vinod/cmpe275/demo1/275-project1-demo1/fetch_ip.sh").start();
                     BufferedReader reader1 = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -142,7 +139,6 @@ public class Dhcp_Lease_Test {
         copyList();
         MasterNode.removeDeadNodeStats(deadNodes);
 
-        //TODO replicate the data in the dead node to another live node.
 /*        for(int i=0;i<deadNodes.size();i++) {
             MasterNode.migrateDataFromANode(deadNodes.get(i));
         }*/
@@ -151,9 +147,9 @@ public class Dhcp_Lease_Test {
     public List<String> getCurrentIpList() {
         if(!isDhcp) {
             oldIpList.clear();
-            oldIpList.add("192.168.0.34"); // prabha
-//            oldIpList.add("192.168.0.38"); // nrupa
-//            oldIpList.add("192.168.0.35");// prathamesh
+            oldIpList.add("192.168.0.34");
+            oldIpList.add("192.168.0.38");
+            oldIpList.add("192.168.0.35");
         }
         logger.info("old IP list content: "+ oldIpList);
         return oldIpList;
