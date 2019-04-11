@@ -37,7 +37,7 @@ public class RouteClient {
     private static FileserviceGrpc.FileserviceBlockingStub blockingStub;
     private Properties setup;
     private String name;
-    private static String myIp = "client"; // intially , later master node will assign an ip
+    private static String myIp = "client";
     protected static Logger logger = LoggerFactory.getLogger("client");
     boolean ackStatus = false;
     boolean putCompleted = false;
@@ -80,7 +80,7 @@ public class RouteClient {
         return true;
     }
 
-    public String streamFileToServer(String filename) {
+    public String streamFileToServer(String filename, int x) {
         if (searchFileInServer(filename)) {
             return "File already present";
         } else {
@@ -110,9 +110,11 @@ public class RouteClient {
             };
 
             fileservice.FileData.Builder fileData = FileData.newBuilder();
-
-            fileData.setFilename(filename);
-
+            if( x != 0) {
+                fileData.setFilename(filename+x);
+            } else {
+                fileData.setFilename(filename);
+            }
             fileData.setUsername(name);
 
             StreamObserver<FileData> fileDataStreamObserver = asyncStub.uploadFile(ackStreamObserver);
@@ -142,13 +144,13 @@ public class RouteClient {
                         fileDataStreamObserver.onNext(fileData.build());
                     }
                 } catch (IOException e) {
-                    ; // ignore? really?
+                    e.printStackTrace();
                     fileDataStreamObserver.onError(e);
                 } finally {
                     try {
                         fis.close();
                     } catch (IOException e) {
-                        ; // ignore
+                        e.printStackTrace();
                     }
                 }
             }
@@ -270,13 +272,13 @@ public class RouteClient {
                         fileDataStreamObserver.onNext(fileData.build());
                     }
                 } catch (IOException e) {
-                    ; // ignore? really?
+                    e.printStackTrace();
                     fileDataStreamObserver.onError(e);
                 } finally {
                     try {
                         fis.close();
                     } catch (IOException e) {
-                        ; // ignore
+                        e.printStackTrace();
                     }
                 }
             }
