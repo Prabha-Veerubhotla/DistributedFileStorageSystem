@@ -1,16 +1,18 @@
 package message;
 
 import grpc.route.client.RouteClient;
+
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
 /**
  * console interface to the socket example
  *
- * @author gash
  */
 public class MessageClient {
     private Properties setup;
@@ -26,46 +28,47 @@ public class MessageClient {
         try {
 
             BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-            if (choice.equalsIgnoreCase("post")) {
-                System.out.print("Enter message or file path: ");
+            if (choice.equalsIgnoreCase("put")) {
+                System.out.print("Enter file path: ");
                 String msg = br.readLine();
-                boolean msgstatus = rc.put(msg);
-                if (msgstatus) {
-                    System.out.println(msg + " saved successfully");
-                } else {
-                    System.out.println(msg + " not saved successfully");
-                }
+                System.out.println(rc.streamFileToServer(msg, 0));
 
             } else if (choice.equalsIgnoreCase("get")) {
-                System.out.print("Enter message or file name to retrieve: ");
+                System.out.print("Enter file name to retrieve: ");
                 String msg = br.readLine();
-                byte[] received = rc.get(msg); // pending: change this method call
-                System.out.println("Retrieved file or message in byte array format: " + received);
-                System.out.println("Retrieved file or message in string format:" + received.toString());
-
+                File f = rc.getFileFromServer(msg);
+                System.out.println("Retrieved file: " + f);
             } else if (choice.equalsIgnoreCase("list")) {
-                List<String> msgList = rc.list();
-                if (msgList.size() != 0) {
-                    for (String s : msgList) {
-                        System.out.println(s);
-                    }
+                String list = rc.listFilesInServer(clientname);
+                if (list != null) {
+                    System.out.println(list);
                 } else {
-                    System.out.println("no messages or files saved from this user: " + clientname);
+                    System.out.println("No files saved from this user: " + clientname);
                 }
             } else if (choice.equalsIgnoreCase("delete")) {
-                System.out.print("Enter message or file name to delete: ");
+                System.out.print("Enter file name to delete: ");
                 String msg = br.readLine();
-                boolean deleteStatus = rc.delete(msg);
-                if (deleteStatus) {
-                    System.out.println("Message  " + msg + " successfully deleted");
+                System.out.println(rc.deleteFileFromServer(msg));
+            } else if (choice.equalsIgnoreCase("update")) {
+                System.out.print("Enter file name to update: ");
+                String msg = br.readLine();
+                String updateStatus = rc.updateFileInServer(msg);
+                System.out.println(updateStatus);
+            } else if (choice.equalsIgnoreCase("search")) {
+                System.out.print("Enter file name to search: ");
+                String msg = br.readLine();
+                boolean searchResult = rc.searchFileInServer(msg);
+                if (searchResult) {
+                    System.out.println("File " + msg + " is present. Enter get and file name to retrieve it");
                 } else {
-                    System.out.println("Delete operation failed for: " + msg);
+                    System.out.println("File: " + msg + " is not present in the server. Enter put and file name to save it");
                 }
             } else {
-
-                // if the choice is not one of the above options { get, post, list, delete }
-                // the default is post
-                rc.put(choice);
+                // if the choice is not one of the above options { get, put, list, delete }
+                // the default is put
+                System.out.print("Enter file path: ");
+                String msg = br.readLine();
+                System.out.println(rc.streamFileToServer(msg, 0));
             }
         } catch (IOException ie) {
             System.out.println("Exception: " + ie + " while handling the client choice: " + choice);
@@ -98,20 +101,19 @@ public class MessageClient {
         rc.setName(name);
         clientname = name;
         rc.startClientSession();
-        if (!rc.join()) {
-            rc.stopClientSession();
-            System.exit(0);
-        }
+
 
         System.out.println("\nWelcome " + name + "\n");
         System.out.println("Commands");
         System.out.println("-----------------------------------------------");
         System.out.println("help - show this menu");
-        System.out.println("post - send a file or message(default)");
         System.out.println("whoami - list my settings");
-        System.out.println("get - retrieve a stored message or file");
-        System.out.println("list - list all stored messages or files");
-        System.out.println("delete - delete a stored message or file");
+        System.out.println("put - send a file (default)");
+        System.out.println("get - retrieve a stored  file");
+        System.out.println("update - update a stored file");
+        System.out.println("list - list all stored  files");
+        System.out.println("delete - delete a stored file");
+        System.out.println("search - know if a file is present");
         System.out.println("exit - end session");
         System.out.println("");
 
@@ -135,11 +137,13 @@ public class MessageClient {
                     System.out.println("Commands");
                     System.out.println("-------------------------------");
                     System.out.println("help - show this menu");
-                    System.out.println("post - save a message or file(default)");
                     System.out.println("whoami - list my settings");
-                    System.out.println("get - retrieve a stored message or file");
-                    System.out.println("list - list all stored messages or files");
-                    System.out.println("delete - delete a stored message or file");
+                    System.out.println("put - send a file (default)");
+                    System.out.println("get - retrieve a stored  file");
+                    System.out.println("update - update a stored file");
+                    System.out.println("list - list all stored  files");
+                    System.out.println("delete - delete a stored file");
+                    System.out.println("search - to know if a file is present");
                     System.out.println("exit - end session");
                     System.out.println("");
                 } else {
@@ -151,9 +155,9 @@ public class MessageClient {
                 forever = false;
             }
         }
-            System.out.println("\nGoodbye");
-            rc.stopClientSession();
-            System.exit(0);
+        System.out.println("\nGoodbye");
+        rc.stopClientSession();
+        System.exit(0);
 
     }
 
@@ -161,31 +165,10 @@ public class MessageClient {
         // client config properties
         Properties p = new Properties();
         p.setProperty("host", args[0]);
-        p.setProperty("port", "2345");
+        p.setProperty("port", "9000");
 
         MessageClient ca = new MessageClient(p);
         ca.run();
 
     }
 }
-
- /*else if(choice.equalsIgnoreCase("put-file")) {
-                    System.out.print("Enter the relative path of file with the file name: ");
-                    System.out.println("Example Usage:  /Users/Desktop/project1.txt");
-                    System.out.print("Enter file path: ");
-                    String msg = br.readLine();
-                    boolean putStatus = rc.putFile(msg);
-                    if(putStatus) {
-                        System.out.println("Successfully stored file: "+msg);
-                    }
-                }*/
-
- /*else if(choice.equalsIgnoreCase("get-file")) {
-                    System.out.print("Enter file name to retrieve: ");
-                    String msg = br.readLine();
-                    //byte[] filecontents = rc.getFile(msg);
-                    //TODO: print the file name or the contents ?
-                    byte[] content = rc.getFile(msg);
-                    System.out.println("Fetching file contents: ");
-                    System.out.println(new String(content));
-                }*/
