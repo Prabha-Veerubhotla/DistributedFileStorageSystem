@@ -69,7 +69,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         if (map.containsKey("slave")) {
             slaveips = map.get("slave");
         }
-        //slave1 = slaveips.get(0); -- local testing
         slave1 = MasterNode.assignSlaveIp(slaveips);
     }
 
@@ -112,7 +111,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
 
         RouteServer.configure(conf);
 
-        //TODO: Integrate Leader Election here
         final RouteServerImpl impl = new RouteServerImpl();
         if (conf.getProperty("server.name").equalsIgnoreCase("master")) {
             isMaster = true;
@@ -454,7 +452,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                             logger.info("Server is done sending data");
                             cdl.countDown();
 
-                            // replicaChannel.shutdown();
                         }
                     };
 
@@ -692,8 +689,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
                         public void onCompleted() {
                             logger.info("Server is done sending data");
                             cdl.countDown();
-
-                            // replicaChannel.shutdown();
                         }
                     };
 
@@ -965,8 +960,6 @@ public class RouteServerImpl extends FileserviceGrpc.FileserviceImplBase {
         File systemFile = new File("/");
         stats.setDiskSpace(Double.toString(((systemFile.getTotalSpace()-systemFile.getUsableSpace())*100)/systemFile.getTotalSpace()));
         stats.setUsedMem(Double.toString((((UnixOperatingSystemMXBean) mxBean).getTotalPhysicalMemorySize()-((UnixOperatingSystemMXBean) mxBean).getFreePhysicalMemorySize())*100/((UnixOperatingSystemMXBean) mxBean).getTotalPhysicalMemorySize()));
-//        stats.setUsedMem(Double.toString(mxBean.))
-
         responseObserver.onNext(stats.build());
         responseObserver.onCompleted();
 

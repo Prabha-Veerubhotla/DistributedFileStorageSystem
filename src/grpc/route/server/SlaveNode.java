@@ -44,13 +44,10 @@ public class SlaveNode extends RouteServerImpl {
      * @return boolean
      */
     public static boolean put(FileData fileData, String seqID) {
-//        logger.info("All Data" + new String(fileData.getContent().toByteArray()));
         String userName = fileData.getUsername();
         byte[] payload = fileData.getData().toByteArray();
         String fileName = getFileName(fileData.getFilename());
         logger.info("Put details: " + userName + " seq num: " + seqID);
-        //logger.info("content: " + new String(payload));
-        //TODO: store the file in db from method : writeChunksIntoFile -- done
         rh.put(userName, fileName, seqID, payload);
 
         return true;
@@ -70,7 +67,6 @@ public class SlaveNode extends RouteServerImpl {
         mh.put(userName, new FileEntity(fileName, res));
         return true;
     }
-    //TODO: Handle cache miss
 
     /**
      * retrieve a file. If file is not in Redis fetch from MongoDB
@@ -137,10 +133,3 @@ public class SlaveNode extends RouteServerImpl {
     }
 
 }
-
-/*
-// v2: 4. maintain a in memory, cache
-
- v2: 4. maintain a in memory, cache
-
-*/

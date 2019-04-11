@@ -185,6 +185,8 @@ public class RedisHandler {
         }
         put(userName, fileName, seqID, content);
     }
+}
+
 
 
 //    @SuppressWarnings("unchecked")
@@ -229,4 +231,3 @@ public class RedisHandler {
 //            e.printStackTrace();
 //        }
 //    }
-}

@@ -13,7 +13,6 @@ import java.util.logging.Logger;
 @SuppressWarnings("unchecked")
 public class MasterMetaData {
     Logger logger = Logger.getLogger(MasterMetaData.class.getName());
-    //{userName: {fileName : [ori_IP, rep_IP]}}
 
     private Jedis redisConnector;
     public static JedisPool redisPool;
