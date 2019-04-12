@@ -2,7 +2,8 @@
 1. Build and Run the DHCP server.
    Details:
    * clone the dhcp-server from the github link provided in software requirements.(A docker file will be present in the folder.)
-   * Build docker image using docker file. COMMAND: *"docker build -t <username>/dhcpd ."*
+   * Build docker image using docker file. 
+      -`docker build -t <username>/dhcpd .`
    * Install "isc-dhcp-server" package in ubuntu. COMMAND: *"sudo apt-get install isc-dhcp-server"* (This is for Ubuntu, not tested in MAC or Windows).
    * Now, you should be able to locate /etc/dhcp/dhcpd.conf file. Add following text in dhcpd.conf file:
    ``` 
