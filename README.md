@@ -22,7 +22,7 @@ You can process the files of any type in the fluffy. Every file is converted to 
    Build GRPC **codegen java_plugin** from [here](https://github.com/grpc/grpc-java/tree/master/compiler)
 5. DHCP server - [DHCP installation](https://github.com/container-images/dhcp-server)
    - Requirements: **Docker**
-   6. python3 
+6. python3 
 7. Redis
 8. MongoDB
 
