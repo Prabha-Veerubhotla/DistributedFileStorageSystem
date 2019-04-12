@@ -14,14 +14,14 @@ You can process the files of any type in the fluffy. Every file is converted to 
 
 ### Software requirements:
 1. Java 1.8
-2. Apache Ant
+2. Apache Ant - 
    [Ant installation steps](https://ant.apache.org/manual/install.html)
-3. Protobuf compiler
+3. Protobuf compiler - 
    [Protobuf installation](https://github.com/protocolbuffers/protobuf)
-4. gRPC
+4. gRPC - 
    Build GRPC **codegen java_plugin** from [here](https://github.com/grpc/grpc-java/tree/master/compiler)
 5. DHCP server
-   Requirements: **Docker**
+   - Requirements: **Docker**
    [DHCP installation](https://github.com/container-images/dhcp-server)
 6. python3 
 7. Redis
