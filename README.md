@@ -20,10 +20,9 @@ You can process the files of any type in the fluffy. Every file is converted to 
    [Protobuf installation](https://github.com/protocolbuffers/protobuf)
 4. gRPC - 
    Build GRPC **codegen java_plugin** from [here](https://github.com/grpc/grpc-java/tree/master/compiler)
-5. DHCP server
+5. DHCP server - [DHCP installation](https://github.com/container-images/dhcp-server)
    - Requirements: **Docker**
-   [DHCP installation](https://github.com/container-images/dhcp-server)
-6. python3 
+   6. python3 
 7. Redis
 8. MongoDB
 
