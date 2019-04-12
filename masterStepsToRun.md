@@ -4,8 +4,9 @@
    * clone the dhcp-server from the github link provided in software requirements.(A docker file will be present in the folder.)
    * Build docker image using docker file. 
       - `docker build -t <username>/dhcpd .`
-   * Install "isc-dhcp-server" package in ubuntu. `sudo apt-get install isc-dhcp-server`
+   * Install "isc-dhcp-server" package in ubuntu. 
    (This is for Ubuntu, not tested in MAC or Windows).
+      - `sudo apt-get install isc-dhcp-server`
    * Now, you should be able to locate /etc/dhcp/dhcpd.conf file. Add following text in dhcpd.conf file:
    ``` 
         subnet 10.250.10.0  netmask 255.255.255.0 {
