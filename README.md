@@ -43,6 +43,6 @@ You can process the files of any type in the fluffy. Every file is converted to 
 
 ### Contributors
 1. [Nrupa Chitley](https://github.com/nrupachitley)
-2. [Prahba Veerubhotla](https://github.com/Prabha-Veerubhotla)
+2. [Prabha Veerubhotla](https://github.com/Prabha-Veerubhotla)
 3. [Prathamesh Patki](https://github.com/PrathameshPatki)
 4. [Vinod Katta](https://github.com/vinodkattaSJSU)
